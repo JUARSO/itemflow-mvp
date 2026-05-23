@@ -1,0 +1,341 @@
+/* Core CSS required for Ionic components to work properly */
+@import "@ionic/angular/css/core.css";
+@import "@ionic/angular/css/normalize.css";
+@import "@ionic/angular/css/structure.css";
+@import "@ionic/angular/css/typography.css";
+@import "@ionic/angular/css/display.css";
+
+@import "@ionic/angular/css/padding.css";
+@import "@ionic/angular/css/float-elements.css";
+@import "@ionic/angular/css/text-alignment.css";
+@import "@ionic/angular/css/text-transformation.css";
+@import "@ionic/angular/css/flex-utils.css";
+
+/* Paper design siempre claro — NO importamos el palette dark de Ionic */
+
+/* =========================================================
+   ItemFlow — Estilos globales paper design
+   ========================================================= */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--ui-font-sans);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font-size: var(--ui-fs-md);
+  line-height: var(--ui-lh-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-semibold);
+  line-height: var(--ui-lh-tight);
+  color: var(--ui-text-strong);
+  margin: 0 0 var(--ui-sp-3) 0;
+  letter-spacing: -0.01em;
+}
+
+h1 { font-size: var(--ui-fs-2xl); font-weight: var(--ui-fw-bold); }
+h2 { font-size: var(--ui-fs-xl); }
+h3 { font-size: var(--ui-fs-lg); }
+h4 { font-size: var(--ui-fs-md); font-weight: var(--ui-fw-semibold); }
+
+p { margin: 0 0 var(--ui-sp-3) 0; }
+
+.mono { font-family: var(--ui-font-mono); }
+.muted { color: var(--ui-text-muted); }
+
+/* ---------- Ionic overrides ---------- */
+
+ion-toolbar {
+  --border-width: 0 0 var(--ui-border-w-sm) 0;
+  --border-color: var(--ui-border);
+  --border-style: solid;
+  --background: var(--ui-surface);
+  --color: var(--ui-text);
+  --min-height: 56px;
+}
+
+ion-title {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-semibold);
+  font-size: var(--ui-fs-lg);
+  padding-inline: var(--ui-sp-4);
+  letter-spacing: -0.01em;
+}
+
+ion-content {
+  --background: var(--ui-surface);
+}
+
+ion-button {
+  --border-radius: var(--ui-radius);
+  --border-width: var(--ui-border-w-sm);
+  --border-style: solid;
+  --border-color: var(--ui-border-strong);
+  --box-shadow: var(--ui-shadow-sm);
+  --padding-start: var(--ui-sp-4);
+  --padding-end: var(--ui-sp-4);
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  font-family: var(--ui-font-sans);
+  font-weight: var(--ui-fw-medium);
+  font-size: var(--ui-fs-md);
+  text-transform: none;
+  letter-spacing: 0;
+  min-height: 44px;
+  transition: box-shadow 120ms ease, transform 120ms ease, background 120ms ease;
+  margin: 0;
+}
+
+ion-button.button-solid {
+  --background: var(--ui-primary);
+  --color: var(--ui-primary-contrast);
+  --border-color: transparent;
+}
+
+ion-button[color="success"].button-solid { --color: #ffffff; }
+ion-button[color="warning"].button-solid { --color: var(--ui-text); }
+ion-button[color="danger"].button-solid { --color: #ffffff; }
+
+ion-button:hover {
+  --box-shadow: var(--ui-shadow-md);
+}
+
+ion-button:active,
+ion-button.button-pressed {
+  --box-shadow: var(--ui-shadow-sm);
+  transform: scale(0.98);
+}
+
+ion-button[fill="clear"],
+ion-button[fill="outline"].ghost,
+ion-button.ghost {
+  --background: transparent;
+  --color: var(--ui-text);
+  --border-color: transparent;
+  --box-shadow: none;
+}
+
+ion-button[fill="outline"] {
+  --background: var(--ui-surface);
+  --color: var(--ui-text);
+  --border-color: var(--ui-border-strong);
+  --box-shadow: none;
+}
+
+ion-button.no-shadow {
+  --box-shadow: none;
+}
+
+ion-input,
+ion-textarea,
+ion-select {
+  --background: var(--ui-surface);
+  --color: var(--ui-text);
+  --placeholder-color: var(--ui-text-muted);
+  --padding-start: var(--ui-sp-3);
+  --padding-end: var(--ui-sp-3);
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  margin-bottom: var(--ui-sp-3);
+  min-height: 48px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+ion-input.has-focus,
+ion-textarea.has-focus,
+ion-select.has-focus {
+  border-color: var(--ui-primary);
+  box-shadow: 0 0 0 3px rgba(63, 120, 114, 0.18);
+}
+
+ion-item {
+  --background: var(--ui-surface);
+  --border-color: var(--ui-border);
+  --border-width: 0 0 var(--ui-border-w-sm) 0;
+  --border-style: solid;
+  --padding-start: var(--ui-sp-4);
+  --inner-padding-end: var(--ui-sp-4);
+  --min-height: 56px;
+}
+
+ion-list {
+  background: transparent;
+  padding: 0;
+}
+
+ion-card {
+  background: var(--ui-surface);
+  border: var(--ui-border-w-sm) solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow-md);
+  margin: var(--ui-sp-3);
+  padding: 0;
+  transition: box-shadow 200ms ease;
+}
+
+ion-card:hover {
+  box-shadow: var(--ui-shadow-lg);
+}
+
+ion-card-header {
+  padding: var(--ui-sp-4);
+  padding-bottom: var(--ui-sp-2);
+}
+
+ion-card-title {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-semibold);
+  font-size: var(--ui-fs-lg);
+  color: var(--ui-text);
+  letter-spacing: -0.01em;
+}
+
+ion-card-subtitle {
+  font-size: var(--ui-fs-sm);
+  color: var(--ui-text-muted);
+  font-weight: var(--ui-fw-regular);
+  text-transform: none;
+}
+
+ion-card-content {
+  padding: var(--ui-sp-4);
+  color: var(--ui-text);
+  font-size: var(--ui-fs-md);
+}
+
+ion-fab-button {
+  --background: var(--ui-primary);
+  --color: var(--ui-primary-contrast);
+  --border-radius: 50%;
+  --box-shadow: var(--ui-shadow-lg);
+  border: none;
+  width: 56px;
+  height: 56px;
+}
+
+ion-searchbar {
+  --background: var(--ui-surface);
+  --color: var(--ui-text);
+  --placeholder-color: var(--ui-text-muted);
+  --border-radius: var(--ui-radius);
+  --box-shadow: none;
+  padding: var(--ui-sp-3) var(--ui-sp-4);
+}
+
+ion-searchbar .searchbar-input-container .searchbar-input {
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong) !important;
+  border-radius: var(--ui-radius) !important;
+  box-shadow: var(--ui-shadow-sm) !important;
+  font-family: var(--ui-font-sans);
+  font-size: var(--ui-fs-md);
+}
+
+ion-segment {
+  --background: var(--ui-surface-2);
+  border: var(--ui-border-w-sm) solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  padding: 3px;
+}
+
+ion-segment-button {
+  --background: transparent;
+  --background-checked: var(--ui-surface);
+  --color: var(--ui-text-muted);
+  --color-checked: var(--ui-text);
+  --border-radius: var(--ui-radius-sm);
+  --indicator-color: transparent;
+  text-transform: none;
+  font-weight: var(--ui-fw-medium);
+  font-size: var(--ui-fs-sm);
+  min-height: 36px;
+  margin: 0;
+  letter-spacing: 0;
+}
+
+ion-segment-button.segment-button-checked {
+  box-shadow: var(--ui-shadow-sm);
+}
+
+ion-tab-bar {
+  --background: var(--ui-surface);
+  border-top: var(--ui-border-w-sm) solid var(--ui-border);
+  box-shadow: 0 -1px 2px rgba(17, 24, 39, 0.04);
+}
+
+ion-tab-button {
+  --color: var(--ui-text-muted);
+  --color-selected: var(--ui-primary);
+  font-weight: var(--ui-fw-medium);
+}
+
+ion-menu {
+  --background: var(--ui-surface);
+  --border-color: var(--ui-border);
+}
+
+ion-menu::part(container) {
+  border-right: var(--ui-border-w-sm) solid var(--ui-border);
+  box-shadow: none;
+}
+
+ion-menu ion-content {
+  --background: var(--ui-surface);
+}
+
+ion-badge {
+  border: none;
+  border-radius: var(--ui-radius-pill);
+  font-weight: var(--ui-fw-medium);
+  font-size: var(--ui-fs-xs);
+  padding: 3px 10px;
+  letter-spacing: 0;
+}
+
+ion-modal {
+  --border-radius: var(--ui-radius-lg);
+  --box-shadow: var(--ui-shadow-xl);
+}
+
+ion-alert .alert-wrapper {
+  border-radius: var(--ui-radius-lg) !important;
+  border: var(--ui-border-w-sm) solid var(--ui-border) !important;
+  box-shadow: var(--ui-shadow-xl) !important;
+}
+
+ion-toast {
+  --border-radius: var(--ui-radius);
+  --box-shadow: var(--ui-shadow-lg);
+  --border-width: var(--ui-border-w-sm);
+  --border-style: solid;
+  --border-color: var(--ui-border);
+}
+
+/* ---------- Focus ring (accesibilidad) ---------- */
+
+:focus-visible {
+  outline: 2px solid var(--ui-primary) !important;
+  outline-offset: 2px !important;
+  border-radius: var(--ui-radius-sm);
+}
+
+ion-button:focus-visible,
+ion-fab-button:focus-visible {
+  outline-offset: 3px !important;
+}
+
+/* ---------- Motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

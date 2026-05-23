@@ -1,0 +1,72 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permite a la action escribir en Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Solo un deploy a la vez; cancela cualquiera en curso al hacer push nuevo.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Inventory
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Inventory/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Angular app
+        # GH Pages sirve en /<repo>/ así que pasamos el base-href correcto.
+        # ${{ github.event.repository.name }} resuelve al nombre del repo.
+        run: |
+          npx ng build \
+            --configuration production \
+            --base-href "/${{ github.event.repository.name }}/"
+
+      - name: SPA fallback (copia index.html como 404.html)
+        # Truco estándar para que las rutas profundas de Angular funcionen
+        # sin servidor: GH Pages sirve 404.html ante cualquier ruta no encontrada,
+        # y como contiene el bootstrap de Angular, la SPA toma el control.
+        run: cp www/index.html www/404.html
+
+      - name: Disable Jekyll
+        # Sin este archivo, Pages procesa el output con Jekyll y oculta archivos
+        # que empiezan con _ (como _ngsw-worker chunks).
+        run: touch www/.nojekyll
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: Inventory/www
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

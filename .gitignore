@@ -1,0 +1,63 @@
+# =========================
+# Node / npm
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# =========================
+# Angular / Ionic build output
+# =========================
+Inventory/www/
+Inventory/dist/
+Inventory/.angular/
+Inventory/.sourcemaps/
+Inventory/.tmp/
+
+# =========================
+# Capacitor (binarios y caches nativos)
+# =========================
+Inventory/android/app/build/
+Inventory/android/build/
+Inventory/android/.gradle/
+Inventory/android/local.properties
+Inventory/ios/App/build/
+Inventory/ios/App/Pods/
+Inventory/ios/App/Podfile.lock
+Inventory/ios/DerivedData/
+
+# =========================
+# IDE / editores
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =========================
+# Sistema operativo
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Claude Code: settings locales del usuario (las skills sí se versionan)
+# =========================
+.claude/settings.local.json
+.claude/projects/
+
+# =========================
+# Stray: solo el folder src/ vacío en la raíz del repo,
+# NO el src/ del proyecto Angular (que vive en Inventory/src/).
+# =========================
+/src/
+
+# =========================
+# Logs y temporales
+# =========================
+*.log
+.cache/
+coverage/

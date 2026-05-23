@@ -1,0 +1,182 @@
+/* =========================================================
+   ItemFlow — Tokens de diseño (Paper × paleta ItemFlow)
+   ========================================================= */
+
+:root {
+  /* --- Marca (desaturada, "tinta") --- */
+  --ui-primary: #3f7872;        /* teal apagado tipo sage */
+  --ui-primary-tint: #5a9189;
+  --ui-primary-shade: #2f5e59;
+  --ui-primary-contrast: #ffffff;
+  --ui-secondary: #6f5e8c;      /* slate-violet desaturado */
+
+  /* --- Estados semánticos (paleta editorial, baja saturación) --- */
+  --ui-success: #5f8466;        /* sage green */
+  --ui-success-tint: #eef3ef;
+  --ui-warning: #a87b41;        /* amber/oro apagado */
+  --ui-warning-tint: #f5efe5;
+  --ui-danger: #9c5454;         /* rojo ladrillo */
+  --ui-danger-tint: #f4ebeb;
+  --ui-excess: #6f5e8c;         /* slate-violet (= secondary) */
+  --ui-excess-tint: #efedf3;
+  --ui-transit: #3f7872;        /* = primary */
+  --ui-transit-tint: #eaf0ee;
+
+  /* --- Superficie (blancos cálidos tipo papel) --- */
+  --ui-surface: #ffffff;        /* papel base */
+  --ui-surface-2: #fafaf8;      /* papel marfil sutil */
+  --ui-surface-3: #f3f3f0;      /* hover / fila alterna */
+
+  /* --- Texto (4 niveles en escala de grises) --- */
+  --ui-text: #1f1f1f;           /* tinta principal */
+  --ui-text-strong: #0a0a0a;    /* títulos y números clave */
+  --ui-text-muted: #6e6e6e;     /* secundario, metadatos */
+  --ui-text-subtle: #9a9a9a;    /* placeholders, labels muy chicos */
+
+  /* --- Bordes (grises neutros, ritmo claro) --- */
+  --ui-border: #e8e8e4;         /* divisor sutil */
+  --ui-border-strong: #c7c7c2;  /* inputs, botones outline */
+
+  /* --- Sombras blandas (núcleo paper design) --- */
+  --ui-shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --ui-shadow-md: 0 1px 3px rgba(17, 24, 39, 0.08), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --ui-shadow-lg: 0 4px 12px rgba(17, 24, 39, 0.08), 0 2px 4px rgba(17, 24, 39, 0.04);
+  --ui-shadow-xl: 0 12px 28px rgba(17, 24, 39, 0.12), 0 4px 8px rgba(17, 24, 39, 0.06);
+
+  /* --- Bordes (paper: finos, sutiles) --- */
+  --ui-border-w-sm: 1px;
+  --ui-border-w-md: 1px;
+  --ui-border-w-lg: 2px;
+  --ui-radius-sm: 4px;
+  --ui-radius: 6px;
+  --ui-radius-lg: 8px;
+  --ui-radius-pill: 9999px;
+
+  /* --- Tipografía --- */
+  --ui-font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui-font-display: 'Montserrat', 'Roboto', sans-serif;
+  --ui-font-mono: 'PT Mono', 'SF Mono', Menlo, monospace;
+
+  /* Escala paper: 14 / 16 / 18 / 24 / 32 / 40 */
+  --ui-fs-xs: 14px;
+  --ui-fs-sm: 14px;
+  --ui-fs-md: 16px;
+  --ui-fs-lg: 18px;
+  --ui-fs-xl: 24px;
+  --ui-fs-2xl: 32px;
+  --ui-fs-3xl: 40px;
+
+  --ui-fw-thin: 100;
+  --ui-fw-light: 300;
+  --ui-fw-regular: 400;
+  --ui-fw-medium: 500;
+  --ui-fw-semibold: 600;
+  --ui-fw-bold: 700;
+  --ui-fw-black: 900;
+
+  --ui-lh-tight: 1.2;
+  --ui-lh-base: 1.5;
+  --ui-lh-loose: 1.7;
+
+  /* --- Espaciado --- */
+  --ui-sp-1: 4px;
+  --ui-sp-2: 8px;
+  --ui-sp-3: 12px;
+  --ui-sp-4: 16px;
+  --ui-sp-6: 24px;
+  --ui-sp-8: 32px;
+
+  /* =========================================================
+     Mapeo a tokens de Ionic
+     ========================================================= */
+  --ion-background-color: var(--ui-surface);
+  --ion-background-color-rgb: 255, 255, 255;
+  --ion-text-color: var(--ui-text);
+  --ion-text-color-rgb: 31, 31, 31;
+  --ion-font-family: var(--ui-font-sans);
+
+  --ion-color-primary: var(--ui-primary);
+  --ion-color-primary-rgb: 63, 120, 114;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: var(--ui-primary-shade);
+  --ion-color-primary-tint: var(--ui-primary-tint);
+
+  --ion-color-secondary: var(--ui-secondary);
+  --ion-color-secondary-rgb: 111, 94, 140;
+  --ion-color-secondary-contrast: #ffffff;
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: #5b4d73;
+  --ion-color-secondary-tint: #87779f;
+
+  --ion-color-success: var(--ui-success);
+  --ion-color-success-rgb: 95, 132, 102;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #4d6c54;
+  --ion-color-success-tint: #79997f;
+
+  --ion-color-warning: var(--ui-warning);
+  --ion-color-warning-rgb: 168, 123, 65;
+  --ion-color-warning-contrast: #ffffff;
+  --ion-color-warning-contrast-rgb: 255, 255, 255;
+  --ion-color-warning-shade: #8a6635;
+  --ion-color-warning-tint: #b58e5e;
+
+  --ion-color-danger: var(--ui-danger);
+  --ion-color-danger-rgb: 156, 84, 84;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #80464a;
+  --ion-color-danger-tint: #ad6c6c;
+
+  --ion-color-medium: var(--ui-text-muted);
+  --ion-color-medium-rgb: 110, 110, 110;
+  --ion-color-medium-contrast: #ffffff;
+  --ion-color-medium-contrast-rgb: 255, 255, 255;
+  --ion-color-medium-shade: #585858;
+  --ion-color-medium-tint: #8a8a8a;
+
+  --ion-color-light: var(--ui-surface-2);
+  --ion-color-light-rgb: 250, 250, 248;
+  --ion-color-light-contrast: var(--ui-text);
+  --ion-color-light-contrast-rgb: 31, 31, 31;
+  --ion-color-light-shade: var(--ui-surface-3);
+  --ion-color-light-tint: var(--ui-surface);
+
+  --ion-toolbar-background: var(--ui-surface);
+  --ion-toolbar-color: var(--ui-text);
+  --ion-toolbar-border-color: var(--ui-border);
+
+  --ion-item-background: var(--ui-surface);
+  --ion-item-color: var(--ui-text);
+  --ion-item-border-color: var(--ui-border);
+}
+
+/* =========================================================
+   Color custom Ionic: excess (violeta)
+   ========================================================= */
+.ion-color-excess {
+  --ion-color-base: var(--ui-excess);
+  --ion-color-base-rgb: 111, 94, 140;
+  --ion-color-contrast: #ffffff;
+  --ion-color-contrast-rgb: 255, 255, 255;
+  --ion-color-shade: #5b4d73;
+  --ion-color-tint: #87779f;
+}
+
+.ion-color-transit {
+  --ion-color-base: var(--ui-transit);
+  --ion-color-base-rgb: 63, 120, 114;
+  --ion-color-contrast: #ffffff;
+  --ion-color-contrast-rgb: 255, 255, 255;
+  --ion-color-shade: #2f5e59;
+  --ion-color-tint: #5a9189;
+}
+
+/* =========================================================
+   Paper design siempre claro — no respondemos a dark mode
+   del OS. La esencia de paper es la superficie blanca tipo
+   papel impreso. Si en el futuro se necesita un modo nocturno,
+   debe ser explícito (toggle de usuario), no automático.
+   ========================================================= */
