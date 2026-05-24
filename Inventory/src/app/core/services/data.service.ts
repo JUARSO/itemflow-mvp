@@ -730,6 +730,154 @@ export class DataService {
   }
 
   // ============================================================
+  //  Simulación de burn-down (para pantalla de análisis)
+  // ============================================================
+
+  /**
+   * Proyecta día a día el stock futuro de un item considerando:
+   *  - Demanda diaria = rollingMean(item, 7 días).
+   *  - Llegadas programadas: OCs pending del item con expectedDate dentro del horizonte.
+   *
+   * Devuelve la trayectoria + fechas clave (cruce ROP, stock 0, día sugerido de orden).
+   *
+   * NOTA: este método NO considera "boosts" de demanda todavía. Cuando se
+   * implemente el sistema de boosts, sustituir `dailyDemand` por
+   * `effectiveDailyDemand(itemKind, itemId, day)`.
+   */
+  simulateBurnDown(itemKind: 'supply' | 'product', itemId: string, horizonDays = 90): {
+    trayectoria: number[];
+    initialStock: number;
+    dailyDemand: number;
+    leadTime: number;
+    reorderPoint: number;
+    minStock: number;
+    maxStock: number;
+    daysOfCoverage: number;
+    /** Día (0..horizon) en que el stock cruza ROP. null si nunca lo cruza. */
+    dayCrossesReorder: number | null;
+    /** Día (0..horizon) en que el stock llega a 0. null si no se vacía en el horizonte. */
+    dayHitsZero: number | null;
+    /** Día sugerido para colocar la OC (dayCrossesReorder - leadTime). null si N/A. */
+    dayToOrder: number | null;
+    /** OCs pending del item con fecha esperada en el horizonte. */
+    incomingPOs: { code: string; arrivalDay: number; qty: number }[];
+    /** Cantidad sugerida a ordenar para llegar al máximo cuando entre la OC. */
+    suggestedOrderQty: number;
+  } {
+    // Estado base del item
+    let item: { stock: number; reorderPoint: number; minStock: number; maxStock: number; leadTime: number } | null = null;
+    if (itemKind === 'supply') {
+      const s = this.supplyById(itemId);
+      if (!s) return this.emptyBurnDown();
+      const stockItem = this.supplyStockFor(itemId);
+      item = {
+        stock: stockItem?.quantity ?? 0,
+        reorderPoint: s.reorderPoint,
+        minStock: s.minStock,
+        maxStock: s.maxStock,
+        leadTime: s.leadTime,
+      };
+    } else {
+      const p = this.productById(itemId);
+      if (!p || p.hasRecipe) return this.emptyBurnDown();
+      const stockItem = this.productStockFor(itemId);
+      const rop = p.reorderPoint ?? 0;
+      const minStock = p.minStock ?? Math.floor(rop / 3);
+      item = {
+        stock: stockItem?.quantity ?? 0,
+        reorderPoint: rop,
+        minStock,
+        maxStock: Math.max(rop * 3, minStock + 10),
+        leadTime: p.leadTime,
+      };
+    }
+
+    const dailyDemand = this.rollingMean(itemKind, itemId, 7);
+    const initialStock = item.stock;
+    const trayectoria: number[] = [];
+
+    // OCs pending que tocan al item y tienen expectedDate dentro del horizonte
+    const now = Date.now();
+    const incomingPOs: { code: string; arrivalDay: number; qty: number }[] = [];
+    for (const po of this._pos()) {
+      if (po.status !== 'pending' || !po.expectedDate) continue;
+      const matching = po.items.filter(it =>
+        itemKind === 'supply' ? it.supplyId === itemId : it.productId === itemId
+      );
+      if (matching.length === 0) continue;
+      const arrivalDay = Math.max(0, Math.floor((po.expectedDate.getTime() - now) / 86_400_000));
+      if (arrivalDay > horizonDays) continue;
+      const qty = matching.reduce((s, it) => s + it.qty, 0);
+      incomingPOs.push({ code: po.code, arrivalDay, qty });
+    }
+
+    // Simulación día a día
+    let stock = initialStock;
+    let dayCrossesReorder: number | null = null;
+    let dayHitsZero: number | null = null;
+
+    for (let d = 0; d <= horizonDays; d++) {
+      // Llegadas del día d
+      for (const po of incomingPOs) {
+        if (po.arrivalDay === d) stock += po.qty;
+      }
+      trayectoria.push(Math.max(0, Math.round(stock)));
+      if (dayCrossesReorder === null && stock <= item.reorderPoint && stock > 0) {
+        dayCrossesReorder = d;
+      }
+      if (dayHitsZero === null && stock <= 0) {
+        dayHitsZero = d;
+      }
+      stock = Math.max(0, stock - dailyDemand);
+    }
+
+    const dayToOrder = dayCrossesReorder !== null
+      ? Math.max(0, dayCrossesReorder - item.leadTime)
+      : null;
+
+    const stockAtOrderArrival = dayToOrder !== null && dayToOrder + item.leadTime <= horizonDays
+      ? trayectoria[dayToOrder + item.leadTime] ?? 0
+      : 0;
+    const suggestedOrderQty = Math.max(0, item.maxStock - stockAtOrderArrival);
+
+    const daysOfCoverage = dailyDemand > 0 ? initialStock / dailyDemand : 0;
+
+    return {
+      trayectoria,
+      initialStock,
+      dailyDemand,
+      leadTime: item.leadTime,
+      reorderPoint: item.reorderPoint,
+      minStock: item.minStock,
+      maxStock: item.maxStock,
+      daysOfCoverage,
+      dayCrossesReorder,
+      dayHitsZero,
+      dayToOrder,
+      incomingPOs,
+      suggestedOrderQty,
+    };
+  }
+
+  private emptyBurnDown() {
+    return {
+      trayectoria: [],
+      initialStock: 0,
+      dailyDemand: 0,
+      leadTime: 0,
+      reorderPoint: 0,
+      minStock: 0,
+      maxStock: 0,
+      daysOfCoverage: 0,
+      dayCrossesReorder: null,
+      dayHitsZero: null,
+      dayToOrder: null,
+      incomingPOs: [],
+      suggestedOrderQty: 0,
+    };
+  }
+
+  // ============================================================
   //  Estadísticas de demanda (para Predicciones IA)
   // ============================================================
 

@@ -54,6 +54,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/predicciones/predicciones.page').then(m => m.PrediccionesPage),
       },
       {
+        path: 'burn-down',
+        loadComponent: () => import('./features/burn-down/burn-down.page').then(m => m.BurnDownPage),
+      },
+      {
         path: 'mas',
         loadComponent: () => import('./features/mas/mas.page').then(m => m.MasPage),
       },

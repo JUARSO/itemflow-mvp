@@ -87,6 +87,10 @@ import { BrandingService } from '../../core/services/branding.service';
             <span class="menu-item__icon">📈</span>
             <span class="menu-item__label">Predicciones</span>
           </a>
+          <a routerLink="/burn-down" routerLinkActive="active" class="menu-item">
+            <span class="menu-item__icon">📉</span>
+            <span class="menu-item__label">Análisis de stock</span>
+          </a>
 
           <div class="menu-section">Cuenta</div>
           <a routerLink="/mas" routerLinkActive="active" class="menu-item">
