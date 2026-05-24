@@ -39,7 +39,7 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
       <app-page-header
         title="Órdenes de Compra"
         subtitle="Cuando una OC se recibe, genera entradas de kardex automáticamente.">
-        @if (tenant.isAdmin()) {
+        @if (tenant.canManagePurchaseOrders()) {
           <ion-button (click)="modalOpen.set(true)">+ Nueva OC</ion-button>
         }
       </app-page-header>
@@ -89,15 +89,15 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
                       <span class="po-item__kind">producto</span>
                     }
                   </span>
-                  <span class="po-item__qty mono">{{ it.qty }} × \${{ it.unitCost | number:'1.0-0' }}</span>
-                  <span class="po-item__total mono">\${{ it.qty * it.unitCost | number:'1.0-0' }}</span>
+                  <span class="po-item__qty mono">{{ it.qty }} × ₡{{ it.unitCost | number:'1.0-0' }}</span>
+                  <span class="po-item__total mono">₡{{ it.qty * it.unitCost | number:'1.0-0' }}</span>
                 </div>
               }
             </div>
             <footer class="po__footer">
               <div class="po__total">
                 <span class="muted">Total OC</span>
-                <span class="mono"><strong>\${{ po.totalCost | number:'1.0-0' }}</strong></span>
+                <span class="mono"><strong>₡{{ po.totalCost | number:'1.0-0' }}</strong></span>
               </div>
               @if (po.status === 'pending' && po.expectedDate) {
                 <div class="po__expected">
@@ -107,7 +107,7 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
                   }
                 </div>
               }
-              @if (tenant.isAdmin()) {
+              @if (tenant.canManagePurchaseOrders()) {
                 <div class="po__actions">
                   @if (po.status === 'pending') {
                     <ion-button size="small" (click)="pedirAccion(po, 'receive')">Marcar recibida</ion-button>

@@ -5,6 +5,7 @@ import {
   IonButton, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
+import { TenantContextService } from '../../core/services/tenant-context.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
@@ -48,7 +49,9 @@ const REASON_LABELS: Record<string, string> = {
       <app-page-header
         title="Ajustes"
         subtitle="Movimientos manuales fuera del flujo de venta y compra: devoluciones, mermas, donaciones y correcciones de conteo.">
-        <ion-button (click)="modalOpen.set(true)">+ Nuevo movimiento</ion-button>
+        @if (tenant.canAdjustStock()) {
+          <ion-button (click)="modalOpen.set(true)">+ Nuevo movimiento</ion-button>
+        }
       </app-page-header>
 
       <div class="kpis">
@@ -218,6 +221,7 @@ const REASON_LABELS: Record<string, string> = {
 })
 export class AjustesPage {
   protected readonly data = inject(DataService);
+  protected readonly tenant = inject(TenantContextService);
 
   readonly modalOpen = signal(false);
   readonly query = signal('');

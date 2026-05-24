@@ -5,6 +5,10 @@ import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalo
 
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
+import { registerAppIcons } from './app/core/icons';
+
+// Registra todos los iconos de Ionicons usados en la app
+registerAppIcons();
 
 bootstrapApplication(AppComponent, {
   providers: [

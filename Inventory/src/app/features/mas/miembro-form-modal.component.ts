@@ -31,10 +31,12 @@ import { ToastService } from '../../shared/components/toast/toast.service';
             class="mono" />
         </app-form-field>
 
-        <app-form-field label="Rol" [required]="true" hint="Operador no puede ver costos ni gestionar catálogo">
+        <app-form-field label="Rol" [required]="true" hint="Define qué pantallas y acciones puede usar el miembro">
           <select formControlName="role">
-            <option value="admin">Administrador</option>
-            <option value="operator">Operador</option>
+            <option value="admin">Administrador (visualiza todo)</option>
+            <option value="sales">Encargado de Ventas</option>
+            <option value="production">Encargado de Producción</option>
+            <option value="operator">Operario (fabricación)</option>
           </select>
         </app-form-field>
 
@@ -77,7 +79,7 @@ export class MiembroFormModalComponent {
   readonly form = this.fb.group({
     displayName: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     email: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    role: this.fb.control<UserRole>('operator', { nonNullable: true, validators: [Validators.required] }),
+    role: this.fb.control<UserRole>('sales', { nonNullable: true, validators: [Validators.required] }),
   });
 
   constructor() {
@@ -86,9 +88,16 @@ export class MiembroFormModalComponent {
       if (m) {
         this.form.reset({ displayName: m.displayName, email: m.email, role: m.role });
       } else if (this.isOpen()) {
-        this.form.reset({ displayName: '', email: '', role: 'operator' });
+        this.form.reset({ displayName: '', email: '', role: 'sales' });
       }
     });
+  }
+
+  private roleLabel(r: UserRole): string {
+    if (r === 'admin') return 'Administrador';
+    if (r === 'sales') return 'Encargado de Ventas';
+    if (r === 'production') return 'Encargado de Producción';
+    return 'Operario';
   }
 
   async onSubmit() {
@@ -101,14 +110,14 @@ export class MiembroFormModalComponent {
     const editing = this.editing();
     if (editing) {
       this.data.updateMemberRole(editing.uid, v.role);
-      await this.toast.show(`Rol de "${editing.displayName}" actualizado a ${v.role === 'admin' ? 'Admin' : 'Operador'}.`);
+      await this.toast.show(`Rol de "${editing.displayName}" actualizado a ${this.roleLabel(v.role)}.`);
     } else {
       this.data.inviteMember({
         email: v.email.trim().toLowerCase(),
         displayName: v.displayName.trim(),
         role: v.role,
       });
-      await this.toast.show(`${v.displayName} invitado como ${v.role === 'admin' ? 'Admin' : 'Operador'}.`);
+      await this.toast.show(`${v.displayName} invitado como ${this.roleLabel(v.role)}.`);
     }
     this.saved.emit();
   }

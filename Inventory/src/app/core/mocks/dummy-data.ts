@@ -1,21 +1,22 @@
 import {
   Member, Company, Product, Supply, Recipe,
   StockItem, SupplyStockItem, KardexEntry, SaleRecord,
-  Alert, DemandPrediction, PurchaseOrder
+  Alert, DemandPrediction, PurchaseOrder, CustomerOrder, ProductReturn
 } from '../models';
 
 export const MOCK_COMPANY: Company = {
   id: 'tenant-demo',
   name: 'Panadería Pan & Co',
   adminEmail: 'admin@panyco.cl',
-  currency: 'CLP',
-  timezone: 'America/Santiago',
+  currency: 'CRC',
+  timezone: 'America/Costa_Rica',
 };
 
 export const MOCK_MEMBERS: Member[] = [
   { uid: 'u-admin', email: 'admin@panyco.cl', displayName: 'María González', role: 'admin', active: true },
-  { uid: 'u-op-1', email: 'juan@panyco.cl', displayName: 'Juan Pérez', role: 'operator', active: true },
-  { uid: 'u-op-2', email: 'sofia@panyco.cl', displayName: 'Sofía Rojas', role: 'operator', active: true },
+  { uid: 'u-ventas', email: 'ventas@panyco.cl', displayName: 'Juan Pérez', role: 'sales', active: true },
+  { uid: 'u-produccion', email: 'produccion@panyco.cl', displayName: 'Sofía Rojas', role: 'production', active: true },
+  { uid: 'u-operario', email: 'operario@panyco.cl', displayName: 'Carlos Mora', role: 'operator', active: true },
 ];
 
 export const MOCK_SUPPLIES: Supply[] = [
@@ -57,6 +58,7 @@ export const MOCK_RECIPES: Recipe[] = [
       { supplyId: 's-sal', itemName: 'Sal de mesa', qty: 0.03, unit: 'kg' },
       { supplyId: 's-levadura', itemName: 'Levadura fresca', qty: 0.02, unit: 'kg' },
     ],
+    notes: 'Amasar 12 min. Primera fermentación 1h en bloque. Formar baguettes y fermentar 45 min más. Hornear a 220°C con vapor por 22 min.',
   },
   {
     id: 'p-marraqueta', productId: 'p-marraqueta', productName: 'Marraqueta', yieldQty: 20,
@@ -83,6 +85,7 @@ export const MOCK_RECIPES: Recipe[] = [
       { supplyId: 's-levadura', itemName: 'Levadura fresca', qty: 0.015, unit: 'kg' },
       { supplyId: 's-azucar', itemName: 'Azúcar granulada', qty: 0.06, unit: 'kg' },
     ],
+    notes: 'Mantequilla SIEMPRE fría. 3 vueltas dobles con reposo de 30 min entre cada una. Fermentar 2h antes de hornear. 200°C por 18 min.',
   },
   {
     id: 'p-empanada', productId: 'p-empanada', productName: 'Empanada queso', yieldQty: 10,
@@ -197,15 +200,16 @@ const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
 
 export const MOCK_KARDEX: KardexEntry[] = [
   { id: 'k-1', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'in', qty: 50, balance: 163, cost: 850, reason: 'purchase', note: 'OC #142 recibida', userId: 'u-admin', userName: 'María González', at: hoursAgo(3) },
-  { id: 'k-2', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 7.5, balance: 113, cost: 850, reason: 'sale', userId: 'u-op-1', userName: 'Juan Pérez', at: hoursAgo(8) },
-  { id: 'k-3', supplyId: 's-levadura', itemName: 'Levadura fresca', type: 'out', qty: 0.5, balance: 11, cost: 4200, reason: 'sale', userId: 'u-op-2', userName: 'Sofía Rojas', at: hoursAgo(12) },
+
+  { id: 'k-2', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 7.5, balance: 113, cost: 850, reason: 'sale', userId: 'u-ventas', userName: 'Juan Pérez', at: hoursAgo(8) },
+  { id: 'k-3', supplyId: 's-levadura', itemName: 'Levadura fresca', type: 'out', qty: 0.5, balance: 11, cost: 4200, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: hoursAgo(12) },
   { id: 'k-6', supplyId: 's-azucar', itemName: 'Azúcar granulada', type: 'adjustment', qty: 2, balance: 97, cost: 950, reason: 'count_correction', note: 'Diferencia inventario físico', userId: 'u-admin', userName: 'María González', at: daysAgo(2) },
-  { id: 'k-7', supplyId: 's-cacao', itemName: 'Cacao en polvo', type: 'out', qty: 0.3, balance: 0, cost: 6500, reason: 'sale', userId: 'u-op-2', userName: 'Sofía Rojas', at: daysAgo(2) },
+  { id: 'k-7', supplyId: 's-cacao', itemName: 'Cacao en polvo', type: 'out', qty: 0.3, balance: 0, cost: 6500, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(2) },
   { id: 'k-8', supplyId: 's-choco', itemName: 'Chocolate cobertura', type: 'in', qty: 10, balance: 4, cost: 9800, reason: 'purchase', note: 'OC #138', userId: 'u-admin', userName: 'María González', at: daysAgo(3) },
   { id: 'k-9', supplyId: 's-huevos', itemName: 'Huevos', type: 'in', qty: 180, balance: 600, cost: 220, reason: 'purchase', userId: 'u-admin', userName: 'María González', at: daysAgo(3) },
-  { id: 'k-10', supplyId: 's-leche', itemName: 'Leche entera', type: 'adjustment', qty: -2, balance: 86, cost: 1100, reason: 'damaged', note: 'Cartones vencidos', userId: 'u-op-2', userName: 'Sofía Rojas', at: daysAgo(4) },
-  { id: 'k-11', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 12, balance: 120, cost: 850, reason: 'sale', userId: 'u-op-2', userName: 'Sofía Rojas', at: daysAgo(5) },
-  { id: 'k-12', productId: 'p-cafe', itemName: 'Café molido 250g', type: 'out', qty: 1, balance: 33, cost: 3500, reason: 'sale', userId: 'u-op-2', userName: 'Sofía Rojas', at: daysAgo(6) },
+  { id: 'k-10', supplyId: 's-leche', itemName: 'Leche entera', type: 'adjustment', qty: -2, balance: 86, cost: 1100, reason: 'damaged', note: 'Cartones vencidos', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(4) },
+  { id: 'k-11', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 12, balance: 120, cost: 850, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(5) },
+  { id: 'k-12', productId: 'p-cafe', itemName: 'Café molido 250g', type: 'out', qty: 1, balance: 33, cost: 3500, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(6) },
 ];
 
 export const MOCK_SALES: SaleRecord[] = (() => {
@@ -365,5 +369,155 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
     items: [{ productId: 'p-cafe', itemName: 'Café molido 250g', qty: 30, unitCost: 3500 }],
     totalCost: 105000,
     expectedDate: daysAgo(-5), createdAt: hoursAgo(2),
+  },
+];
+
+// Órdenes de producción de muestra cubriendo todos los estados.
+// El "purpose" es el motivo/destino interno del lote — no representa un
+// compromiso con un cliente externo; el producto fabricado queda en stock.
+export const MOCK_ORDERS: CustomerOrder[] = [
+  {
+    id: 'ord-1', code: 'ORD-001', purpose: 'Reposición vitrina mañana',
+    status: 'pending',
+    items: [
+      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 24, unitPrice: 1200, fulfilledQty: 0 },
+      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 18, unitPrice: 1900, fulfilledQty: 0 },
+    ],
+    totalAmount: 24 * 1200 + 18 * 1900,
+    notes: 'Para el primer turno del día siguiente',
+    createdAt: hoursAgo(1),
+    createdBy: 'María González',
+    reservations: [],
+    shortfalls: [],
+  },
+  {
+    id: 'ord-2', code: 'ORD-002', purpose: 'Stock del fin de semana',
+    status: 'pending',
+    items: [
+      { productId: 'p-marraqueta', productName: 'Marraqueta', unit: 'unidad', qty: 80, unitPrice: 320, fulfilledQty: 0 },
+      { productId: 'p-hallulla', productName: 'Hallulla', unit: 'unidad', qty: 60, unitPrice: 280, fulfilledQty: 0 },
+    ],
+    totalAmount: 80 * 320 + 60 * 280,
+    createdAt: hoursAgo(3),
+    createdBy: 'Juan Pérez',
+    reservations: [],
+    shortfalls: [],
+  },
+  {
+    id: 'ord-3', code: 'ORD-003', purpose: 'Lote tarde',
+    status: 'in_production',
+    items: [
+      { productId: 'p-empanada', productName: 'Empanada queso', unit: 'unidad', qty: 30, unitPrice: 1700, fulfilledQty: 30 },
+      { productId: 'p-brownie', productName: 'Brownie chocolate', unit: 'unidad', qty: 20, unitPrice: 2200, fulfilledQty: 20 },
+    ],
+    totalAmount: 30 * 1700 + 20 * 2200,
+    createdAt: hoursAgo(5),
+    createdBy: 'María González',
+    productionStartedAt: hoursAgo(4),
+    reservations: [
+      { kind: 'supply', itemId: 's-harina', itemName: 'Harina de trigo', unit: 'kg', qty: 4.5 },
+      { kind: 'supply', itemId: 's-queso', itemName: 'Queso crema', unit: 'kg', qty: 1.8 },
+      { kind: 'supply', itemId: 's-choco', itemName: 'Chocolate cobertura', unit: 'kg', qty: 1.2 },
+    ],
+    shortfalls: [],
+  },
+  {
+    id: 'ord-4', code: 'ORD-004', purpose: 'Pedido evento especial',
+    status: 'in_production',
+    items: [
+      { productId: 'p-pie', productName: 'Pie de limón', unit: 'unidad', qty: 6, unitPrice: 18000, fulfilledQty: 4 },
+      { productId: 'p-galleta', productName: 'Galleta avena pasas', unit: 'unidad', qty: 100, unitPrice: 600, fulfilledQty: 100 },
+    ],
+    totalAmount: 6 * 18000 + 100 * 600,
+    notes: 'Esperando reposición de huevos y leche',
+    createdAt: hoursAgo(8),
+    createdBy: 'Sofía Rojas',
+    productionStartedAt: hoursAgo(6),
+    reservations: [
+      { kind: 'supply', itemId: 's-mantequilla', itemName: 'Mantequilla sin sal', unit: 'kg', qty: 1.6 },
+      { kind: 'supply', itemId: 's-azucar', itemName: 'Azúcar granulada', unit: 'kg', qty: 1.4 },
+    ],
+    shortfalls: [
+      { kind: 'supply', itemId: 's-huevos', itemName: 'Huevos', unit: 'unidad', required: 12, available: 4, short: 8, forProductId: 'p-pie' },
+      { kind: 'supply', itemId: 's-leche', itemName: 'Leche entera', unit: 'L', required: 2, available: 0.8, short: 1.2, forProductId: 'p-pie' },
+    ],
+  },
+  {
+    id: 'ord-5', code: 'ORD-005', purpose: 'Reposición principal',
+    status: 'completed',
+    items: [
+      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 40, unitPrice: 1200, fulfilledQty: 40 },
+    ],
+    totalAmount: 40 * 1200,
+    createdAt: hoursAgo(20),
+    createdBy: 'Juan Pérez',
+    productionStartedAt: hoursAgo(18),
+    completedAt: hoursAgo(2),
+    reservations: [
+      { kind: 'supply', itemId: 's-harina', itemName: 'Harina de trigo', unit: 'kg', qty: 30 },
+      { kind: 'supply', itemId: 's-levadura', itemName: 'Levadura fresca', unit: 'kg', qty: 0.4 },
+      { kind: 'supply', itemId: 's-sal', itemName: 'Sal de mesa', unit: 'kg', qty: 0.4 },
+    ],
+    shortfalls: [],
+  },
+  {
+    id: 'ord-6', code: 'ORD-006', purpose: 'Lote viernes',
+    status: 'completed',
+    items: [
+      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 50, unitPrice: 1900, fulfilledQty: 50 },
+    ],
+    totalAmount: 50 * 1900,
+    createdAt: daysAgo(1),
+    createdBy: 'María González',
+    productionStartedAt: daysAgo(1),
+    completedAt: hoursAgo(18),
+    reservations: [
+      { kind: 'supply', itemId: 's-harina', itemName: 'Harina de trigo', unit: 'kg', qty: 7.5 },
+      { kind: 'supply', itemId: 's-mantequilla', itemName: 'Mantequilla sin sal', unit: 'kg', qty: 2.5 },
+    ],
+    shortfalls: [],
+  },
+];
+
+// Devoluciones de muestra (Ventas → Producción).
+export const MOCK_RETURNS: ProductReturn[] = [
+  {
+    id: 'ret-1',
+    productId: 'p-baguette', productName: 'Baguette tradicional',
+    qty: 4, unit: 'unidad',
+    reason: 'defective',
+    notes: 'Sobrecocidas, muy oscuras',
+    costAtReturn: 380, totalLoss: 1520,
+    createdAt: hoursAgo(2),
+    createdBy: 'Juan Pérez',
+  },
+  {
+    id: 'ret-2',
+    productId: 'p-croissant', productName: 'Croissant mantequilla',
+    qty: 6, unit: 'unidad',
+    reason: 'leftover',
+    notes: 'Quedaron del cierre de ayer',
+    costAtReturn: 650, totalLoss: 3900,
+    createdAt: hoursAgo(14),
+    createdBy: 'Sofía Rojas',
+  },
+  {
+    id: 'ret-3',
+    productId: 'p-galleta', productName: 'Galleta avena pasas',
+    qty: 3, unit: 'unidad',
+    reason: 'damaged',
+    costAtReturn: 180, totalLoss: 540,
+    createdAt: daysAgo(1),
+    createdBy: 'María González',
+  },
+  {
+    id: 'ret-4',
+    productId: 'p-cafe', productName: 'Café molido 250g (reventa)',
+    qty: 1, unit: 'unidad',
+    reason: 'expired',
+    notes: 'Pasó la fecha del envase',
+    costAtReturn: 3500, totalLoss: 3500,
+    createdAt: daysAgo(2),
+    createdBy: 'María González',
   },
 ];

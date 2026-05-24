@@ -37,7 +37,7 @@ import { Recipe, RecipeItem } from '../../core/models';
       <app-page-header
         title="Recetas"
         subtitle="Cuántos insumos consume cada producto. Paso 3 del flujo.">
-        @if (tenant.isAdmin()) {
+        @if (tenant.canEditRecipes()) {
           <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
           <ion-button (click)="abrirNuevo()">+ Nueva receta</ion-button>
         }
@@ -60,13 +60,13 @@ import { Recipe, RecipeItem } from '../../core/models';
                   <h3 class="card__title">{{ recipe.productName }}</h3>
                   <div class="card__yield">Rinde <strong class="mono">{{ recipe.yieldQty }}</strong> unidades</div>
                 </div>
-                @if (tenant.isAdmin()) {
+                @if (tenant.canEditRecipes()) {
                   <div class="card__cost mono">
                     <div>
-                      Total corrida: <strong>\${{ costoReceta(recipe.id) | number:'1.0-0' }}</strong>
+                      Total corrida: <strong>₡{{ costoReceta(recipe.id) | number:'1.0-0' }}</strong>
                     </div>
                     <div class="card__cost-unit">
-                      Por unidad: \${{ costoPorUnidad(recipe.productId) | number:'1.0-0' }}
+                      Por unidad: ₡{{ costoPorUnidad(recipe.productId) | number:'1.0-0' }}
                     </div>
                   </div>
                 }
@@ -82,7 +82,14 @@ import { Recipe, RecipeItem } from '../../core/models';
                 }
               </div>
 
-              @if (tenant.isAdmin()) {
+              @if (recipe.notes) {
+                <div class="card__notes">
+                  <div class="card__notes-label">Observaciones</div>
+                  <p class="card__notes-text">{{ recipe.notes }}</p>
+                </div>
+              }
+
+              @if (tenant.canEditRecipes()) {
                 <div class="card__actions">
                   <ion-button size="small" fill="clear" class="ghost" (click)="abrirEditar(recipe)">
                     Editar
@@ -184,6 +191,28 @@ import { Recipe, RecipeItem } from '../../core/models';
     }
     .item-row:last-child { border-bottom: none; }
     .item-row__qty { font-weight: var(--ui-fw-bold); }
+
+    .card__notes {
+      margin-top: var(--ui-sp-3);
+      padding: var(--ui-sp-2) var(--ui-sp-3);
+      background: var(--ui-surface-2);
+      border-left: 3px solid var(--ui-primary);
+    }
+    .card__notes-label {
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-black);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+      margin-bottom: 4px;
+    }
+    .card__notes-text {
+      margin: 0;
+      font-size: var(--ui-fs-sm);
+      color: var(--ui-text);
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
     .card__actions {
       display: flex;
       gap: var(--ui-sp-2);

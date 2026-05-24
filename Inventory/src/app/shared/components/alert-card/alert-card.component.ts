@@ -30,24 +30,28 @@ import { Alert } from '../../../core/models';
         }
 
         @if (alert().status === 'active') {
-          <div class="alert__actions">
-            <ion-button size="small" (click)="onReorder.emit(alert())">
-              Generar OC
-            </ion-button>
-            <ion-button size="small" fill="clear" class="ghost" (click)="onAcknowledge.emit(alert())">
-              Marcar revisada
-            </ion-button>
-            <ion-button size="small" fill="clear" class="ghost" (click)="onResolve.emit(alert())">
-              Resolver
-            </ion-button>
-          </div>
+          @if (actionsEnabled()) {
+            <div class="alert__actions">
+              <ion-button size="small" (click)="onReorder.emit(alert())">
+                Generar OC
+              </ion-button>
+              <ion-button size="small" fill="clear" class="ghost" (click)="onAcknowledge.emit(alert())">
+                Marcar revisada
+              </ion-button>
+              <ion-button size="small" fill="clear" class="ghost" (click)="onResolve.emit(alert())">
+                Resolver
+              </ion-button>
+            </div>
+          }
         } @else if (alert().status === 'acknowledged') {
           <div class="alert__meta">
             Revisada por {{ alert().acknowledgedBy }}
           </div>
-          <div class="alert__actions">
-            <ion-button size="small" (click)="onResolve.emit(alert())">Resolver</ion-button>
-          </div>
+          @if (actionsEnabled()) {
+            <div class="alert__actions">
+              <ion-button size="small" (click)="onResolve.emit(alert())">Resolver</ion-button>
+            </div>
+          }
         } @else {
           <div class="alert__meta">
             Resuelta por {{ alert().resolvedBy }}
@@ -149,6 +153,8 @@ import { Alert } from '../../../core/models';
 })
 export class AlertCardComponent {
   readonly alert = input.required<Alert>();
+  /** Si false, oculta los botones (modo solo lectura — ej. admin). */
+  readonly actionsEnabled = input<boolean>(true);
   readonly onAcknowledge = output<Alert>();
   readonly onResolve = output<Alert>();
   readonly onReorder = output<Alert>();

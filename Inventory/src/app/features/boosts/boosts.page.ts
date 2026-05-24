@@ -6,6 +6,7 @@ import {
   IonButton, IonSearchbar, IonSegment, IonSegmentButton, IonLabel,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
+import { TenantContextService } from '../../core/services/tenant-context.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -45,7 +46,9 @@ type FilterStatus = 'todos' | 'activos' | 'expirados' | 'cancelados';
       <app-page-header
         title="Boosts de demanda"
         subtitle="Registra eventos, promos o contratos que aumentan temporalmente la demanda de un producto final. El sistema propaga el efecto a los insumos vía receta.">
-        <ion-button (click)="modalOpen.set(true)">+ Nuevo boost</ion-button>
+        @if (tenant.canManageBoosts()) {
+          <ion-button (click)="modalOpen.set(true)">+ Nuevo boost</ion-button>
+        }
       </app-page-header>
 
       <!-- Resumen rápido -->
@@ -147,7 +150,7 @@ type FilterStatus = 'todos' | 'activos' | 'expirados' | 'cancelados';
                 <span class="boost__created mono">
                   creado {{ b.createdAt | date:'dd-MM HH:mm' }} · {{ b.createdBy }}
                 </span>
-                @if (statusOf(b) === 'active') {
+                @if (statusOf(b) === 'active' && tenant.canManageBoosts()) {
                   <button type="button" class="boost__cancel" (click)="askCancel(b)">
                     Cancelar boost
                   </button>
@@ -347,6 +350,7 @@ type FilterStatus = 'todos' | 'activos' | 'expirados' | 'cancelados';
 })
 export class BoostsPage {
   protected readonly data = inject(DataService);
+  protected readonly tenant = inject(TenantContextService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 

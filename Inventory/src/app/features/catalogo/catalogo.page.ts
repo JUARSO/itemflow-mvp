@@ -12,7 +12,10 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { ProductoFormModalComponent } from './producto-form-modal.component';
 import { BulkImportModalComponent, BulkImportConfig } from '../../shared/components/bulk-import/bulk-import-modal.component';
-import { Product } from '../../core/models';
+import { Product, Unit } from '../../core/models';
+import { UNITS } from '../../core/units';
+
+const VALID_UNITS = new Set<string>(UNITS.map(u => u.value));
 
 @Component({
   selector: 'app-catalogo',
@@ -37,7 +40,7 @@ import { Product } from '../../core/models';
       <app-page-header
         title="Catálogo"
         subtitle="Productos terminados que vende tu negocio. Paso 1 del flujo.">
-        @if (tenant.isAdmin()) {
+        @if (tenant.canEditCatalog()) {
           <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
           <ion-button (click)="abrirNuevo()">+ Nuevo producto</ion-button>
         }
@@ -77,15 +80,15 @@ import { Product } from '../../core/models';
               <div class="card__row">
                 <div class="card__cell">
                   <div class="card__label">Precio venta</div>
-                  <div class="card__value mono">\${{ p.sellPrice | number:'1.0-0' }}</div>
+                  <div class="card__value mono">₡{{ p.sellPrice | number:'1.0-0' }}</div>
                 </div>
-                @if (tenant.isAdmin()) {
+                @if (tenant.canEditCatalog()) {
                   <div class="card__cell">
                     <div class="card__label">
                       Costo
                       @if (p.hasRecipe) { <span class="card__tag">receta</span> }
                     </div>
-                    <div class="card__value mono">\${{ effectiveCost(p) | number:'1.0-0' }}</div>
+                    <div class="card__value mono">₡{{ effectiveCost(p) | number:'1.0-0' }}</div>
                   </div>
                   <div class="card__cell">
                     <div class="card__label">Margen</div>
@@ -93,7 +96,7 @@ import { Product } from '../../core/models';
                   </div>
                 }
               </div>
-              @if (tenant.isAdmin()) {
+              @if (tenant.canEditCatalog()) {
                 <div class="card__actions">
                   <ion-button size="small" fill="clear" class="ghost" (click)="abrirEditar(p)">
                     Editar
@@ -245,6 +248,10 @@ export class CatalogoPage {
         if (!sku) { errors.push({ row: rowNum, raw: r, message: 'SKU vacío' }); return; }
         if (!nombre) { errors.push({ row: rowNum, raw: r, message: 'Nombre vacío' }); return; }
         if (!unidad) { errors.push({ row: rowNum, raw: r, message: 'Unidad vacía' }); return; }
+        if (!VALID_UNITS.has(unidad)) {
+          errors.push({ row: rowNum, raw: r, message: `Unidad "${unidad}" no válida. Usa: ${[...VALID_UNITS].join(', ')}` });
+          return;
+        }
         if (existing.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU ya existe en catálogo' }); return; }
         if (seen.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU duplicado en el archivo' }); return; }
         if (!isFinite(buy) || buy < 0) { errors.push({ row: rowNum, raw: r, message: 'Precio compra inválido' }); return; }
@@ -279,7 +286,7 @@ export class CatalogoPage {
           sku,
           name: nombre,
           category: (r['categoria'] ?? '').trim() || undefined,
-          unit: unidad,
+          unit: unidad as Unit,
           buyPrice: buy,
           sellPrice: sell,
           leadTime: lead,

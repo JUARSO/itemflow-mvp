@@ -14,7 +14,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { MiembroFormModalComponent } from './miembro-form-modal.component';
-import { Member } from '../../core/models';
+import { Member, UserRole } from '../../core/models';
 
 @Component({
   selector: 'app-mas',
@@ -52,9 +52,7 @@ import { Member } from '../../core/models';
         </div>
         <div class="kv">
           <span class="muted">Rol</span>
-          <ion-badge [color]="auth.isAdmin() ? 'primary' : 'medium'">
-            {{ auth.isAdmin() ? 'Administrador' : 'Operador' }}
-          </ion-badge>
+          <ion-badge [color]="roleColor()">{{ roleLabel() }}</ion-badge>
         </div>
       </section>
 
@@ -193,7 +191,7 @@ import { Member } from '../../core/models';
       <section class="card">
         <div class="card__head">
           <h3>Miembros del equipo</h3>
-          @if (tenant.isAdmin()) {
+          @if (tenant.canManageMembers()) {
             <ion-button size="small" (click)="abrirInvitar()">+ Invitar</ion-button>
           }
         </div>
@@ -209,7 +207,7 @@ import { Member } from '../../core/models';
                 <ion-badge [color]="m.role === 'admin' ? 'primary' : 'medium'">
                   {{ m.role === 'admin' ? 'Admin' : 'Operador' }}
                 </ion-badge>
-                @if (tenant.isAdmin() && m.uid !== auth.user()?.uid) {
+                @if (tenant.canManageMembers() && m.uid !== auth.user()?.uid) {
                   <div class="member__actions">
                     <button class="link-btn" (click)="abrirEditar(m)">Editar</button>
                     <button class="link-btn link-btn--danger" (click)="pedirEliminar(m)">Eliminar</button>
@@ -222,17 +220,22 @@ import { Member } from '../../core/models';
       </section>
 
       <section class="card demo-card">
-        <h3>Demo</h3>
+        <h3>Demo · cambio rápido de rol</h3>
         <p class="muted">
-          Este MVP usa datos en memoria. Cambia entre admin y operador para ver permisos diferentes
-          (operador no ve costos ni puede gestionar catálogo/recetas).
+          Este MVP usa datos en memoria. Cambia entre los 3 roles para ver permisos y pantallas diferentes.
         </p>
         <div class="actions">
           <ion-button (click)="switchTo('admin')" [disabled]="auth.isAdmin()">
-            Cambiar a Admin
+            Admin
           </ion-button>
-          <ion-button (click)="switchTo('operator')" [disabled]="auth.isOperator()" fill="clear" class="ghost">
-            Cambiar a Operador
+          <ion-button (click)="switchTo('sales')" [disabled]="auth.isSales()" color="success">
+            Ventas
+          </ion-button>
+          <ion-button (click)="switchTo('production')" [disabled]="auth.isProduction()" color="tertiary">
+            Producción
+          </ion-button>
+          <ion-button (click)="switchTo('operator')" [disabled]="auth.isOperator()" color="warning">
+            Operario
           </ion-button>
         </div>
 
@@ -586,8 +589,24 @@ export class MasPage {
     return name.split(' ').map(s => s[0]?.toUpperCase()).slice(0, 2).join('');
   }
 
-  switchTo(role: 'admin' | 'operator') {
+  switchTo(role: UserRole) {
     this.auth.switchRole(role);
+  }
+
+  roleLabel(): string {
+    if (this.auth.isAdmin()) return 'Administrador';
+    if (this.auth.isSales()) return 'Encargado de Ventas';
+    if (this.auth.isProduction()) return 'Encargado de Producción';
+    if (this.auth.isOperator()) return 'Operario';
+    return '—';
+  }
+
+  roleColor(): string {
+    if (this.auth.isAdmin()) return 'primary';
+    if (this.auth.isSales()) return 'success';
+    if (this.auth.isProduction()) return 'tertiary';
+    if (this.auth.isOperator()) return 'warning';
+    return 'medium';
   }
 
   abrirInvitar() {

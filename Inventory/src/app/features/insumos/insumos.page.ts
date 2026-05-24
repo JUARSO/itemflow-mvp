@@ -12,7 +12,10 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { InsumoFormModalComponent } from './insumo-form-modal.component';
 import { BulkImportModalComponent, BulkImportConfig } from '../../shared/components/bulk-import/bulk-import-modal.component';
-import { Supply, StockStatus } from '../../core/models';
+import { Supply, StockStatus, Unit } from '../../core/models';
+import { UNITS } from '../../core/units';
+
+const VALID_UNITS = new Set<string>(UNITS.map(u => u.value));
 
 @Component({
   selector: 'app-insumos',
@@ -37,7 +40,7 @@ import { Supply, StockStatus } from '../../core/models';
       <app-page-header
         title="Insumos"
         subtitle="Materias primas que compras a proveedores. Paso 2 del flujo.">
-        @if (tenant.isAdmin()) {
+        @if (tenant.canEditSupplies()) {
           <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
           <ion-button (click)="abrirNuevo()">+ Nuevo insumo</ion-button>
         }
@@ -65,10 +68,10 @@ import { Supply, StockStatus } from '../../core/models';
             </header>
 
             <div class="card__row">
-              @if (tenant.isAdmin()) {
+              @if (tenant.canEditSupplies()) {
                 <div class="card__cell">
                   <div class="card__label">Costo unitario</div>
-                  <div class="card__value mono">\${{ item.supply.cost | number:'1.0-0' }}</div>
+                  <div class="card__value mono">₡{{ item.supply.cost | number:'1.0-0' }}</div>
                 </div>
               }
               <div class="card__cell">
@@ -99,7 +102,7 @@ import { Supply, StockStatus } from '../../core/models';
               </div>
             }
 
-            @if (tenant.isAdmin()) {
+            @if (tenant.canEditSupplies()) {
               <div class="card__actions">
                 <ion-button size="small" fill="clear" class="ghost" (click)="abrirEditar(item.supply)">
                   Editar
@@ -256,6 +259,10 @@ export class InsumosPage {
         if (!sku) { errors.push({ row: rowNum, raw: r, message: 'SKU vacío' }); return; }
         if (!nombre) { errors.push({ row: rowNum, raw: r, message: 'Nombre vacío' }); return; }
         if (!unidad) { errors.push({ row: rowNum, raw: r, message: 'Unidad vacía' }); return; }
+        if (!VALID_UNITS.has(unidad)) {
+          errors.push({ row: rowNum, raw: r, message: `Unidad "${unidad}" no válida. Usa: ${[...VALID_UNITS].join(', ')}` });
+          return;
+        }
         if (existing.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU ya existe' }); return; }
         if (seen.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU duplicado en el archivo' }); return; }
         if (!isFinite(costo) || costo < 0) { errors.push({ row: rowNum, raw: r, message: 'Costo inválido' }); return; }
@@ -269,7 +276,7 @@ export class InsumosPage {
           sku,
           name: nombre,
           category: (r['categoria'] ?? '').trim() || undefined,
-          unit: unidad,
+          unit: unidad as Unit,
           cost: costo,
           minStock: min,
           maxStock: max,

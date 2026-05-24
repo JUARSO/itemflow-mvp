@@ -1,13 +1,14 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  Alert, DemandBoost, DemandPrediction, KardexEntry, Member, Product,
-  PurchaseOrder, Recipe, SaleRecord, StockItem, Supply, SupplyStockItem,
-  StockStatus, UserRole, POStatus,
+  Alert, CustomerOrder, DemandBoost, DemandPrediction, KardexEntry, Member,
+  OrderItem, OrderReservation, OrderShortfall, OrderStatus, Product,
+  ProductReturn, PurchaseOrder, Recipe, ReturnReason, SaleRecord, StockItem,
+  Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
 } from '../models';
 import {
-  MOCK_ALERTS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_PREDICTIONS,
+  MOCK_ALERTS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
   MOCK_PRODUCTS, MOCK_PRODUCT_STOCK, MOCK_PURCHASE_ORDERS, MOCK_RECIPES,
-  MOCK_SALES, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
+  MOCK_RETURNS, MOCK_SALES, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
 } from '../mocks/dummy-data';
 
 /**
@@ -29,6 +30,8 @@ export class DataService {
   private readonly _pos = signal<PurchaseOrder[]>([...MOCK_PURCHASE_ORDERS]);
   private readonly _members = signal<Member[]>([...MOCK_MEMBERS]);
   private readonly _boosts = signal<DemandBoost[]>([]);
+  private readonly _orders = signal<CustomerOrder[]>([...MOCK_ORDERS]);
+  private readonly _returns = signal<ProductReturn[]>([...MOCK_RETURNS]);
 
   constructor() {
     // Sembrar alertas auto-derivadas a partir del stock inicial.
@@ -51,6 +54,23 @@ export class DataService {
   readonly purchaseOrders = this._pos.asReadonly();
   readonly members = this._members.asReadonly();
   readonly boosts = this._boosts.asReadonly();
+  readonly orders = this._orders.asReadonly();
+
+  /** Órdenes que aún están abiertas en el flujo (no completadas ni canceladas). */
+  readonly openOrders = computed(() =>
+    this._orders().filter(o => o.status === 'pending' || o.status === 'in_production')
+  );
+  readonly pendingOrders = computed(() =>
+    this._orders().filter(o => o.status === 'pending')
+  );
+  readonly inProductionOrders = computed(() =>
+    this._orders().filter(o => o.status === 'in_production')
+  );
+  readonly completedOrders = computed(() =>
+    this._orders().filter(o => o.status === 'completed')
+  );
+
+  readonly returns = this._returns.asReadonly();
 
   /**
    * Boosts no cancelados cuyo período cubre la fecha actual o el futuro
@@ -528,6 +548,15 @@ export class DataService {
   // ============================================================
   //  Ventas
   // ============================================================
+  /**
+   * Registra una venta al cliente final: descuenta del stock del producto
+   * terminado (poblado por producción al completar órdenes) y genera el
+   * SaleRecord para histórico/predicción.
+   *
+   * Ya NO explosiona BOM: los insumos se descuentan durante la fabricación
+   * (en startProduction), no al vender. El producto terminado tiene su propio
+   * stock que se incrementa cuando producción completa una orden.
+   */
   registerSale(input: {
     productId: string; qty: number; unitPrice: number;
     userId: string; userName: string;
@@ -548,79 +577,10 @@ export class DataService {
       isOutlier: false,
     };
 
-    if (product.hasRecipe) {
-      // Explosión recursiva: aplana toda la BOM hasta insumos base.
-      // Si la receta tiene subproductos con receta propia, los expande.
-      // Si un subproducto es reventa (hasRecipe=false), descontamos su stock propio.
-      const exploded = this.explodeBom(product.id, input.qty);
-      // Primero validamos que TODO hay stock (atomicidad: no descontar a medias).
-      for (const need of exploded.supplyNeeds) {
-        const stock = this.supplyStockFor(need.supplyId);
-        const supply = this.supplyById(need.supplyId);
-        if (!stock || !supply) throw new Error(`Sin stock de ${need.itemName}.`);
-        if (stock.quantity < need.qty) {
-          throw new Error(`Stock insuficiente de ${need.itemName}: ${stock.quantity.toFixed(3)} disponible, ${need.qty.toFixed(3)} requerido.`);
-        }
-      }
-      for (const need of exploded.reventaNeeds) {
-        const stock = this.productStockFor(need.productId);
-        if (!stock) throw new Error(`Sin stock del subproducto ${need.itemName}.`);
-        if (stock.quantity < need.qty) {
-          throw new Error(`Stock insuficiente del subproducto ${need.itemName}: ${stock.quantity} disponible, ${need.qty.toFixed(3)} requerido.`);
-        }
-      }
-      // Descontamos insumos
-      for (const need of exploded.supplyNeeds) {
-        const stock = this.supplyStockFor(need.supplyId)!;
-        const supply = this.supplyById(need.supplyId)!;
-        const newQty = stock.quantity - need.qty;
-        const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
-        this._supplyStock.update(list => list.map(s =>
-          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
-        ));
-        this.registerKardexEntry({
-          id: `k-${Date.now()}-${need.supplyId}-${Math.random().toString(36).slice(2, 7)}`,
-          supplyId: need.supplyId,
-          itemName: need.itemName,
-          type: 'out',
-          qty: need.qty,
-          balance: newQty,
-          cost: supply.cost,
-          reason: 'sale',
-          note: `Vía venta de ${product.name}`,
-          userId: input.userId,
-          userName: input.userName,
-          at: new Date(),
-        });
-      }
-      // Descontamos subproductos de reventa (los que NO tienen receta)
-      for (const need of exploded.reventaNeeds) {
-        const stock = this.productStockFor(need.productId)!;
-        const subProduct = this.productById(need.productId)!;
-        const newQty = stock.quantity - need.qty;
-        const newStatus = this.computeProductStatus(newQty, subProduct.reorderPoint, subProduct.minStock);
-        this._productStock.update(list => list.map(s =>
-          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
-        ));
-        this.registerKardexEntry({
-          id: `k-${Date.now()}-${need.productId}-${Math.random().toString(36).slice(2, 7)}`,
-          productId: need.productId,
-          itemName: need.itemName,
-          type: 'out',
-          qty: need.qty,
-          balance: newQty,
-          cost: subProduct.buyPrice,
-          reason: 'sale',
-          note: `Vía venta de ${product.name} (subproducto)`,
-          userId: input.userId,
-          userName: input.userName,
-          at: new Date(),
-        });
-      }
-    } else {
+    {
       const stock = this.productStockFor(input.productId);
       if (!stock || stock.quantity < input.qty) {
-        throw new Error(`Stock insuficiente del producto: ${stock?.quantity ?? 0} disponible.`);
+        throw new Error(`Stock insuficiente: ${stock?.quantity ?? 0} disponible, ${input.qty} solicitadas. Fabrica una orden de producción primero.`);
       }
       const newQty = stock.quantity - input.qty;
       const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
@@ -654,6 +614,82 @@ export class DataService {
    */
   createSalesBulk(sales: SaleRecord[]) {
     this._sales.update(list => [...sales, ...list]);
+  }
+
+  /**
+   * Registra múltiples ventas como una sola transacción atómica:
+   *  1. Valida que TODOS los items tengan stock suficiente
+   *  2. Si alguno falla, no se descuenta nada (rollback implícito)
+   *  3. Si todos pasan, descuenta stock + kardex + crea SaleRecord(s)
+   *
+   * Soporta varias líneas del mismo producto (las suma para validación).
+   */
+  registerSalesBatch(input: {
+    items: { productId: string; qty: number; unitPrice: number }[];
+    userId: string; userName: string;
+  }): SaleRecord[] {
+    if (input.items.length === 0) {
+      throw new Error('El carrito está vacío.');
+    }
+
+    // Agregar requeridos por producto (para validar contra stock disponible total)
+    const required = new Map<string, number>();
+    for (const it of input.items) {
+      required.set(it.productId, (required.get(it.productId) ?? 0) + it.qty);
+    }
+
+    // Validación previa: TODO o nada
+    for (const [productId, qty] of required) {
+      const product = this.productById(productId);
+      if (!product) throw new Error(`Producto no encontrado.`);
+      const stock = this.productStockFor(productId);
+      const have = stock?.quantity ?? 0;
+      if (have < qty) {
+        throw new Error(`Stock insuficiente de "${product.name}": ${have} disponible, ${qty} requerido.`);
+      }
+    }
+
+    // Aplicar mutaciones
+    const now = new Date();
+    const created: SaleRecord[] = [];
+    for (const it of input.items) {
+      const product = this.productById(it.productId)!;
+      const stock = this.productStockFor(it.productId)!;
+      const newQty = stock.quantity - it.qty;
+      const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+      this._productStock.update(list => list.map(s =>
+        s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+      ));
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${product.id}-${Math.random().toString(36).slice(2, 7)}`,
+        productId: product.id,
+        itemName: product.name,
+        type: 'out',
+        qty: it.qty,
+        balance: newQty,
+        cost: this.effectiveProductCost(product.id),
+        reason: 'sale',
+        userId: input.userId,
+        userName: input.userName,
+        at: now,
+      });
+      const sale: SaleRecord = {
+        id: `sale-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        productId: product.id,
+        productName: product.name,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        total: it.qty * it.unitPrice,
+        dayOfWeek: now.getDay(),
+        month: now.getMonth() + 1,
+        date: now,
+        isOutlier: false,
+      };
+      created.push(sale);
+    }
+    this._sales.update(list => [...created, ...list]);
+    this.regenerateRestockAlerts();
+    return created;
   }
 
   // ============================================================
@@ -1430,5 +1466,503 @@ export class DataService {
     // Preservar alertas no-auto (manuales, históricas, excess, stockout_risk creadas a mano)
     const manual = existing.filter(a => !a.id.startsWith('auto-restock-'));
     this._alerts.set([...autoNext, ...manual]);
+  }
+
+  // ============================================================
+  //  Pedidos (Ventas → Producción)
+  // ============================================================
+
+  orderById(id: string): CustomerOrder | undefined {
+    return this._orders().find(o => o.id === id);
+  }
+
+  /**
+   * Analiza un pedido (real o hipotético) contra el stock actual y devuelve:
+   *  - itemAnalysis: por cada item del pedido, requested vs canFulfill (parcial)
+   *  - shortfalls: lista de insumos/productos faltantes con cuánto se necesita extra
+   *
+   * NO muta nada. Útil tanto para previsualizar (estado pending) como para calcular
+   * lo que se va a reservar al iniciar producción.
+   *
+   * Cumplimiento parcial: si un item necesita 10 panes y solo alcanza para 7,
+   * canFulfill=7 y los faltantes para los 3 restantes aparecen en shortfalls.
+   */
+  analyzeOrder(items: OrderItem[]): {
+    itemAnalysis: { productId: string; productName: string; requested: number; canFulfill: number }[];
+    shortfalls: OrderShortfall[];
+  } {
+    const itemAnalysis: { productId: string; productName: string; requested: number; canFulfill: number }[] = [];
+    const shortfalls: OrderShortfall[] = [];
+
+    // Working copy del stock disponible (varios items del mismo pedido compiten entre sí)
+    const supplyAvail = new Map<string, number>();
+    const productAvail = new Map<string, number>();
+    for (const ss of this._supplyStock()) supplyAvail.set(ss.supplyId, ss.quantity);
+    for (const ps of this._productStock()) productAvail.set(ps.productId, ps.quantity);
+
+    for (const item of items) {
+      const product = this.productById(item.productId);
+      if (!product) {
+        itemAnalysis.push({ productId: item.productId, productName: item.productName, requested: item.qty, canFulfill: 0 });
+        continue;
+      }
+
+      if (product.hasRecipe) {
+        // Cuánto se puede producir según el insumo/subproducto más limitante
+        const fullNeed = this.explodeBom(item.productId, item.qty);
+        let ratio = 1;
+        for (const need of fullNeed.supplyNeeds) {
+          if (need.qty <= 0) continue;
+          const avail = supplyAvail.get(need.supplyId) ?? 0;
+          ratio = Math.min(ratio, Math.max(0, avail / need.qty));
+        }
+        for (const need of fullNeed.reventaNeeds) {
+          if (need.qty <= 0) continue;
+          const avail = productAvail.get(need.productId) ?? 0;
+          ratio = Math.min(ratio, Math.max(0, avail / need.qty));
+        }
+        const canFulfill = Math.floor(item.qty * ratio);
+
+        // Descontar working copy según lo que sí podremos fabricar
+        if (canFulfill > 0) {
+          const actual = this.explodeBom(item.productId, canFulfill);
+          for (const n of actual.supplyNeeds) {
+            supplyAvail.set(n.supplyId, (supplyAvail.get(n.supplyId) ?? 0) - n.qty);
+          }
+          for (const n of actual.reventaNeeds) {
+            productAvail.set(n.productId, (productAvail.get(n.productId) ?? 0) - n.qty);
+          }
+        }
+
+        // Faltantes (sobre las unidades que NO podemos fabricar)
+        const missingQty = item.qty - canFulfill;
+        if (missingQty > 0) {
+          const miss = this.explodeBom(item.productId, missingQty);
+          for (const need of miss.supplyNeeds) {
+            const avail = Math.max(0, supplyAvail.get(need.supplyId) ?? 0);
+            const sup = this.supplyById(need.supplyId);
+            shortfalls.push({
+              kind: 'supply',
+              itemId: need.supplyId,
+              itemName: need.itemName,
+              unit: sup?.unit ?? 'unidad',
+              required: +need.qty.toFixed(3),
+              available: +avail.toFixed(3),
+              short: +Math.max(0, need.qty - avail).toFixed(3),
+              forProductId: item.productId,
+            });
+          }
+          for (const need of miss.reventaNeeds) {
+            const avail = Math.max(0, productAvail.get(need.productId) ?? 0);
+            const subProd = this.productById(need.productId);
+            shortfalls.push({
+              kind: 'product',
+              itemId: need.productId,
+              itemName: need.itemName,
+              unit: subProd?.unit ?? 'unidad',
+              required: +need.qty.toFixed(3),
+              available: +avail.toFixed(3),
+              short: +Math.max(0, need.qty - avail).toFixed(3),
+              forProductId: item.productId,
+            });
+          }
+        }
+
+        itemAnalysis.push({ productId: item.productId, productName: item.productName, requested: item.qty, canFulfill });
+      } else {
+        // Producto de reventa: comparar directo con stock del producto
+        const avail = productAvail.get(item.productId) ?? 0;
+        const canFulfill = Math.min(item.qty, Math.floor(avail));
+        productAvail.set(item.productId, avail - canFulfill);
+        if (canFulfill < item.qty) {
+          shortfalls.push({
+            kind: 'product',
+            itemId: item.productId,
+            itemName: item.productName,
+            unit: product.unit,
+            required: item.qty,
+            available: Math.max(0, avail),
+            short: item.qty - canFulfill,
+            forProductId: item.productId,
+          });
+        }
+        itemAnalysis.push({ productId: item.productId, productName: item.productName, requested: item.qty, canFulfill });
+      }
+    }
+
+    return { itemAnalysis, shortfalls };
+  }
+
+  /** Crea una orden de producción en estado pending. No toca stock. */
+  createOrder(input: {
+    purpose?: string;
+    items: { productId: string; qty: number; unitPrice: number }[];
+    notes?: string;
+    userId: string;
+    userName: string;
+  }): CustomerOrder {
+    if (input.items.length === 0) {
+      throw new Error('La orden debe tener al menos un item.');
+    }
+    const code = this.nextOrderCode();
+    const orderItems: OrderItem[] = input.items.map(it => {
+      const p = this.productById(it.productId);
+      return {
+        productId: it.productId,
+        productName: p?.name ?? '',
+        unit: p?.unit ?? 'unidad',
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        fulfilledQty: 0,
+      };
+    });
+    const total = orderItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+    const order: CustomerOrder = {
+      id: `ord-${Date.now()}`,
+      code,
+      purpose: input.purpose?.trim() || undefined,
+      status: 'pending',
+      items: orderItems,
+      totalAmount: total,
+      notes: input.notes,
+      createdAt: new Date(),
+      createdBy: input.userName,
+      reservations: [],
+      shortfalls: [],
+    };
+    this._orders.update(list => [order, ...list]);
+    return order;
+  }
+
+  /**
+   * Pasa un pedido a "in_production":
+   *  - Analiza stock disponible
+   *  - Descuenta del stock real lo que pueda producirse (cumplimiento parcial)
+   *  - Registra kardex de tipo 'out' con reason 'production'
+   *  - Guarda reservations y shortfalls en el pedido
+   *  - Actualiza fulfilledQty por item
+   */
+  startProduction(orderId: string, userId: string, userName: string): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (order.status !== 'pending') {
+      throw new Error('Solo se puede iniciar producción desde estado pendiente.');
+    }
+
+    const { itemAnalysis, shortfalls } = this.analyzeOrder(order.items);
+    const reservations: OrderReservation[] = [];
+
+    // Descontar stock realmente por cada item, en su qty cumplible
+    for (const an of itemAnalysis) {
+      if (an.canFulfill <= 0) continue;
+      const product = this.productById(an.productId);
+      if (!product) continue;
+
+      if (product.hasRecipe) {
+        const exploded = this.explodeBom(an.productId, an.canFulfill);
+        for (const need of exploded.supplyNeeds) {
+          const stock = this.supplyStockFor(need.supplyId);
+          const supply = this.supplyById(need.supplyId);
+          if (!stock || !supply) continue;
+          const newQty = Math.max(0, stock.quantity - need.qty);
+          const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
+          this._supplyStock.update(list => list.map(s =>
+            s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+          ));
+          this.registerKardexEntry({
+            id: `k-${Date.now()}-${need.supplyId}-${Math.random().toString(36).slice(2, 7)}`,
+            supplyId: need.supplyId,
+            itemName: need.itemName,
+            type: 'out',
+            qty: need.qty,
+            balance: newQty,
+            cost: supply.cost,
+            reason: 'production',
+            note: `Pedido ${order.code} — ${product.name}`,
+            userId,
+            userName,
+            at: new Date(),
+          });
+          reservations.push({ kind: 'supply', itemId: need.supplyId, itemName: need.itemName, unit: supply.unit, qty: need.qty });
+        }
+        for (const need of exploded.reventaNeeds) {
+          const stock = this.productStockFor(need.productId);
+          const subProd = this.productById(need.productId);
+          if (!stock || !subProd) continue;
+          const newQty = Math.max(0, stock.quantity - need.qty);
+          const newStatus = this.computeProductStatus(newQty, subProd.reorderPoint, subProd.minStock);
+          this._productStock.update(list => list.map(s =>
+            s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+          ));
+          this.registerKardexEntry({
+            id: `k-${Date.now()}-${need.productId}-${Math.random().toString(36).slice(2, 7)}`,
+            productId: need.productId,
+            itemName: need.itemName,
+            type: 'out',
+            qty: need.qty,
+            balance: newQty,
+            cost: subProd.buyPrice,
+            reason: 'production',
+            note: `Pedido ${order.code} — ${product.name} (subproducto)`,
+            userId,
+            userName,
+            at: new Date(),
+          });
+          reservations.push({ kind: 'product', itemId: need.productId, itemName: need.itemName, unit: subProd.unit, qty: need.qty });
+        }
+      } else {
+        const stock = this.productStockFor(an.productId);
+        if (!stock) continue;
+        const newQty = Math.max(0, stock.quantity - an.canFulfill);
+        const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${an.productId}`,
+          productId: an.productId,
+          itemName: product.name,
+          type: 'out',
+          qty: an.canFulfill,
+          balance: newQty,
+          cost: product.buyPrice,
+          reason: 'production',
+          note: `Pedido ${order.code}`,
+          userId,
+          userName,
+          at: new Date(),
+        });
+        reservations.push({ kind: 'product', itemId: an.productId, itemName: product.name, unit: product.unit, qty: an.canFulfill });
+      }
+    }
+
+    const updated: CustomerOrder = {
+      ...order,
+      status: 'in_production',
+      productionStartedAt: new Date(),
+      reservations,
+      shortfalls,
+      items: order.items.map(it => {
+        const an = itemAnalysis.find(a => a.productId === it.productId);
+        return { ...it, fulfilledQty: an?.canFulfill ?? 0 };
+      }),
+    };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    this.regenerateRestockAlerts();
+    return updated;
+  }
+
+  /**
+   * Producción terminó la fabricación: suma las unidades fabricadas al stock
+   * del producto terminado (creando un StockItem si no existe — los productos
+   * con receta no tenían stock propio hasta ahora). Cierra la orden.
+   *
+   * No genera SaleRecord: la venta al cliente final es un evento separado.
+   */
+  completeOrder(orderId: string, userId: string, userName: string): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Orden no encontrada.');
+    if (order.status !== 'in_production') {
+      throw new Error('Solo se puede completar desde "en producción".');
+    }
+
+    const now = new Date();
+    for (const it of order.items) {
+      if (it.fulfilledQty <= 0) continue;
+      const product = this.productById(it.productId);
+      if (!product) continue;
+
+      // Asegurar que exista StockItem para el producto fabricado
+      let stock = this.productStockFor(it.productId);
+      if (!stock) {
+        stock = {
+          id: it.productId,
+          productId: it.productId,
+          quantity: 0,
+          reservedQty: 0,
+          status: 'out',
+        };
+        this._productStock.update(list => [...list, stock!]);
+      }
+
+      const newQty = stock.quantity + it.fulfilledQty;
+      const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+      this._productStock.update(list => list.map(s =>
+        s.productId === it.productId ? { ...s, quantity: newQty, status: newStatus } : s
+      ));
+
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${it.productId}-${Math.random().toString(36).slice(2, 7)}`,
+        productId: it.productId,
+        itemName: it.productName,
+        type: 'in',
+        qty: it.fulfilledQty,
+        balance: newQty,
+        cost: this.effectiveProductCost(it.productId),
+        reason: 'production',
+        note: `Orden ${order.code} completada`,
+        userId,
+        userName,
+        at: now,
+      });
+    }
+
+    const updated: CustomerOrder = { ...order, status: 'completed', completedAt: now };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    this.regenerateRestockAlerts();
+    return updated;
+  }
+
+  /**
+   * Cancela el pedido. Si tenía reservas (estado in_production o ready), las
+   * devuelve al stock y registra entradas de kardex de tipo 'in' como reversión.
+   */
+  cancelOrder(orderId: string, userId: string, userName: string, motivo?: string): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Orden no encontrada.');
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      throw new Error('No se puede cancelar una orden ya completada o cancelada.');
+    }
+
+    // Revertir reservas si las había
+    for (const r of order.reservations) {
+      if (r.kind === 'supply') {
+        const stock = this.supplyStockFor(r.itemId);
+        const supply = this.supplyById(r.itemId);
+        if (!stock || !supply) continue;
+        const newQty = stock.quantity + r.qty;
+        const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
+        this._supplyStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${r.itemId}-${Math.random().toString(36).slice(2, 7)}`,
+          supplyId: r.itemId,
+          itemName: r.itemName,
+          type: 'in',
+          qty: r.qty,
+          balance: newQty,
+          cost: supply.cost,
+          reason: 'production_cancel',
+          note: `Cancelación pedido ${order.code}${motivo ? ` — ${motivo}` : ''}`,
+          userId,
+          userName,
+          at: new Date(),
+        });
+      } else {
+        const stock = this.productStockFor(r.itemId);
+        const product = this.productById(r.itemId);
+        if (!stock || !product) continue;
+        const newQty = stock.quantity + r.qty;
+        const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${r.itemId}-${Math.random().toString(36).slice(2, 7)}`,
+          productId: r.itemId,
+          itemName: r.itemName,
+          type: 'in',
+          qty: r.qty,
+          balance: newQty,
+          cost: product.buyPrice,
+          reason: 'production_cancel',
+          note: `Cancelación pedido ${order.code}${motivo ? ` — ${motivo}` : ''}`,
+          userId,
+          userName,
+          at: new Date(),
+        });
+      }
+    }
+
+    const updated: CustomerOrder = {
+      ...order,
+      status: 'cancelled',
+      cancelledAt: new Date(),
+      reservations: [],
+      items: order.items.map(it => ({ ...it, fulfilledQty: 0 })),
+      notes: motivo ? `${order.notes ? order.notes + ' · ' : ''}Cancelado: ${motivo}` : order.notes,
+    };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    this.regenerateRestockAlerts();
+    return updated;
+  }
+
+  // ============================================================
+  //  Devoluciones (Ventas → Producción)
+  // ============================================================
+
+  /**
+   * Registra una devolución de producto terminado a producción.
+   * Descuenta del stock disponible y genera kardex `out` con reason
+   * 'return_to_production'. La pérdida monetaria se calcula con el costo
+   * efectivo del producto al momento de devolver.
+   */
+  registerReturn(input: {
+    productId: string;
+    qty: number;
+    reason: ReturnReason;
+    notes?: string;
+    userId: string;
+    userName: string;
+  }): ProductReturn {
+    if (input.qty <= 0) throw new Error('La cantidad debe ser mayor a 0.');
+    const product = this.productById(input.productId);
+    if (!product) throw new Error('Producto no encontrado.');
+    const stock = this.productStockFor(input.productId);
+    const have = stock?.quantity ?? 0;
+    if (have < input.qty) {
+      throw new Error(`Stock insuficiente de "${product.name}": ${have} disponible, ${input.qty} a devolver.`);
+    }
+
+    const newQty = have - input.qty;
+    const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+    this._productStock.update(list => list.map(s =>
+      s.id === stock!.id ? { ...s, quantity: newQty, status: newStatus } : s
+    ));
+
+    const costAtReturn = this.effectiveProductCost(input.productId);
+    const totalLoss = +(costAtReturn * input.qty).toFixed(2);
+
+    this.registerKardexEntry({
+      id: `k-${Date.now()}-${product.id}-ret`,
+      productId: product.id,
+      itemName: product.name,
+      type: 'out',
+      qty: input.qty,
+      balance: newQty,
+      cost: costAtReturn,
+      reason: 'return_to_production',
+      note: `Devolución (${input.reason})${input.notes ? ' — ' + input.notes : ''}`,
+      userId: input.userId,
+      userName: input.userName,
+      at: new Date(),
+    });
+
+    const ret: ProductReturn = {
+      id: `ret-${Date.now()}`,
+      productId: product.id,
+      productName: product.name,
+      qty: input.qty,
+      unit: product.unit,
+      reason: input.reason,
+      notes: input.notes?.trim() || undefined,
+      costAtReturn,
+      totalLoss,
+      createdAt: new Date(),
+      createdBy: input.userName,
+    };
+    this._returns.update(list => [ret, ...list]);
+    this.regenerateRestockAlerts();
+    return ret;
+  }
+
+  /** Próximo correlativo ORD-NNN basado en los pedidos existentes. */
+  private nextOrderCode(): string {
+    const nums = this._orders()
+      .map(o => Number(o.code.replace(/^ORD-/, '')))
+      .filter(n => Number.isFinite(n));
+    const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
+    return `ORD-${String(next).padStart(3, '0')}`;
   }
 }

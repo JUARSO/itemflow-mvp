@@ -66,7 +66,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
           </div>
           <div class="summary__total">
             <div class="summary__label">Valor entrada</div>
-            <div class="summary__value mono">\${{ totalCost() | number:'1.0-0' }}</div>
+            <div class="summary__value mono">₡{{ totalCost() | number:'1.0-0' }}</div>
           </div>
         </div>
       </form>

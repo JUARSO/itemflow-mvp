@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import {
   IonSplitPane, IonMenu, IonContent,
-  IonBadge, IonRouterOutlet, MenuController,
+  IonBadge, IonRouterOutlet, IonIcon, MenuController,
 } from '@ionic/angular/standalone';
 import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
@@ -16,7 +16,7 @@ import { BrandingService } from '../../core/services/branding.service';
   imports: [
     RouterLink, RouterLinkActive,
     IonSplitPane, IonMenu, IonContent,
-    IonBadge, IonRouterOutlet,
+    IonBadge, IonRouterOutlet, IonIcon,
   ],
   template: `
     <!--
@@ -32,8 +32,10 @@ import { BrandingService } from '../../core/services/branding.service';
             <div class="brand__logo">
               @if (branding.branding().logoImage) {
                 <img [src]="branding.branding().logoImage" alt="Logo" class="brand__logo-img" />
-              } @else {
+              } @else if (branding.branding().logo) {
                 <span>{{ branding.branding().logo }}</span>
+              } @else {
+                <ion-icon name="cube-outline" class="brand__logo-icon"></ion-icon>
               }
             </div>
             <div class="brand__text">
@@ -42,69 +44,140 @@ import { BrandingService } from '../../core/services/branding.service';
             </div>
           </div>
 
-          <div class="menu-section">Flujo principal</div>
-          <a routerLink="/catalogo" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">1</span>
-            <span class="menu-item__label">Catálogo</span>
-          </a>
-          <a routerLink="/insumos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">2</span>
-            <span class="menu-item__label">Insumos</span>
-          </a>
-          <a routerLink="/recetas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">3</span>
-            <span class="menu-item__label">Recetas</span>
-          </a>
-          <a routerLink="/ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">4</span>
-            <span class="menu-item__label">Ventas</span>
-          </a>
-          <a routerLink="/ajustes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">5</span>
-            <span class="menu-item__label">Ajustes</span>
-          </a>
+          @if (auth.isAdmin()) {
+            <div class="menu-section">Administración</div>
+            <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="home-outline"></ion-icon>
+              <span class="menu-item__label">Dashboard</span>
+            </a>
+            <a routerLink="/admin/ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="bar-chart-outline"></ion-icon>
+              <span class="menu-item__label">Análisis · Ventas</span>
+            </a>
+            <a routerLink="/admin/produccion" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="analytics-outline"></ion-icon>
+              <span class="menu-item__label">Análisis · Producción</span>
+            </a>
+            <a routerLink="/admin/financiero" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="pie-chart-outline"></ion-icon>
+              <span class="menu-item__label">Análisis · Financiero</span>
+            </a>
+            <a routerLink="/admin/devoluciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="return-up-back-outline"></ion-icon>
+              <span class="menu-item__label">Análisis · Devoluciones</span>
+            </a>
+          }
 
-          <div class="menu-section">Operación</div>
-          <a routerLink="/inventario" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">📊</span>
-            <span class="menu-item__label">Inventario</span>
-          </a>
-          <a routerLink="/ordenes-compra" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">📝</span>
-            <span class="menu-item__label">Órdenes de Compra</span>
-          </a>
-          <a routerLink="/alertas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">🔔</span>
-            <span class="menu-item__label">Alertas</span>
-            @if (data.activeAlerts().length > 0) {
-              <ion-badge color="danger" class="menu-item__badge">
-                {{ data.activeAlerts().length }}
-              </ion-badge>
-            }
-          </a>
-          <a routerLink="/boosts" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">⚡</span>
-            <span class="menu-item__label">Boosts de demanda</span>
-            @if (data.activeBoosts().length > 0) {
-              <ion-badge color="warning" class="menu-item__badge">
-                {{ data.activeBoosts().length }}
-              </ion-badge>
-            }
-          </a>
+          @if (auth.isAdmin() || auth.isSales()) {
+            <div class="menu-section">Ventas</div>
+            <a routerLink="/pedidos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="receipt-outline"></ion-icon>
+              <span class="menu-item__label">Órdenes a producción</span>
+              @if (data.openOrders().length > 0) {
+                <ion-badge color="primary" class="menu-item__badge">
+                  {{ data.openOrders().length }}
+                </ion-badge>
+              }
+            </a>
+            <a routerLink="/ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="cash-outline"></ion-icon>
+              <span class="menu-item__label">Vender</span>
+            </a>
+            <a routerLink="/devoluciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="return-up-back-outline"></ion-icon>
+              <span class="menu-item__label">Devoluciones</span>
+            </a>
+            <a routerLink="/catalogo" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="library-outline"></ion-icon>
+              <span class="menu-item__label">Catálogo</span>
+              @if (auth.isSales()) { <span class="menu-item__hint">solo lectura</span> }
+            </a>
+          }
 
-          <div class="menu-section">Análisis</div>
-          <a routerLink="/predicciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">📈</span>
-            <span class="menu-item__label">Predicciones</span>
-          </a>
-          <a routerLink="/burn-down" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">📉</span>
-            <span class="menu-item__label">Análisis de stock</span>
-          </a>
+          @if (auth.isOperator()) {
+            <div class="menu-section">Producción</div>
+            <a routerLink="/produccion" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="hammer-outline"></ion-icon>
+              <span class="menu-item__label">Cola de producción</span>
+              @if (data.pendingOrders().length + data.inProductionOrders().length > 0) {
+                <ion-badge color="warning" class="menu-item__badge">
+                  {{ data.pendingOrders().length + data.inProductionOrders().length }}
+                </ion-badge>
+              }
+            </a>
+            <a routerLink="/recetas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="book-outline"></ion-icon>
+              <span class="menu-item__label">Recetas</span>
+              <span class="menu-item__hint">solo lectura</span>
+            </a>
+          }
+
+          @if (auth.isAdmin() || auth.isProduction()) {
+            <div class="menu-section">Producción &amp; Inventario</div>
+            <a routerLink="/produccion" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="hammer-outline"></ion-icon>
+              <span class="menu-item__label">Cola de producción</span>
+              @if (data.pendingOrders().length + data.inProductionOrders().length > 0) {
+                <ion-badge color="warning" class="menu-item__badge">
+                  {{ data.pendingOrders().length + data.inProductionOrders().length }}
+                </ion-badge>
+              }
+            </a>
+            <a routerLink="/insumos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="leaf-outline"></ion-icon>
+              <span class="menu-item__label">Insumos</span>
+            </a>
+            <a routerLink="/recetas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="book-outline"></ion-icon>
+              <span class="menu-item__label">Recetas</span>
+            </a>
+            <a routerLink="/inventario" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
+              <span class="menu-item__label">Inventario</span>
+            </a>
+            <a routerLink="/ajustes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="create-outline"></ion-icon>
+              <span class="menu-item__label">Ajustes</span>
+            </a>
+            <a routerLink="/ordenes-compra" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="document-text-outline"></ion-icon>
+              <span class="menu-item__label">Órdenes de Compra</span>
+            </a>
+            <a routerLink="/alertas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="notifications-outline"></ion-icon>
+              <span class="menu-item__label">Alertas</span>
+              @if (data.activeAlerts().length > 0) {
+                <ion-badge color="danger" class="menu-item__badge">
+                  {{ data.activeAlerts().length }}
+                </ion-badge>
+              }
+            </a>
+            <a routerLink="/boosts" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="flash-outline"></ion-icon>
+              <span class="menu-item__label">Boosts de demanda</span>
+              @if (data.activeBoosts().length > 0) {
+                <ion-badge color="warning" class="menu-item__badge">
+                  {{ data.activeBoosts().length }}
+                </ion-badge>
+              }
+            </a>
+          }
+
+          @if (auth.isAdmin()) {
+            <div class="menu-section">Análisis</div>
+            <a routerLink="/predicciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="trending-up-outline"></ion-icon>
+              <span class="menu-item__label">Predicciones</span>
+            </a>
+            <a routerLink="/burn-down" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="trending-down-outline"></ion-icon>
+              <span class="menu-item__label">Análisis de stock</span>
+            </a>
+          }
 
           <div class="menu-section">Cuenta</div>
           <a routerLink="/mas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-            <span class="menu-item__icon">⚙️</span>
+            <ion-icon class="menu-item__icon" name="settings-outline"></ion-icon>
             <span class="menu-item__label">Más</span>
           </a>
 
@@ -161,6 +234,10 @@ import { BrandingService } from '../../core/services/branding.service';
       height: 100%;
       object-fit: contain;
     }
+    .brand__logo-icon {
+      font-size: 28px;
+      color: var(--ui-text);
+    }
     .brand__text { min-width: 0; }
     .brand__name {
       font-family: var(--ui-font-display);
@@ -201,13 +278,23 @@ import { BrandingService } from '../../core/services/branding.service';
       font-weight: var(--ui-fw-bold);
     }
     .menu-item__icon {
-      width: 28px;
-      text-align: center;
-      font-weight: var(--ui-fw-black);
-      font-family: var(--ui-font-display);
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      font-size: 22px;
+      color: var(--ui-text-muted);
     }
+    .menu-item.active .menu-item__icon { color: var(--ui-primary); }
     .menu-item__label { flex: 1; }
     .menu-item__badge { margin-left: auto; }
+    .menu-item__hint {
+      font-size: 9px;
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: auto;
+    }
 
     .user-block {
       margin: var(--ui-sp-4);
@@ -253,8 +340,12 @@ export class ShellPage {
   protected readonly branding = inject(BrandingService);
   private readonly router = inject(Router);
 
-  roleLabel() {
-    return this.auth.isAdmin() ? 'Administrador' : 'Operador';
+  roleLabel(): string {
+    if (this.auth.isAdmin()) return 'Administrador';
+    if (this.auth.isSales()) return 'Encargado de Ventas';
+    if (this.auth.isProduction()) return 'Encargado de Producción';
+    if (this.auth.isOperator()) return 'Operario';
+    return '—';
   }
 
   /**

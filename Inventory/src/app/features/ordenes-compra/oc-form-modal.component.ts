@@ -66,7 +66,7 @@ type LineGroup = ReturnType<OcFormModalComponent['buildLineGroup']>;
 
           <div class="total">
             <span>Total OC</span>
-            <strong class="mono">\${{ total() | number:'1.0-0' }}</strong>
+            <strong class="mono">₡{{ total() | number:'1.0-0' }}</strong>
           </div>
         </div>
       </form>

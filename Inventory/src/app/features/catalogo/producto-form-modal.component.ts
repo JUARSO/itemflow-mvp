@@ -3,7 +3,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { IonButton } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
-import { Product } from '../../core/models';
+import { Product, Unit } from '../../core/models';
+import { UNIT_GROUPS, unitsByGroup } from '../../core/units';
 import { DataService } from '../../core/services/data.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 
@@ -25,11 +26,13 @@ import { ToastService } from '../../shared/components/toast/toast.service';
           </app-form-field>
           <app-form-field label="Unidad" [required]="true">
             <select formControlName="unit">
-              <option value="unidad">unidad</option>
-              <option value="kg">kg</option>
-              <option value="g">g</option>
-              <option value="L">L</option>
-              <option value="ml">ml</option>
+              @for (g of unitGroups; track g) {
+                <optgroup [label]="g">
+                  @for (u of unitsGrouped[g]; track u.value) {
+                    <option [value]="u.value">{{ u.label }}</option>
+                  }
+                </optgroup>
+              }
             </select>
           </app-form-field>
         </div>
@@ -137,6 +140,10 @@ export class ProductoFormModalComponent {
   private readonly data = inject(DataService);
   private readonly toast = inject(ToastService);
 
+  // Para el <select> agrupado de unidades en el template
+  protected readonly unitGroups = UNIT_GROUPS;
+  protected readonly unitsGrouped = unitsByGroup();
+
   readonly isOpen = input.required<boolean>();
   readonly editing = input<Product | null>(null);
   readonly closed = output<void>();
@@ -146,7 +153,7 @@ export class ProductoFormModalComponent {
     sku: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     name: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     category: this.fb.control(''),
-    unit: this.fb.control('unidad', { nonNullable: true, validators: [Validators.required] }),
+    unit: this.fb.control<Unit>('unidad', { nonNullable: true, validators: [Validators.required] }),
     buyPrice: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
     sellPrice: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
     leadTime: this.fb.control(1, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),

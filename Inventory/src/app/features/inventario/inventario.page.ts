@@ -38,7 +38,9 @@ type StatusFilter = 'todos' | StockStatus;
       <app-page-header
         title="Inventario"
         subtitle="Stock actual, alertas y acciones recomendadas">
-        <ion-button (click)="entradaModalOpen.set(true)">+ Registrar entrada</ion-button>
+        @if (tenant.canMoveInventory()) {
+          <ion-button (click)="entradaModalOpen.set(true)">+ Registrar entrada</ion-button>
+        }
       </app-page-header>
 
       <div class="kpis">
@@ -290,7 +292,7 @@ export class InventarioPage {
           id: stock.id,
           name: sup?.name ?? '—',
           sku: sup?.sku ?? '',
-          unit: sup?.unit ?? '',
+          unit: sup?.unit ?? 'unidad',
           reorderPoint: sup?.reorderPoint ?? 0,
           quantity: stock.quantity,
           status: stock.status,
@@ -314,7 +316,7 @@ export class InventarioPage {
           id: stock.id,
           name: p?.name ?? '—',
           sku: p?.sku ?? '',
-          unit: p?.unit ?? '',
+          unit: p?.unit ?? 'unidad',
           reorderPoint: p?.reorderPoint,
           quantity: stock.quantity,
           status: stock.status,

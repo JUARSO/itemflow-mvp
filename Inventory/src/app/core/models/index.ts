@@ -1,9 +1,22 @@
+import type { Unit } from '../units';
+export type { Unit } from '../units';
+
 export type StockStatus = 'available' | 'low' | 'critical' | 'out';
 export type KardexType = 'in' | 'out' | 'adjustment';
 export type AlertType = 'restock' | 'stockout_risk' | 'excess';
 export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
 export type AlertPriority = 'high' | 'medium' | 'low';
-export type UserRole = 'admin' | 'operator';
+/**
+ * Roles del sistema:
+ *  - admin: SOLO LECTURA en datos operativos (visualiza dashboards y análisis).
+ *    Únicas acciones: gestión de miembros y branding.
+ *  - sales: encargado de ventas — pedidos, catálogo (lectura), vender, devoluciones
+ *  - production: encargado de producción — cola, insumos, recetas, inventario,
+ *    ajustes, órdenes de compra, alertas, boosts
+ *  - operator: operario de fabricación — ve recetas (lectura) y cola de
+ *    producción; puede iniciar y completar órdenes pero NO cancelarlas.
+ */
+export type UserRole = 'admin' | 'sales' | 'production' | 'operator';
 export type POStatus = 'pending' | 'received' | 'cancelled';
 
 export interface Member {
@@ -28,7 +41,7 @@ export interface Product {
   name: string;
   description?: string;
   category?: string;
-  unit: string;
+  unit: Unit;
   buyPrice: number;
   sellPrice: number;
   leadTime: number;
@@ -53,7 +66,7 @@ export interface Supply {
   name: string;
   description?: string;
   category?: string;
-  unit: string;
+  unit: Unit;
   cost: number;
   minStock: number;
   maxStock: number;
@@ -76,7 +89,7 @@ export interface RecipeItem {
   productId?: string;
   itemName: string;
   qty: number;
-  unit: string;
+  unit: Unit;
 }
 
 export interface Recipe {
@@ -85,6 +98,8 @@ export interface Recipe {
   productName: string;
   yieldQty: number;
   items: RecipeItem[];
+  /** Observaciones / notas de preparación, tiempos, advertencias. Opcional. */
+  notes?: string;
 }
 
 export interface StockItem {
@@ -308,4 +323,121 @@ export interface PurchaseOrder {
   expectedDate?: Date;
   receivedAt?: Date;
   createdAt: Date;
+}
+
+// =========================================================
+//  Devoluciones (Ventas → Producción)
+// =========================================================
+
+/**
+ * Motivos por los que ventas devuelve producto terminado a producción.
+ * El stock siempre sale del inventario disponible al registrar la devolución.
+ */
+export type ReturnReason =
+  | 'defective'   // mal hecho, quemado, mal cocido
+  | 'expired'     // vencido o en mal estado
+  | 'leftover'    // sobra de fin de día
+  | 'damaged'     // golpe, caída, mojadura
+  | 'other';
+
+export interface ProductReturn {
+  id: string;
+  productId: string;
+  productName: string;
+  qty: number;
+  unit: Unit;
+  reason: ReturnReason;
+  notes?: string;
+  /** Costo unitario al momento de devolver (snapshot para reporting). */
+  costAtReturn: number;
+  /** qty * costAtReturn — pérdida estimada del lote devuelto. */
+  totalLoss: number;
+  createdAt: Date;
+  createdBy: string;
+}
+
+// =========================================================
+//  Pedidos (Ventas → Producción)
+// =========================================================
+
+/**
+ * Ciclo de vida de una orden de producción interna:
+ *  - pending: ventas la registró, producción aún no la procesa
+ *  - in_production: producción reservó insumos disponibles; pueden faltar
+ *  - completed: producción terminó la fabricación y el stock del producto
+ *    terminado fue actualizado. La orden queda cerrada — la venta al consumidor
+ *    final es un evento separado que descuenta del stock.
+ *  - cancelled: cancelada; libera reservas si las había
+ */
+export type OrderStatus = 'pending' | 'in_production' | 'completed' | 'cancelled';
+
+/**
+ * Reserva concreta de stock realizada al iniciar producción.
+ * Es lo que efectivamente se descontó (cumplimiento parcial: puede ser menor a lo pedido).
+ */
+export interface OrderReservation {
+  kind: 'supply' | 'product';
+  itemId: string;
+  itemName: string;
+  /** Unidad de medida del insumo/producto reservado. */
+  unit: Unit;
+  qty: number;
+}
+
+/**
+ * Item solicitado en un pedido. `fulfilledQty` registra cuántas unidades del
+ * producto se han podido reservar/producir (0 si aún no se inició producción,
+ * menor a `qty` si hubo faltante de insumos).
+ */
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  /** Unidad del producto (unidad, kg, L, etc.) — cacheada al crear el pedido. */
+  unit: Unit;
+  qty: number;
+  unitPrice: number;
+  fulfilledQty: number;
+}
+
+/**
+ * Faltante detectado al iniciar producción: lo que se requería vs lo que había.
+ * Útil para que producción genere OC o avise a compras.
+ */
+export interface OrderShortfall {
+  kind: 'supply' | 'product';
+  itemId: string;
+  itemName: string;
+  /** Unidad de medida del insumo/producto (kg, L, unidad, etc.). */
+  unit: Unit;
+  required: number;
+  available: number;
+  short: number;
+  /** Sugerencia: el item del pedido que generó el faltante (productId). */
+  forProductId?: string;
+}
+
+/**
+ * Orden de producción interna creada por ventas para organizar el trabajo
+ * de fábrica/cocina. NO representa un compromiso de entrega a cliente externo;
+ * el producto fabricado queda en stock disponible para vender después.
+ */
+export interface CustomerOrder {
+  id: string;
+  code: string;
+  /** Motivo o destino interno del lote (ej: "Reposición stock", "Evento Sub-30"). Opcional. */
+  purpose?: string;
+  status: OrderStatus;
+  items: OrderItem[];
+  totalAmount: number;
+  notes?: string;
+  createdAt: Date;
+  createdBy: string;
+  /** Reservas activas (poblado al pasar a in_production, vaciado al cancelar). */
+  reservations: OrderReservation[];
+  /** Snapshot del análisis hecho al iniciar producción. */
+  shortfalls: OrderShortfall[];
+  productionStartedAt?: Date;
+  /** Cuándo producción terminó y se sumó al stock de producto terminado. */
+  completedAt?: Date;
+  cancelledAt?: Date;
 }

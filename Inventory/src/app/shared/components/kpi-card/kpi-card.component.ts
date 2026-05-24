@@ -53,11 +53,16 @@ type Tone = 'primary' | 'success' | 'warning' | 'danger' | 'excess' | 'transit';
       color: var(--ui-text-muted);
     }
     .card__value {
-      font-size: var(--ui-fs-2xl);
+      /* Tamaño fluido: escala 16px → 22px según ancho disponible,
+         caben montos hasta 10 cifras (mil millones) sin overflow. */
+      font-size: clamp(16px, 1.9vw, 22px);
       font-weight: var(--ui-fw-black);
-      line-height: 1;
+      line-height: 1.05;
       color: var(--ui-text);
-      word-break: break-all;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .card__hint {
       font-size: var(--ui-fs-xs);

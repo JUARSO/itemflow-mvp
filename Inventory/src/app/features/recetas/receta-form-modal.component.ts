@@ -81,6 +81,13 @@ type ItemGroup = ReturnType<RecetaFormModalComponent['buildItemGroup']>;
             }
           </div>
         </div>
+
+        <app-form-field label="Observaciones" hint="Tiempos, temperaturas, pasos críticos, advertencias">
+          <textarea
+            formControlName="notes"
+            rows="3"
+            placeholder="Ej: Hornear a 200°C por 25 min. Reposar masa 1h antes de armar."></textarea>
+        </app-form-field>
       </form>
 
       <div footer>
@@ -170,6 +177,7 @@ export class RecetaFormModalComponent {
   readonly form = this.fb.group({
     productId: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     yieldQty: this.fb.control(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    notes: this.fb.control('', { nonNullable: true }),
     items: this.fb.array<ItemGroup>([]),
   });
 
@@ -233,14 +241,14 @@ export class RecetaFormModalComponent {
       const r = this.editing();
       this.items.clear();
       if (r) {
-        this.form.patchValue({ productId: r.productId, yieldQty: r.yieldQty });
+        this.form.patchValue({ productId: r.productId, yieldQty: r.yieldQty, notes: r.notes ?? '' });
         r.items.forEach(it => {
           const kind: 'supply' | 'product' = it.supplyId ? 'supply' : 'product';
           const itemId = it.supplyId ?? it.productId ?? '';
           this.items.push(this.buildItemGroup(kind, itemId, it.qty));
         });
       } else if (this.isOpen()) {
-        this.form.reset({ productId: '', yieldQty: 1, items: [] });
+        this.form.reset({ productId: '', yieldQty: 1, notes: '', items: [] });
         this.addItem('supply');
       }
     });
@@ -263,6 +271,7 @@ export class RecetaFormModalComponent {
       productId: product.id,
       productName: product.name,
       yieldQty: Number(v.yieldQty),
+      notes: v.notes?.trim() || undefined,
       items: v.items.map(it => {
         if (it.kind === 'supply') {
           const sup = this.data.supplyById(it.itemId);
@@ -270,7 +279,7 @@ export class RecetaFormModalComponent {
             supplyId: it.itemId,
             itemName: sup?.name ?? '',
             qty: Number(it.qty),
-            unit: sup?.unit ?? '',
+            unit: sup?.unit ?? 'unidad',
           };
         }
         const subProd = this.data.productById(it.itemId);
@@ -278,7 +287,7 @@ export class RecetaFormModalComponent {
           productId: it.itemId,
           itemName: subProd?.name ?? '',
           qty: Number(it.qty),
-          unit: subProd?.unit ?? '',
+          unit: subProd?.unit ?? 'unidad',
         };
       }),
     };

@@ -5,6 +5,7 @@ import {
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { TenantContextService } from '../../core/services/tenant-context.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { AlertCardComponent } from '../../shared/components/alert-card/alert-card.component';
@@ -77,6 +78,7 @@ type Tab = 'activas' | 'restock' | 'stockout_risk' | 'excess' | 'resueltas';
         @for (a of visibles(); track a.id) {
           <app-alert-card
             [alert]="a"
+            [actionsEnabled]="tenant.canManageAlerts()"
             (onAcknowledge)="ack($event)"
             (onResolve)="resolve($event)"
             (onReorder)="reorder($event)">
@@ -102,6 +104,7 @@ type Tab = 'activas' | 'restock' | 'stockout_risk' | 'excess' | 'resueltas';
 })
 export class AlertasPage {
   protected readonly data = inject(DataService);
+  protected readonly tenant = inject(TenantContextService);
   private readonly auth = inject(AuthService);
 
   readonly tab = signal<Tab>('activas');
