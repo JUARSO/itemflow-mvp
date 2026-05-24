@@ -142,6 +142,10 @@ export interface ProjectionMarker {
       width: 100%; height: 100%;
       display: block;
     }
+    @media (max-width: 768px) {
+      .chart { height: 240px; }
+      .banner { font-size: var(--ui-fs-xs); }
+    }
     .banner {
       padding: var(--ui-sp-2) var(--ui-sp-3);
       margin-bottom: var(--ui-sp-2);

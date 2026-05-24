@@ -235,6 +235,7 @@ import { Member } from '../../core/models';
             Cambiar a Operador
           </ion-button>
         </div>
+
       </section>
 
       <section class="card">

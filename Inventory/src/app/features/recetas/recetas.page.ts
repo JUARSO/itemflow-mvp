@@ -62,16 +62,21 @@ import { Recipe, RecipeItem } from '../../core/models';
                 </div>
                 @if (tenant.isAdmin()) {
                   <div class="card__cost mono">
-                    Costo: \${{ costoReceta(recipe.id) | number:'1.0-0' }}
+                    <div>
+                      Total corrida: <strong>\${{ costoReceta(recipe.id) | number:'1.0-0' }}</strong>
+                    </div>
+                    <div class="card__cost-unit">
+                      Por unidad: \${{ costoPorUnidad(recipe.productId) | number:'1.0-0' }}
+                    </div>
                   </div>
                 }
               </header>
 
               <div class="card__items">
                 <div class="items__head">Insumos requeridos por corrida</div>
-                @for (it of recipe.items; track it.supplyId) {
+                @for (it of recipe.items; track $index) {
                   <div class="item-row">
-                    <span class="item-row__name">{{ it.supplyName }}</span>
+                    <span class="item-row__name">{{ it.itemName }}</span>
                     <span class="item-row__qty mono">{{ it.qty | number:'1.0-3' }} {{ it.unit }}</span>
                   </div>
                 }
@@ -149,9 +154,18 @@ import { Recipe, RecipeItem } from '../../core/models';
       font-size: var(--ui-fs-sm);
       font-weight: var(--ui-fw-bold);
       background: var(--ui-success-tint);
-      padding: 4px 10px;
+      padding: 6px 10px;
       border: var(--ui-border-w-sm) solid var(--ui-border);
       color: var(--ui-success);
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .card__cost-unit {
+      font-weight: var(--ui-fw-medium);
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text);
     }
     .items__head {
       font-size: var(--ui-fs-xs);
@@ -195,17 +209,17 @@ export class RecetasPage {
     entityLabel: 'receta',
     entityLabelPlural: 'recetas',
     templateFilename: 'plantilla-recetas.csv',
-    headers: ['producto_sku', 'rinde', 'insumo_sku', 'cantidad'],
+    headers: ['producto_sku', 'rinde', 'tipo', 'componente_sku', 'cantidad'],
     templateRows: [
-      ['PROD-BAG-001', '10', 'INS-HARINA-001', '1.5'],
-      ['PROD-BAG-001', '10', 'INS-SAL-001', '0.03'],
-      ['PROD-BAG-001', '10', 'INS-LEVADURA-001', '0.02'],
-      ['PROD-MAR-001', '20', 'INS-HARINA-001', '2.0'],
+      ['PROD-BAG-001', '10', 'insumo', 'INS-HARINA-001', '1.5'],
+      ['PROD-BAG-001', '10', 'insumo', 'INS-SAL-001', '0.03'],
+      ['PROD-BAG-001', '10', 'insumo', 'INS-LEVADURA-001', '0.02'],
+      ['PROD-SANDWICH-001', '1', 'subproducto', 'PROD-BAG-001', '1'],
+      ['PROD-SANDWICH-001', '1', 'insumo', 'INS-QUESO-001', '0.05'],
     ],
-    hint: 'Una fila por ingrediente. Agrupamos por producto_sku: cada producto genera UNA receta con todos sus insumos. El producto y todos sus insumos deben existir (busca por SKU). El campo "rinde" debe ser igual en todas las filas del mismo producto.',
+    hint: 'Una fila por componente. Columna "tipo" acepta "insumo" o "subproducto" (default: insumo si está vacío). componente_sku busca el SKU según el tipo. El producto destino y los componentes deben existir.',
     process: (rows) => {
       const errors: { row: number; raw: Record<string, string>; message: string }[] = [];
-      // Mapas por SKU para validación rápida
       const products = new Map(this.data.activeProducts().map(p => [p.sku.toLowerCase(), p]));
       const supplies = new Map(this.data.activeSupplies().map(s => [s.sku.toLowerCase(), s]));
 
@@ -214,17 +228,34 @@ export class RecetasPage {
       rows.forEach((r, i) => {
         const rowNum = i + 2;
         const prodSku = (r['producto_sku'] ?? '').trim();
-        const insSku = (r['insumo_sku'] ?? '').trim();
+        // Backward-compat: si no hay componente_sku, leer del campo viejo insumo_sku.
+        const compSku = (r['componente_sku'] ?? r['insumo_sku'] ?? '').trim();
+        const tipo = (r['tipo'] ?? 'insumo').trim().toLowerCase();
         const rinde = Number(r['rinde']);
         const cantidad = Number(r['cantidad']);
         if (!prodSku) { errors.push({ row: rowNum, raw: r, message: 'producto_sku vacío' }); return; }
-        if (!insSku) { errors.push({ row: rowNum, raw: r, message: 'insumo_sku vacío' }); return; }
+        if (!compSku) { errors.push({ row: rowNum, raw: r, message: 'componente_sku vacío' }); return; }
+        if (!['insumo', 'subproducto'].includes(tipo)) {
+          errors.push({ row: rowNum, raw: r, message: `tipo debe ser "insumo" o "subproducto" (recibido: "${tipo}")` });
+          return;
+        }
         if (!isFinite(rinde) || rinde <= 0) { errors.push({ row: rowNum, raw: r, message: 'rinde debe ser > 0' }); return; }
         if (!isFinite(cantidad) || cantidad <= 0) { errors.push({ row: rowNum, raw: r, message: 'cantidad debe ser > 0' }); return; }
         const prod = products.get(prodSku.toLowerCase());
         if (!prod) { errors.push({ row: rowNum, raw: r, message: `Producto con SKU "${prodSku}" no existe` }); return; }
-        const sup = supplies.get(insSku.toLowerCase());
-        if (!sup) { errors.push({ row: rowNum, raw: r, message: `Insumo con SKU "${insSku}" no existe` }); return; }
+
+        let recipeItem: RecipeItem;
+        if (tipo === 'insumo') {
+          const sup = supplies.get(compSku.toLowerCase());
+          if (!sup) { errors.push({ row: rowNum, raw: r, message: `Insumo con SKU "${compSku}" no existe` }); return; }
+          recipeItem = { supplyId: sup.id, itemName: sup.name, qty: cantidad, unit: sup.unit };
+        } else {
+          // subproducto: el SKU del componente debe ser un producto (no necesariamente con receta)
+          const subProd = products.get(compSku.toLowerCase());
+          if (!subProd) { errors.push({ row: rowNum, raw: r, message: `Producto subproducto con SKU "${compSku}" no existe` }); return; }
+          if (subProd.id === prod.id) { errors.push({ row: rowNum, raw: r, message: `Auto-referencia: ${prodSku} no puede ser subproducto de sí mismo` }); return; }
+          recipeItem = { productId: subProd.id, itemName: subProd.name, qty: cantidad, unit: subProd.unit };
+        }
 
         const key = prod.id;
         let group = grouped.get(key);
@@ -233,12 +264,16 @@ export class RecetasPage {
           grouped.set(key, group);
         }
         if (group.yieldQty !== rinde) {
-          { errors.push({ row: rowNum, raw: r, message: `Rinde inconsistente para ${prodSku} (esperaba ${group.yieldQty})` }); return; }
+          errors.push({ row: rowNum, raw: r, message: `Rinde inconsistente para ${prodSku} (esperaba ${group.yieldQty})` });
+          return;
         }
-        if (group.items.some(it => it.supplyId === sup.id)) {
-          { errors.push({ row: rowNum, raw: r, message: `Insumo ${insSku} duplicado en receta de ${prodSku}` }); return; }
+        const duplicateId = recipeItem.supplyId ?? recipeItem.productId;
+        const exists = group.items.some(it => (it.supplyId ?? it.productId) === duplicateId);
+        if (exists) {
+          errors.push({ row: rowNum, raw: r, message: `Componente ${compSku} duplicado en receta de ${prodSku}` });
+          return;
         }
-        group.items.push({ supplyId: sup.id, supplyName: sup.name, qty: cantidad, unit: sup.unit });
+        group.items.push(recipeItem);
         group.rowNums.push(rowNum);
       });
 
@@ -267,13 +302,27 @@ export class RecetasPage {
     return `Eliminar la receta de "${r.productName}". El producto seguirá existiendo pero ya no descontará insumos al venderse.`;
   });
 
+  /** Costo total de hacer una corrida completa de la receta (sin dividir por yield). */
   costoReceta(recipeId: string): number {
     const r = this.data.recipes().find(x => x.id === recipeId);
     if (!r) return 0;
     return r.items.reduce((sum, it) => {
-      const sup = this.data.supplyById(it.supplyId);
-      return sum + (sup?.cost ?? 0) * it.qty;
+      // Insumo: usar costo directo del supply
+      if (it.supplyId) {
+        const sup = this.data.supplyById(it.supplyId);
+        return sum + (sup?.cost ?? 0) * it.qty;
+      }
+      // Subproducto: usar effectiveProductCost (recursivo si tiene receta)
+      if (it.productId) {
+        return sum + this.data.effectiveProductCost(it.productId) * it.qty;
+      }
+      return sum;
     }, 0);
+  }
+
+  /** Costo por cada unidad producida (delega al helper del service). */
+  costoPorUnidad(productId: string): number {
+    return this.data.computeRecipeCost(productId) ?? 0;
   }
 
   abrirNuevo() {

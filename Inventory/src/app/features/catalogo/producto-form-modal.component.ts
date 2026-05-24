@@ -48,8 +48,16 @@ import { ToastService } from '../../shared/components/toast/toast.service';
         </div>
 
         <div class="row">
-          <app-form-field label="Precio compra (costo)" [required]="true">
-            <input type="number" formControlName="buyPrice" min="0" />
+          <app-form-field
+            [label]="isReventa() ? 'Precio compra (costo)' : 'Costo (calculado desde receta)'"
+            [required]="isReventa()"
+            [hint]="isReventa() ? undefined : (recipeCostHint() ?? undefined)">
+            <input
+              type="number"
+              formControlName="buyPrice"
+              min="0"
+              [readonly]="!isReventa()"
+              [class.input--computed]="!isReventa()" />
           </app-form-field>
           <app-form-field label="Precio venta" [required]="true">
             <input type="number" formControlName="sellPrice" min="0" />
@@ -114,6 +122,14 @@ import { ToastService } from '../../shared/components/toast/toast.service';
       color: var(--ui-text-muted);
       margin-bottom: var(--ui-sp-3);
     }
+    /* Input readonly que muestra valor calculado: se ve grisáceo con label especial. */
+    .input--computed {
+      background: var(--ui-surface-2) !important;
+      color: var(--ui-text-muted) !important;
+      cursor: not-allowed;
+      font-family: var(--ui-font-mono);
+      font-weight: var(--ui-fw-bold);
+    }
   `],
 })
 export class ProductoFormModalComponent {
@@ -144,8 +160,45 @@ export class ProductoFormModalComponent {
   private readonly _hasRecipeSignal = signal(false);
   readonly isReventa = computed(() => !this._hasRecipeSignal());
 
+  /**
+   * Costo calculado desde la receta del producto editado. null si está creando
+   * un producto nuevo (sin id todavía) o si no tiene receta aún.
+   */
+  readonly recipeCost = computed<number | null>(() => {
+    if (this.isReventa()) return null;
+    const editing = this.editing();
+    if (!editing) return null; // creando nuevo, no hay receta todavía
+    return this.data.computeRecipeCost(editing.id);
+  });
+
+  readonly recipeCostHint = computed<string | null>(() => {
+    if (this.isReventa()) return null;
+    const editing = this.editing();
+    if (!editing) {
+      return 'Crea el producto, luego define la receta en /recetas — el costo se calcula automáticamente.';
+    }
+    const cost = this.recipeCost();
+    if (cost == null) {
+      return 'Aún no hay receta para este producto. Defínela en /recetas para calcular el costo.';
+    }
+    const recipe = this.data.recipeFor(editing.id);
+    const items = recipe?.items.length ?? 0;
+    return `Σ de ${items} insumo${items === 1 ? '' : 's'} ÷ rinde ${recipe?.yieldQty} = costo unitario`;
+  });
+
   onHasRecipeChange() {
-    this._hasRecipeSignal.set(this.form.controls.hasRecipe.value);
+    const newVal = this.form.controls.hasRecipe.value;
+    this._hasRecipeSignal.set(newVal);
+    this.syncRecipeCostToForm();
+  }
+
+  /** Si está marcado hasRecipe, sobrescribe buyPrice del form con el costo calculado. */
+  private syncRecipeCostToForm() {
+    if (this.isReventa()) return;
+    const cost = this.recipeCost();
+    if (cost != null) {
+      this.form.controls.buyPrice.setValue(cost);
+    }
   }
 
   constructor() {
@@ -166,6 +219,8 @@ export class ProductoFormModalComponent {
           description: p.description ?? '',
         });
         this._hasRecipeSignal.set(p.hasRecipe);
+        // Si tiene receta, sobrescribir el buyPrice con el costo calculado.
+        this.syncRecipeCostToForm();
       } else if (this.isOpen()) {
         this.form.reset({
           sku: '',
@@ -193,6 +248,13 @@ export class ProductoFormModalComponent {
     }
     const v = this.form.getRawValue();
     const isReventa = !v.hasRecipe;
+    // Si tiene receta, el costo siempre viene del cálculo desde insumos.
+    // Esto evita guardar un buyPrice stale si la receta cambió mientras tanto.
+    const editing = this.editing();
+    const computedCost = !isReventa && editing
+      ? this.data.computeRecipeCost(editing.id)
+      : null;
+    const finalBuyPrice = computedCost ?? Number(v.buyPrice);
     const rop = isReventa && v.reorderPoint != null && v.reorderPoint !== ('' as unknown as number)
       ? Number(v.reorderPoint) : undefined;
     const ms = isReventa && v.minStock != null && v.minStock !== ('' as unknown as number)
@@ -206,7 +268,7 @@ export class ProductoFormModalComponent {
       name: v.name.trim(),
       category: v.category?.trim() || undefined,
       unit: v.unit,
-      buyPrice: Number(v.buyPrice),
+      buyPrice: finalBuyPrice,
       sellPrice: Number(v.sellPrice),
       leadTime: Number(v.leadTime),
       hasRecipe: v.hasRecipe,
@@ -215,7 +277,6 @@ export class ProductoFormModalComponent {
       description: v.description?.trim() || undefined,
       active: true,
     };
-    const editing = this.editing();
     if (editing) {
       this.data.updateProduct({ ...editing, ...base });
       await this.toast.show(`Producto "${base.name}" actualizado.`);

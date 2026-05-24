@@ -81,12 +81,15 @@ import { Product } from '../../core/models';
                 </div>
                 @if (tenant.isAdmin()) {
                   <div class="card__cell">
-                    <div class="card__label">Costo</div>
-                    <div class="card__value mono">\${{ p.buyPrice | number:'1.0-0' }}</div>
+                    <div class="card__label">
+                      Costo
+                      @if (p.hasRecipe) { <span class="card__tag">receta</span> }
+                    </div>
+                    <div class="card__value mono">\${{ effectiveCost(p) | number:'1.0-0' }}</div>
                   </div>
                   <div class="card__cell">
                     <div class="card__label">Margen</div>
-                    <div class="card__value mono">{{ margen(p.sellPrice, p.buyPrice) }}%</div>
+                    <div class="card__value mono">{{ margen(p.sellPrice, effectiveCost(p)) }}%</div>
                   </div>
                 }
               </div>
@@ -178,6 +181,19 @@ import { Product } from '../../core/models';
       font-size: var(--ui-fs-xs);
       color: var(--ui-text-muted);
       font-weight: var(--ui-fw-medium);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .card__tag {
+      font-size: 9px;
+      font-weight: var(--ui-fw-bold);
+      padding: 1px 6px;
+      background: var(--ui-warning-tint);
+      color: var(--ui-warning);
+      border-radius: var(--ui-radius-pill);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .card__value { font-size: var(--ui-fs-md); font-weight: var(--ui-fw-bold); }
     .card__actions {
@@ -289,6 +305,15 @@ export class CatalogoPage {
     if (!p) return '';
     return `Vas a archivar "${p.name}". Su receta y stock asociado también se eliminarán. Esta acción no se puede deshacer.`;
   });
+
+  /**
+   * Costo efectivo del producto. Si tiene receta, lo calcula desde insumos
+   * (reactivo: refleja cambios de costo de insumo sin guardar el producto).
+   * Si es reventa, devuelve buyPrice almacenado.
+   */
+  effectiveCost(p: Product): number {
+    return this.data.effectiveProductCost(p.id);
+  }
 
   margen(sell: number, buy: number): string {
     if (sell === 0) return '0';

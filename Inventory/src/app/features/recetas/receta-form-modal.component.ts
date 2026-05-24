@@ -37,23 +37,36 @@ type ItemGroup = ReturnType<RecetaFormModalComponent['buildItemGroup']>;
 
         <div class="items">
           <div class="items__head">
-            <h3>Insumos requeridos</h3>
-            <ion-button size="small" fill="clear" class="ghost" (click)="addItem()">+ Agregar insumo</ion-button>
+            <h3>Componentes de la receta</h3>
+            <div class="items__actions">
+              <ion-button size="small" fill="clear" class="ghost" (click)="addItem('supply')">+ Insumo</ion-button>
+              <ion-button size="small" fill="clear" class="ghost" (click)="addItem('product')">+ Subproducto</ion-button>
+            </div>
           </div>
 
           @if (items.controls.length === 0) {
             <div class="items__empty">
-              Agrega al menos un insumo para definir la receta.
+              Agrega al menos un insumo o subproducto para definir la receta.
             </div>
           }
 
           <div formArrayName="items" class="items__list">
             @for (ctrl of items.controls; track $index) {
               <div [formGroupName]="$index" class="item">
-                <select formControlName="supplyId" class="item__supply">
-                  <option value="">— Insumo —</option>
-                  @for (s of data.activeSupplies(); track s.id) {
-                    <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+                <select formControlName="kind" class="item__kind" (change)="onKindChange($index)">
+                  <option value="supply">📦 Insumo</option>
+                  <option value="product">🍞 Subproducto</option>
+                </select>
+                <select formControlName="itemId" class="item__supply">
+                  <option value="">— Selecciona —</option>
+                  @if (kindAt($index) === 'supply') {
+                    @for (s of data.activeSupplies(); track s.id) {
+                      <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+                    }
+                  } @else {
+                    @for (p of subproductosDisponibles(); track p.id) {
+                      <option [value]="p.id">{{ p.name }} ({{ p.unit }})</option>
+                    }
                   }
                 </select>
                 <input
@@ -106,13 +119,21 @@ type ItemGroup = ReturnType<RecetaFormModalComponent['buildItemGroup']>;
       font-size: var(--ui-fs-sm);
     }
     .items__list { display: grid; gap: var(--ui-sp-2); }
+    .items__actions { display: flex; gap: 4px; flex-wrap: wrap; }
     .item {
       display: grid;
-      grid-template-columns: 1fr 100px 36px;
+      grid-template-columns: 130px 1fr 100px 36px;
       gap: var(--ui-sp-2);
       align-items: center;
     }
-    .item__supply, .item__qty {
+    @media (max-width: 600px) {
+      .item { grid-template-columns: 130px 1fr 80px 36px; }
+    }
+    @media (max-width: 480px) {
+      .item { grid-template-columns: 1fr 1fr; }
+      .item__remove { grid-column: 2 / 3; justify-self: end; }
+    }
+    .item__kind, .item__supply, .item__qty {
       padding: 8px 10px;
       border: var(--ui-border-w-md) solid var(--ui-border);
       background: var(--ui-surface);
@@ -158,26 +179,54 @@ export class RecetaFormModalComponent {
 
   productosDisponibles = () => {
     const editing = this.editing();
-    // si editando, incluir el producto actual; sino solo productos sin receta
-    return this.data.activeProducts().filter(p =>
-      p.id === editing?.productId || !p.hasRecipe
-    );
+    // Productos que ya tienen receta definida (para evitar duplicados).
+    const conRecetaDefinida = new Set(this.data.recipes().map(r => r.productId));
+    return this.data.activeProducts().filter(p => {
+      // Editando: siempre incluir el producto cuya receta se está editando.
+      if (editing && p.id === editing.productId) return true;
+      // Solo productos marcados como "usa receta" en el catálogo.
+      if (!p.hasRecipe) return false;
+      // Y que aún NO tengan una receta definida (sino sería duplicado).
+      return !conRecetaDefinida.has(p.id);
+    });
   };
 
-  buildItemGroup(supplyId = '', qty = 1) {
+  buildItemGroup(kind: 'supply' | 'product' = 'supply', itemId = '', qty = 1) {
     return this.fb.group({
-      supplyId: this.fb.control(supplyId, { nonNullable: true, validators: [Validators.required] }),
+      kind: this.fb.control<'supply' | 'product'>(kind, { nonNullable: true, validators: [Validators.required] }),
+      itemId: this.fb.control(itemId, { nonNullable: true, validators: [Validators.required] }),
       qty: this.fb.control(qty, { nonNullable: true, validators: [Validators.required, Validators.min(0.001)] }),
     });
   }
 
-  addItem() {
-    this.items.push(this.buildItemGroup());
+  addItem(kind: 'supply' | 'product' = 'supply') {
+    this.items.push(this.buildItemGroup(kind));
   }
 
   removeItem(i: number) {
     this.items.removeAt(i);
   }
+
+  /** Devuelve el kind actual de un item (para condicionar el select del template). */
+  kindAt(i: number): 'supply' | 'product' {
+    return this.items.at(i)?.get('kind')?.value ?? 'supply';
+  }
+
+  /** Cuando cambia el kind, limpiar el itemId (no tiene sentido conservar un supplyId si ahora es subproducto). */
+  onKindChange(i: number) {
+    this.items.at(i)?.get('itemId')?.setValue('');
+  }
+
+  /**
+   * Productos con receta disponibles como SUBPRODUCTOS de la receta editada.
+   * Excluimos el producto cuya receta estamos editando para evitar auto-referencia.
+   */
+  subproductosDisponibles = () => {
+    const currentProductId = this.form.controls.productId.value;
+    return this.data.activeProducts().filter(p =>
+      p.hasRecipe && p.id !== currentProductId
+    );
+  };
 
   constructor() {
     effect(() => {
@@ -185,10 +234,14 @@ export class RecetaFormModalComponent {
       this.items.clear();
       if (r) {
         this.form.patchValue({ productId: r.productId, yieldQty: r.yieldQty });
-        r.items.forEach(it => this.items.push(this.buildItemGroup(it.supplyId, it.qty)));
+        r.items.forEach(it => {
+          const kind: 'supply' | 'product' = it.supplyId ? 'supply' : 'product';
+          const itemId = it.supplyId ?? it.productId ?? '';
+          this.items.push(this.buildItemGroup(kind, itemId, it.qty));
+        });
       } else if (this.isOpen()) {
         this.form.reset({ productId: '', yieldQty: 1, items: [] });
-        this.addItem();
+        this.addItem('supply');
       }
     });
   }
@@ -196,7 +249,7 @@ export class RecetaFormModalComponent {
   async onSubmit() {
     if (this.form.invalid || this.items.length === 0) {
       this.form.markAllAsTouched();
-      await this.toast.show('Completa el producto, rendimiento y al menos un insumo.', 'danger');
+      await this.toast.show('Completa el producto, rendimiento y al menos un componente.', 'danger');
       return;
     }
     const v = this.form.getRawValue();
@@ -211,12 +264,21 @@ export class RecetaFormModalComponent {
       productName: product.name,
       yieldQty: Number(v.yieldQty),
       items: v.items.map(it => {
-        const sup = this.data.supplyById(it.supplyId);
+        if (it.kind === 'supply') {
+          const sup = this.data.supplyById(it.itemId);
+          return {
+            supplyId: it.itemId,
+            itemName: sup?.name ?? '',
+            qty: Number(it.qty),
+            unit: sup?.unit ?? '',
+          };
+        }
+        const subProd = this.data.productById(it.itemId);
         return {
-          supplyId: it.supplyId,
-          supplyName: sup?.name ?? '',
+          productId: it.itemId,
+          itemName: subProd?.name ?? '',
           qty: Number(it.qty),
-          unit: sup?.unit ?? '',
+          unit: subProd?.unit ?? '',
         };
       }),
     };

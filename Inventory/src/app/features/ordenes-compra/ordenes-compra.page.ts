@@ -218,6 +218,13 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
     .po__expected { font-size: var(--ui-fs-sm); display: flex; gap: 6px; align-items: center; }
     .po__actions { display: flex; gap: var(--ui-sp-2); flex-wrap: wrap; }
     .muted { color: var(--ui-text-muted); }
+
+    @media (max-width: 768px) {
+      .po-item { grid-template-columns: 1fr 1fr; gap: 4px var(--ui-sp-2); padding: var(--ui-sp-2) 0; }
+      .po-item__name { grid-column: 1 / -1; }
+      .po-item__qty { text-align: left; }
+      .po__actions ion-button { flex: 1 1 auto; min-width: 110px; }
+    }
   `],
 })
 export class OrdenesCompraPage {

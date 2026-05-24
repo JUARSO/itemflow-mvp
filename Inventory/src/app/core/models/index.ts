@@ -63,9 +63,18 @@ export interface Supply {
   active: boolean;
 }
 
+/**
+ * Item de una receta. Puede referir a:
+ *  - un INSUMO crudo (supplyId definido), o
+ *  - un SUBPRODUCTO con su propia receta (productId definido)
+ *
+ * Exactamente uno de supplyId/productId debe estar presente.
+ * `itemName` es el nombre legible cacheado para evitar lookups en UI.
+ */
 export interface RecipeItem {
-  supplyId: string;
-  supplyName: string;
+  supplyId?: string;
+  productId?: string;
+  itemName: string;
   qty: number;
   unit: string;
 }
@@ -142,6 +151,51 @@ export interface Alert {
   acknowledgedBy?: string;
   resolvedAt?: Date;
   resolvedBy?: string;
+}
+
+// =========================================================
+//  Demand Boost (override administrativo de la demanda)
+// =========================================================
+
+export type BoostMode =
+  | 'multiplier'   // demanda diaria = histórico × value
+  | 'absoluteAdd'  // demanda diaria = histórico + value (u/día)
+  | 'eventTotal';  // se consumirán value unidades en TODO el período
+
+export type BoostReason =
+  | 'promo'
+  | 'evento'
+  | 'contrato'
+  | 'feriado'
+  | 'campaña'
+  | 'otro';
+
+export type BoostStatus = 'active' | 'expired' | 'cancelled';
+
+/**
+ * Override declarativo de la demanda esperada para un item durante un período.
+ * Se aplica a:
+ *  - regenerateRestockAlerts (lookahead)
+ *  - simulateBurnDown (consumo diario)
+ *  - PredictionService.simulateLocally (trayectoria 180d)
+ *
+ * `status='expired'` se calcula on-the-fly por activeBoosts() en runtime —
+ * lo guardado es 'active' o 'cancelled'.
+ */
+export interface DemandBoost {
+  id: string;
+  itemKind: 'supply' | 'product';
+  itemId: string;
+  itemName: string;       // cacheado al crear para evitar lookups
+  startDate: Date;
+  endDate: Date;
+  mode: BoostMode;
+  value: number;
+  reason: BoostReason;
+  description?: string;
+  status: BoostStatus;
+  createdAt: Date;
+  createdBy: string;
 }
 
 // =========================================================

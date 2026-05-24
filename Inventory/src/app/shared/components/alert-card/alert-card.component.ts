@@ -135,6 +135,16 @@ import { Alert } from '../../../core/models';
       flex-wrap: wrap;
       margin-top: var(--ui-sp-3);
     }
+    @media (max-width: 768px) {
+      .alert__body { padding: var(--ui-sp-3); }
+      .alert__title { font-size: var(--ui-fs-md); }
+      .alert__message { font-size: var(--ui-fs-sm); }
+      .alert__header { flex-wrap: wrap; }
+      .alert__actions ion-button {
+        flex: 1 1 auto;
+        min-width: 120px;
+      }
+    }
   `],
 })
 export class AlertCardComponent {

@@ -127,9 +127,14 @@ type Range = '7d' | '30d' | 'todo';
       .table__head { display: none; }
       .table__row {
         grid-template-columns: 1fr 1fr;
-        gap: var(--ui-sp-2);
+        gap: 4px var(--ui-sp-2);
+        padding: var(--ui-sp-3) var(--ui-sp-4);
+        border-bottom: var(--ui-border-w-sm) solid var(--ui-border);
       }
-      .num { text-align: left; }
+      .num { text-align: left; font-size: var(--ui-fs-sm); }
+    }
+    @media (max-width: 380px) {
+      .table__row { grid-template-columns: 1fr; }
     }
   `],
 })

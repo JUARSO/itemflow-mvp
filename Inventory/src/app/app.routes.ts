@@ -22,10 +22,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/alertas/alertas.page').then(m => m.AlertasPage),
       },
       {
-        path: 'kardex',
-        loadComponent: () => import('./features/kardex/kardex.page').then(m => m.KardexPage),
-      },
-      {
         path: 'catalogo',
         loadComponent: () => import('./features/catalogo/catalogo.page').then(m => m.CatalogoPage),
       },
@@ -56,6 +52,10 @@ export const routes: Routes = [
       {
         path: 'burn-down',
         loadComponent: () => import('./features/burn-down/burn-down.page').then(m => m.BurnDownPage),
+      },
+      {
+        path: 'boosts',
+        loadComponent: () => import('./features/boosts/boosts.page').then(m => m.BoostsPage),
       },
       {
         path: 'mas',

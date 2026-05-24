@@ -1,8 +1,19 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import {
   PredictionDecision, PredictionRequest, PredictionResponse,
   PredictionEvent,
 } from '../models';
+import { DataService } from './data.service';
+
+/**
+ * Contexto opcional del item analizado. Si se pasa, el simulador local usa
+ * `effectiveDailyDemand` (rolling + boosts activos) en vez de la rolling_mean
+ * plana del request — produce una trayectoria que respeta promos/eventos.
+ */
+export interface PredictionItemContext {
+  kind: 'supply' | 'product';
+  id: string;
+}
 
 /**
  * Endpoint del backend. Si la respuesta no es OK o falla la red, se usa
@@ -24,6 +35,7 @@ export interface PredictionState {
 
 @Injectable({ providedIn: 'root' })
 export class PredictionService {
+  private readonly data = inject(DataService);
   private readonly _state = signal<PredictionState>({
     loading: false,
     error: null,
@@ -33,7 +45,7 @@ export class PredictionService {
   });
   readonly state = this._state.asReadonly();
 
-  async predict(req: PredictionRequest): Promise<PredictionResponse> {
+  async predict(req: PredictionRequest, itemContext?: PredictionItemContext): Promise<PredictionResponse> {
     this._state.update(s => ({ ...s, loading: true, error: null, request: req }));
     try {
       let result: PredictionResponse;
@@ -41,7 +53,7 @@ export class PredictionService {
       try {
         result = await this.callBackend(req);
       } catch {
-        result = this.simulateLocally(req);
+        result = this.simulateLocally(req, itemContext);
         simulated = true;
       }
       this._state.set({ loading: false, error: null, result, request: req, simulated });
@@ -79,7 +91,7 @@ export class PredictionService {
   //  `lt_avg` días después con cantidad = stock_max - stock_actual
   //  (acotado a cantidad_modelo del Modelo 1).
   // ------------------------------------------------------------
-  private simulateLocally(req: PredictionRequest): PredictionResponse {
+  private simulateLocally(req: PredictionRequest, itemContext?: PredictionItemContext): PredictionResponse {
     const safety_stock = +(req.rolling_std_7d * Math.sqrt(req.lt_avg) * 1.65).toFixed(2);
     const reorder_point = +(req.rolling_mean_7d * req.lt_avg + safety_stock).toFixed(2);
     const dias_cobertura = req.rolling_mean_7d > 0
@@ -118,8 +130,12 @@ export class PredictionService {
         const qty = Math.max(0, Math.min(cantidad_final, req.stock_max - Math.round(stock)));
         if (qty > 0) eventos.push({ trigger: d, arrival: d + lt, qty });
       }
-      // Consumo del día
-      stock = Math.max(0, stock - req.rolling_mean_7d);
+      // Consumo del día: si tenemos contexto de item, usamos demanda efectiva
+      // (rolling + boosts). Sin contexto caemos al rolling_mean_7d del request.
+      const dayDemand = itemContext
+        ? this.data.effectiveDailyDemand(itemContext.kind, itemContext.id, d)
+        : req.rolling_mean_7d;
+      stock = Math.max(0, stock - dayDemand);
     }
 
     const get = (i: number) => trayectoria[Math.min(i, trayectoria.length - 1)];

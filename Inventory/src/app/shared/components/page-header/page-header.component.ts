@@ -44,9 +44,23 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       display: flex;
       gap: var(--ui-sp-2);
       flex-shrink: 0;
+      flex-wrap: wrap;
     }
     @media (max-width: 768px) {
+      .ph {
+        padding: var(--ui-sp-3);
+        gap: var(--ui-sp-2);
+      }
       .ph__title { font-size: var(--ui-fs-xl); }
+      .ph__sub { font-size: var(--ui-fs-sm); }
+      .ph__actions {
+        width: 100%;
+      }
+      /* Botones del header ocupan ancho razonable y crecen si hace falta */
+      .ph__actions ::ng-deep ion-button {
+        flex: 1 1 auto;
+        min-width: 140px;
+      }
     }
   `],
 })

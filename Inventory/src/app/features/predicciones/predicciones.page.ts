@@ -917,7 +917,16 @@ export class PrediccionesPage {
         dia_semana_num: ((now.getDay() + 6) % 7) + 1, // JS dom=0..sáb=6 → lun=1..dom=7
         mes_num: now.getMonth() + 1,
       };
-      await this.pred.predict(payload);
+      // Si el usuario cargó el formulario desde el catálogo, pasamos el
+      // contexto del item para que el simulador local respete los boosts activos.
+      const ref = this.selectedItemRef;
+      const itemContext = ref
+        ? (() => {
+            const [k, id] = ref.split(':') as ['supply' | 'product', string];
+            return { kind: k, id };
+          })()
+        : undefined;
+      await this.pred.predict(payload, itemContext);
     } catch (e: unknown) {
       await this.toast.show(
         e instanceof Error ? e.message : 'Error al ejecutar la predicción.',

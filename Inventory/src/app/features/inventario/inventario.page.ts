@@ -239,12 +239,22 @@ type StatusFilter = 'todos' | StockStatus;
 
     @media (max-width: 768px) {
       .table__head { display: none; }
-      .table__row {
+      /* En mobile cada fila es una card: nombre full-width arriba,
+         stock + status en grid abajo. Mejor escaneable. */
+      .table__row,
+      .table--products .table__row {
         grid-template-columns: 1fr 1fr;
-        gap: var(--ui-sp-2);
+        gap: 6px var(--ui-sp-2);
+        padding: var(--ui-sp-3) var(--ui-sp-4);
       }
       .cell--main { grid-column: 1 / -1; }
-      .num { text-align: left; }
+      .num { text-align: left; font-size: var(--ui-fs-sm); }
+    }
+    @media (max-width: 380px) {
+      .table__row,
+      .table--products .table__row {
+        grid-template-columns: 1fr;
+      }
     }
 
     .cta-block {

@@ -151,12 +151,20 @@ const REASONS_BY_KIND: Record<MovKind, ReasonOption[]> = {
       cursor: pointer;
       transition: all 120ms ease;
     }
-    .seg__opt:hover { background: var(--ui-surface-3); }
+    /* Solo aplica hover gris cuando NO está activo, sino el text blanco se pierde. */
+    .seg__opt:not(.seg__opt--active):hover {
+      background: var(--ui-surface-3);
+      border-color: var(--ui-primary);
+    }
     .seg__opt--active {
       border-color: var(--ui-primary);
       background: var(--ui-primary);
       color: var(--ui-primary-contrast);
       box-shadow: var(--ui-shadow-sm);
+    }
+    /* Cuando está activo, hover preserva el tema y solo oscurece levemente. */
+    .seg__opt--active:hover {
+      background: var(--ui-primary-shade);
     }
     .seg__opt input[type="radio"] {
       position: absolute;

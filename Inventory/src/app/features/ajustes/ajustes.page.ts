@@ -206,9 +206,13 @@ const REASON_LABELS: Record<string, string> = {
       .table__head { display: none; }
       .table__row {
         grid-template-columns: 1fr 1fr;
-        gap: var(--ui-sp-2);
+        gap: 6px var(--ui-sp-2);
+        padding: var(--ui-sp-3);
       }
-      .cell__name { grid-column: 1 / -1; }
+      .cell__name { grid-column: 1 / -1; font-size: var(--ui-fs-md); }
+      .num { text-align: left; font-size: var(--ui-fs-sm); }
+      .cell__reason { grid-column: 1 / -1; }
+      .cell__user { grid-column: 1 / -1; }
     }
   `],
 })

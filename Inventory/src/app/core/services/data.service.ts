@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  Alert, DemandPrediction, KardexEntry, Member, Product,
+  Alert, DemandBoost, DemandPrediction, KardexEntry, Member, Product,
   PurchaseOrder, Recipe, SaleRecord, StockItem, Supply, SupplyStockItem,
   StockStatus, UserRole, POStatus,
 } from '../models';
@@ -28,11 +28,13 @@ export class DataService {
   private readonly _predictions = signal<DemandPrediction[]>([...MOCK_PREDICTIONS]);
   private readonly _pos = signal<PurchaseOrder[]>([...MOCK_PURCHASE_ORDERS]);
   private readonly _members = signal<Member[]>([...MOCK_MEMBERS]);
+  private readonly _boosts = signal<DemandBoost[]>([]);
 
   constructor() {
     // Sembrar alertas auto-derivadas a partir del stock inicial.
     this.regenerateRestockAlerts();
   }
+
 
   // ----- Readonly accessors -----
   readonly products = this._products.asReadonly();
@@ -48,6 +50,16 @@ export class DataService {
   readonly predictions = this._predictions.asReadonly();
   readonly purchaseOrders = this._pos.asReadonly();
   readonly members = this._members.asReadonly();
+  readonly boosts = this._boosts.asReadonly();
+
+  /**
+   * Boosts no cancelados cuyo período cubre la fecha actual o el futuro
+   * (no expirados todavía). Útil para mostrar listas y badges.
+   */
+  readonly activeBoosts = computed(() => {
+    const now = Date.now();
+    return this._boosts().filter(b => b.status === 'active' && b.endDate.getTime() >= now);
+  });
 
   // ----- KPIs computed -----
   readonly totalProducts = computed(() => this._products().filter(p => p.active).length);
@@ -109,6 +121,124 @@ export class DataService {
 
   recipeFor(productId: string): Recipe | undefined {
     return this._recipes().find(r => r.productId === productId);
+  }
+
+  /**
+   * Explosión recursiva de Bill of Materials.
+   *
+   * Para un producto con receta, devuelve dos listas planas:
+   *  - `supplyNeeds`: insumos crudos consumidos (descontados del stock de insumos)
+   *  - `reventaNeeds`: subproductos de reventa (sin receta) que deben descontarse
+   *    del stock del producto. Los subproductos CON receta se expanden a sus
+   *    insumos base recursivamente.
+   *
+   * Útil para `registerSale` (descontar stock correctamente) y para calcular
+   * consumo real cuando hay cadenas multi-nivel (Sandwich → Pan → harina).
+   */
+  explodeBom(productId: string, qty: number, visited: Set<string> = new Set()): {
+    supplyNeeds: { supplyId: string; itemName: string; qty: number }[];
+    reventaNeeds: { productId: string; itemName: string; qty: number }[];
+  } {
+    const supplyMap = new Map<string, { itemName: string; qty: number }>();
+    const reventaMap = new Map<string, { itemName: string; qty: number }>();
+
+    const accumulate = (mapTarget: Map<string, { itemName: string; qty: number }>,
+                       id: string, name: string, q: number) => {
+      const prev = mapTarget.get(id);
+      if (prev) prev.qty += q;
+      else mapTarget.set(id, { itemName: name, qty: q });
+    };
+
+    const walk = (prodId: string, multiplier: number, path: Set<string>) => {
+      if (path.has(prodId)) return; // ciclo
+      const recipe = this.recipeFor(prodId);
+      if (!recipe || recipe.yieldQty <= 0) return;
+      const nextPath = new Set(path); nextPath.add(prodId);
+      const factor = multiplier / recipe.yieldQty;
+
+      for (const item of recipe.items) {
+        const needQty = item.qty * factor;
+        if (item.supplyId) {
+          const sup = this.supplyById(item.supplyId);
+          if (!sup) continue;
+          accumulate(supplyMap, item.supplyId, item.itemName, needQty);
+        } else if (item.productId) {
+          const subProduct = this.productById(item.productId);
+          if (!subProduct) continue;
+          if (subProduct.hasRecipe) {
+            // Subproducto fabricado → seguir expandiendo recursivamente
+            walk(item.productId, needQty, nextPath);
+          } else {
+            // Subproducto de reventa → consume del stock del producto
+            accumulate(reventaMap, item.productId, item.itemName, needQty);
+          }
+        }
+      }
+    };
+
+    walk(productId, qty, visited);
+
+    return {
+      supplyNeeds: Array.from(supplyMap, ([supplyId, v]) => ({ supplyId, itemName: v.itemName, qty: v.qty })),
+      reventaNeeds: Array.from(reventaMap, ([pid, v]) => ({ productId: pid, itemName: v.itemName, qty: v.qty })),
+    };
+  }
+
+  /**
+   * Costo unitario de fabricación de un producto con receta.
+   *  - Suma costo de cada item: insumo → supply.cost × qty;
+   *    subproducto → effectiveProductCost(subProd) × qty
+   *  - Divide por el yield (cantidad que rinde la receta)
+   *  - Recursivo: si un subproducto tiene receta, se evalúa también
+   *  - Detecta ciclos (A usa B, B usa A) para evitar loop infinito
+   *
+   * Reactivo: depende de signals (_recipes, _supplies, _products).
+   */
+  computeRecipeCost(productId: string, visited: Set<string> = new Set()): number | null {
+    if (visited.has(productId)) {
+      // Ciclo detectado — corta la recursión devolviendo 0 (mejor que NaN o crash).
+      return 0;
+    }
+    const recipe = this.recipeFor(productId);
+    if (!recipe || recipe.yieldQty <= 0) return null;
+    const nextVisited = new Set(visited);
+    nextVisited.add(productId);
+
+    let total = 0;
+    for (const item of recipe.items) {
+      if (item.supplyId) {
+        const supply = this.supplyById(item.supplyId);
+        if (!supply) continue;
+        total += supply.cost * item.qty;
+      } else if (item.productId) {
+        // Subproducto: si tiene receta, recursión; si es reventa, usa buyPrice
+        const subProduct = this.productById(item.productId);
+        if (!subProduct) continue;
+        let unitCost: number;
+        if (subProduct.hasRecipe) {
+          unitCost = this.computeRecipeCost(item.productId, nextVisited) ?? 0;
+        } else {
+          unitCost = subProduct.buyPrice;
+        }
+        total += unitCost * item.qty;
+      }
+    }
+    return +(total / recipe.yieldQty).toFixed(2);
+  }
+
+  /**
+   * Costo efectivo de un producto:
+   *  - Si tiene receta → costo calculado desde insumos
+   *  - Si no tiene receta (reventa) → buyPrice almacenado
+   */
+  effectiveProductCost(productId: string): number {
+    const product = this.productById(productId);
+    if (!product) return 0;
+    if (product.hasRecipe) {
+      const calc = this.computeRecipeCost(productId);
+      return calc ?? product.buyPrice;
+    }
+    return product.buyPrice;
   }
 
   supplyStockFor(supplyId: string): SupplyStockItem | undefined {
@@ -419,38 +549,73 @@ export class DataService {
     };
 
     if (product.hasRecipe) {
-      const recipe = this.recipeFor(product.id);
-      if (recipe) {
-        const factor = input.qty / recipe.yieldQty;
-        for (const item of recipe.items) {
-          const stock = this.supplyStockFor(item.supplyId);
-          const supply = this.supplyById(item.supplyId);
-          if (!stock || !supply) {
-            throw new Error(`Sin stock de ${item.supplyName}.`);
-          }
-          const needed = item.qty * factor;
-          if (stock.quantity < needed) {
-            throw new Error(`Stock insuficiente de ${item.supplyName}: ${stock.quantity.toFixed(3)} disponible, ${needed.toFixed(3)} requerido.`);
-          }
-          const newQty = stock.quantity - needed;
-          const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
-          this._supplyStock.update(list => list.map(s =>
-            s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
-          ));
-          this.registerKardexEntry({
-            id: `k-${Date.now()}-${item.supplyId}`,
-            supplyId: item.supplyId,
-            itemName: item.supplyName,
-            type: 'out',
-            qty: needed,
-            balance: newQty,
-            cost: supply.cost,
-            reason: 'sale',
-            userId: input.userId,
-            userName: input.userName,
-            at: new Date(),
-          });
+      // Explosión recursiva: aplana toda la BOM hasta insumos base.
+      // Si la receta tiene subproductos con receta propia, los expande.
+      // Si un subproducto es reventa (hasRecipe=false), descontamos su stock propio.
+      const exploded = this.explodeBom(product.id, input.qty);
+      // Primero validamos que TODO hay stock (atomicidad: no descontar a medias).
+      for (const need of exploded.supplyNeeds) {
+        const stock = this.supplyStockFor(need.supplyId);
+        const supply = this.supplyById(need.supplyId);
+        if (!stock || !supply) throw new Error(`Sin stock de ${need.itemName}.`);
+        if (stock.quantity < need.qty) {
+          throw new Error(`Stock insuficiente de ${need.itemName}: ${stock.quantity.toFixed(3)} disponible, ${need.qty.toFixed(3)} requerido.`);
         }
+      }
+      for (const need of exploded.reventaNeeds) {
+        const stock = this.productStockFor(need.productId);
+        if (!stock) throw new Error(`Sin stock del subproducto ${need.itemName}.`);
+        if (stock.quantity < need.qty) {
+          throw new Error(`Stock insuficiente del subproducto ${need.itemName}: ${stock.quantity} disponible, ${need.qty.toFixed(3)} requerido.`);
+        }
+      }
+      // Descontamos insumos
+      for (const need of exploded.supplyNeeds) {
+        const stock = this.supplyStockFor(need.supplyId)!;
+        const supply = this.supplyById(need.supplyId)!;
+        const newQty = stock.quantity - need.qty;
+        const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
+        this._supplyStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${need.supplyId}-${Math.random().toString(36).slice(2, 7)}`,
+          supplyId: need.supplyId,
+          itemName: need.itemName,
+          type: 'out',
+          qty: need.qty,
+          balance: newQty,
+          cost: supply.cost,
+          reason: 'sale',
+          note: `Vía venta de ${product.name}`,
+          userId: input.userId,
+          userName: input.userName,
+          at: new Date(),
+        });
+      }
+      // Descontamos subproductos de reventa (los que NO tienen receta)
+      for (const need of exploded.reventaNeeds) {
+        const stock = this.productStockFor(need.productId)!;
+        const subProduct = this.productById(need.productId)!;
+        const newQty = stock.quantity - need.qty;
+        const newStatus = this.computeProductStatus(newQty, subProduct.reorderPoint, subProduct.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${need.productId}-${Math.random().toString(36).slice(2, 7)}`,
+          productId: need.productId,
+          itemName: need.itemName,
+          type: 'out',
+          qty: need.qty,
+          balance: newQty,
+          cost: subProduct.buyPrice,
+          reason: 'sale',
+          note: `Vía venta de ${product.name} (subproducto)`,
+          userId: input.userId,
+          userName: input.userName,
+          at: new Date(),
+        });
       }
     } else {
       const stock = this.productStockFor(input.productId);
@@ -469,7 +634,8 @@ export class DataService {
         type: 'out',
         qty: input.qty,
         balance: newQty,
-        cost: product.buyPrice,
+        // Usar costo efectivo (incluye cálculo desde receta si aplica).
+        cost: this.effectiveProductCost(product.id),
         reason: 'sale',
         userId: input.userId,
         userName: input.userName,
@@ -707,6 +873,134 @@ export class DataService {
   }
 
   // ============================================================
+  //  Demand Boosts (overrides administrativos de demanda)
+  // ============================================================
+
+  /**
+   * Registra un nuevo boost de demanda. El status inicial siempre es 'active';
+   * `activeBoosts` filtra automáticamente los expirados por fecha.
+   */
+  createBoost(input: Omit<DemandBoost, 'id' | 'status' | 'createdAt'>): DemandBoost {
+    const boost: DemandBoost = {
+      ...input,
+      id: `boost-${Date.now()}`,
+      status: 'active',
+      createdAt: new Date(),
+    };
+    this._boosts.update(list => [boost, ...list]);
+    this.regenerateRestockAlerts();
+    return boost;
+  }
+
+  cancelBoost(id: string) {
+    this._boosts.update(list => list.map(b =>
+      b.id === id ? { ...b, status: 'cancelled' as const } : b
+    ));
+    this.regenerateRestockAlerts();
+  }
+
+  deleteBoost(id: string) {
+    this._boosts.update(list => list.filter(b => b.id !== id));
+    this.regenerateRestockAlerts();
+  }
+
+  /** Boosts activos que aplican a un item específico. */
+  boostsForItem(itemKind: 'supply' | 'product', itemId: string): DemandBoost[] {
+    return this.activeBoosts().filter(b => b.itemKind === itemKind && b.itemId === itemId);
+  }
+
+  /**
+   * Demanda diaria efectiva para un item en una fecha futura.
+   *
+   * Reglas:
+   *  - Los boosts SIEMPRE son de productos (no insumos directos).
+   *  - Para un PRODUCTO de reventa (hasRecipe=false): los boosts directos del
+   *    producto modifican su consumo propio.
+   *  - Para un INSUMO: la demanda extra surge de las recetas de los productos
+   *    con boost activo. Cada unidad extra del producto consume `qty/yield`
+   *    del insumo según su receta. Sin propagación si el producto es reventa.
+   *
+   * Modos:
+   *  - multiplier  → demanda extra = base × (value - 1)
+   *  - absoluteAdd → demanda extra = value (u/día)
+   *  - eventTotal  → demanda extra = value / días_rango (u/día durante el período)
+   */
+  effectiveDailyDemand(itemKind: 'supply' | 'product', itemId: string, dayOffset: number): number {
+    const base = this.rollingMean(itemKind, itemId, 7);
+    const target = new Date();
+    target.setHours(0, 0, 0, 0);
+    target.setDate(target.getDate() + dayOffset);
+    const targetTs = target.getTime();
+
+    // Helper: ¿este boost cubre la fecha objetivo? Devuelve días del rango si sí.
+    const boostCoversDate = (b: DemandBoost): number => {
+      const start = new Date(b.startDate); start.setHours(0, 0, 0, 0);
+      const end = new Date(b.endDate); end.setHours(23, 59, 59, 999);
+      if (targetTs < start.getTime() || targetTs > end.getTime()) return 0;
+      return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
+    };
+
+    // Helper: demanda extra por día del producto según el boost.
+    const productExtraPerDay = (b: DemandBoost, productBaseDemand: number, rangeDays: number): number => {
+      switch (b.mode) {
+        case 'multiplier':  return productBaseDemand * Math.max(0, b.value - 1);
+        case 'absoluteAdd': return b.value;
+        case 'eventTotal':  return b.value / rangeDays;
+      }
+    };
+
+    if (itemKind === 'product') {
+      // Boost directo al producto (reventa o con receta, igual lo respetamos).
+      const boosts = this.boostsForItem('product', itemId);
+      if (boosts.length === 0) return base;
+
+      let result = base;
+      for (const b of boosts) {
+        const days = boostCoversDate(b);
+        if (days === 0) continue;
+        if (b.mode === 'multiplier') {
+          result = result * b.value;
+        } else if (b.mode === 'absoluteAdd') {
+          result += b.value;
+        } else {
+          result += b.value / days;
+        }
+      }
+      return Math.max(0, result);
+    }
+
+    // itemKind === 'supply' → propagación vía receta
+    let extra = 0;
+    const products = this._products();
+    for (const boost of this.activeBoosts()) {
+      // Skip boosts que no son de producto (no debería haber, pero defensivo)
+      if (boost.itemKind !== 'product') continue;
+      const days = boostCoversDate(boost);
+      if (days === 0) continue;
+
+      const product = products.find(p => p.id === boost.itemId);
+      if (!product || !product.hasRecipe) continue;  // reventa no propaga
+
+      const recipe = this.recipeFor(product.id);
+      if (!recipe) continue;
+
+      // ¿esta receta usa nuestro insumo?
+      const recipeItem = recipe.items.find(ri => ri.supplyId === itemId);
+      if (!recipeItem) continue;
+
+      // Demanda extra de producto por día
+      const productBase = this.rollingMean('product', product.id, 7);
+      const extraProductPerDay = productExtraPerDay(boost, productBase, days);
+
+      // Cada unidad extra de producto consume (item.qty / recipe.yieldQty) del insumo
+      const consumptionPerProductUnit = recipeItem.qty / Math.max(1, recipe.yieldQty);
+      extra += extraProductPerDay * consumptionPerProductUnit;
+    }
+
+    return Math.max(0, base + extra);
+  }
+
+  // ============================================================
   //  Miembros
   // ============================================================
   inviteMember(input: { email: string; displayName: string; role: UserRole }): Member {
@@ -735,19 +1029,19 @@ export class DataService {
 
   /**
    * Proyecta día a día el stock futuro de un item considerando:
-   *  - Demanda diaria = rollingMean(item, 7 días).
+   *  - Demanda diaria = `effectiveDailyDemand(itemKind, itemId, día)` que
+   *    aplica el rollingMean(7d) + boosts activos que cubran cada día.
    *  - Llegadas programadas: OCs pending del item con expectedDate dentro del horizonte.
    *
-   * Devuelve la trayectoria + fechas clave (cruce ROP, stock 0, día sugerido de orden).
-   *
-   * NOTA: este método NO considera "boosts" de demanda todavía. Cuando se
-   * implemente el sistema de boosts, sustituir `dailyDemand` por
-   * `effectiveDailyDemand(itemKind, itemId, day)`.
+   * Devuelve la trayectoria + fechas clave + boosts que afectan el horizonte.
    */
   simulateBurnDown(itemKind: 'supply' | 'product', itemId: string, horizonDays = 90): {
     trayectoria: number[];
+    /** Demanda diaria efectiva por día (con boosts aplicados). */
+    demandPerDay: number[];
     initialStock: number;
-    dailyDemand: number;
+    /** Demanda diaria base (sin boosts) — para comparación. */
+    baselineDailyDemand: number;
     leadTime: number;
     reorderPoint: number;
     minStock: number;
@@ -763,6 +1057,8 @@ export class DataService {
     incomingPOs: { code: string; arrivalDay: number; qty: number }[];
     /** Cantidad sugerida a ordenar para llegar al máximo cuando entre la OC. */
     suggestedOrderQty: number;
+    /** Boosts activos que tocan el horizonte (para UI). */
+    activeBoostsInHorizon: DemandBoost[];
   } {
     // Estado base del item
     let item: { stock: number; reorderPoint: number; minStock: number; maxStock: number; leadTime: number } | null = null;
@@ -792,9 +1088,10 @@ export class DataService {
       };
     }
 
-    const dailyDemand = this.rollingMean(itemKind, itemId, 7);
+    const baselineDailyDemand = this.rollingMean(itemKind, itemId, 7);
     const initialStock = item.stock;
     const trayectoria: number[] = [];
+    const demandPerDay: number[] = [];
 
     // OCs pending que tocan al item y tienen expectedDate dentro del horizonte
     const now = Date.now();
@@ -828,7 +1125,10 @@ export class DataService {
       if (dayHitsZero === null && stock <= 0) {
         dayHitsZero = d;
       }
-      stock = Math.max(0, stock - dailyDemand);
+      // Demanda del día con boosts aplicados
+      const todayDemand = this.effectiveDailyDemand(itemKind, itemId, d);
+      demandPerDay.push(todayDemand);
+      stock = Math.max(0, stock - todayDemand);
     }
 
     const dayToOrder = dayCrossesReorder !== null
@@ -840,12 +1140,23 @@ export class DataService {
       : 0;
     const suggestedOrderQty = Math.max(0, item.maxStock - stockAtOrderArrival);
 
-    const daysOfCoverage = dailyDemand > 0 ? initialStock / dailyDemand : 0;
+    // Cobertura usa la demanda promedio del horizonte (con boosts) — más realista.
+    const avgDemand = demandPerDay.length > 0
+      ? demandPerDay.reduce((s, x) => s + x, 0) / demandPerDay.length
+      : baselineDailyDemand;
+    const daysOfCoverage = avgDemand > 0 ? initialStock / avgDemand : 0;
+
+    // Boosts que tocan el horizonte
+    const horizonEnd = now + horizonDays * 86_400_000;
+    const activeBoostsInHorizon = this.boostsForItem(itemKind, itemId).filter(b =>
+      b.endDate.getTime() >= now && b.startDate.getTime() <= horizonEnd
+    );
 
     return {
       trayectoria,
+      demandPerDay,
       initialStock,
-      dailyDemand,
+      baselineDailyDemand,
       leadTime: item.leadTime,
       reorderPoint: item.reorderPoint,
       minStock: item.minStock,
@@ -856,14 +1167,16 @@ export class DataService {
       dayToOrder,
       incomingPOs,
       suggestedOrderQty,
+      activeBoostsInHorizon,
     };
   }
 
   private emptyBurnDown() {
     return {
       trayectoria: [],
+      demandPerDay: [],
       initialStock: 0,
-      dailyDemand: 0,
+      baselineDailyDemand: 0,
       leadTime: 0,
       reorderPoint: 0,
       minStock: 0,
@@ -874,6 +1187,7 @@ export class DataService {
       dayToOrder: null,
       incomingPOs: [],
       suggestedOrderQty: 0,
+      activeBoostsInHorizon: [],
     };
   }
 
@@ -1053,6 +1367,60 @@ export class DataService {
         message: `Stock ${stock.status === 'out' ? 'agotado' : stock.status === 'critical' ? 'crítico' : 'bajo punto de reorden'}: ${stock.quantity} ${prod.unit}${prod.reorderPoint != null ? ` (reorden ${prod.reorderPoint})` : ''}. Producto de reventa — generar OC al proveedor.`,
         currentQty: stock.quantity,
         reorderPoint: prod.reorderPoint,
+        createdAt: prev?.createdAt ?? new Date(),
+        acknowledgedAt: prev?.acknowledgedAt,
+        acknowledgedBy: prev?.acknowledgedBy,
+      });
+    }
+
+    // Pasada extra: alertas proactivas por boosts activos.
+    // Si un boost va a tirar el stock por debajo del ROP dentro del lookahead
+    // (= lead time + 3 días buffer), emitir alerta aunque el stock actual esté OK.
+    // Estas alertas usan prefijo `auto-restock-boost-` para no duplicar las normales.
+    for (const boost of this.activeBoosts()) {
+      const sameKindKey = `${boost.itemKind}-${boost.itemId}`;
+      const normalAlertId = `auto-restock-${sameKindKey}`;
+      // Si ya hay una alerta normal para este item, skip (más prioritaria).
+      if (autoNext.some(a => a.id === normalAlertId)) continue;
+
+      // Stock + datos del item
+      let stockNow = 0; let ropItem = 0; let leadTime = 0; let unit = ''; let itemName = boost.itemName;
+      if (boost.itemKind === 'supply') {
+        const s = supplies.find(x => x.id === boost.itemId);
+        if (!s || !s.active) continue;
+        const stk = supplyStock.find(x => x.supplyId === boost.itemId);
+        stockNow = stk?.quantity ?? 0;
+        ropItem = s.reorderPoint; leadTime = s.leadTime; unit = s.unit; itemName = s.name;
+      } else {
+        const p = products.find(x => x.id === boost.itemId);
+        if (!p || !p.active || p.hasRecipe) continue;
+        if (p.reorderPoint == null) continue;
+        const stk = productStock.find(x => x.productId === boost.itemId);
+        stockNow = stk?.quantity ?? 0;
+        ropItem = p.reorderPoint; leadTime = p.leadTime; unit = p.unit; itemName = p.name;
+      }
+
+      const lookahead = Math.max(leadTime + 3, 7);
+      let projected = stockNow;
+      for (let d = 0; d < lookahead; d++) {
+        projected -= this.effectiveDailyDemand(boost.itemKind, boost.itemId, d);
+        if (projected < 0) projected = 0;
+      }
+      if (projected >= ropItem) continue; // el stock aguanta con el boost
+
+      const id = `auto-restock-boost-${sameKindKey}`;
+      const prev = existing.find(a => a.id === id);
+      autoNext.push({
+        id,
+        type: 'stockout_risk',
+        status: prev?.status === 'acknowledged' ? 'acknowledged' : 'active',
+        priority: 'high',
+        ...(boost.itemKind === 'supply' ? { supplyId: boost.itemId } : { productId: boost.itemId }),
+        itemName,
+        message: `Boost activo "${boost.reason}" va a llevar el stock de ${Math.round(stockNow)} a ~${Math.round(projected)} ${unit} en ${lookahead} días (ROP: ${ropItem}). Considera generar OC anticipada.`,
+        currentQty: stockNow,
+        reorderPoint: ropItem,
+        projectedDaysUntilStockout: lookahead,
         createdAt: prev?.createdAt ?? new Date(),
         acknowledgedAt: prev?.acknowledgedAt,
         acknowledgedBy: prev?.acknowledgedBy,

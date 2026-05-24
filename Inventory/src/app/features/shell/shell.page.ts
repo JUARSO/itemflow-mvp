@@ -1,12 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, Router } from '@angular/router';
 import {
-  IonSplitPane, IonMenu, IonContent, IonTabBar, IonTabButton,
-  IonLabel, IonBadge, IonRouterOutlet,
+  IonSplitPane, IonMenu, IonContent,
+  IonBadge, IonRouterOutlet, MenuController,
 } from '@ionic/angular/standalone';
 import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
-import { BreakpointService } from '../../core/services/breakpoint.service';
 import { DataService } from '../../core/services/data.service';
 import { BrandingService } from '../../core/services/branding.service';
 
@@ -16,11 +15,17 @@ import { BrandingService } from '../../core/services/branding.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, RouterLinkActive,
-    IonSplitPane, IonMenu, IonContent, IonTabBar, IonTabButton,
-    IonLabel, IonBadge, IonRouterOutlet,
+    IonSplitPane, IonMenu, IonContent,
+    IonBadge, IonRouterOutlet,
   ],
   template: `
-    <ion-split-pane contentId="main-content" when="lg">
+    <!--
+      Menú hamburguesa en TODOS los tamaños.
+      ion-split-pane con [disabled]="true" mantiene la estructura de layout
+      Ionic (toolbar arriba, tab-bar bottom, contenido scrolleable) pero NUNCA
+      activa el modo persistente — el menú siempre es overlay y se abre con ☰.
+    -->
+    <ion-split-pane contentId="main-content" [disabled]="true">
       <ion-menu contentId="main-content" type="overlay">
         <ion-content>
           <div class="brand">
@@ -38,41 +43,37 @@ import { BrandingService } from '../../core/services/branding.service';
           </div>
 
           <div class="menu-section">Flujo principal</div>
-          <a routerLink="/catalogo" routerLinkActive="active" class="menu-item">
+          <a routerLink="/catalogo" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">1</span>
             <span class="menu-item__label">Catálogo</span>
           </a>
-          <a routerLink="/insumos" routerLinkActive="active" class="menu-item">
+          <a routerLink="/insumos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">2</span>
             <span class="menu-item__label">Insumos</span>
           </a>
-          <a routerLink="/recetas" routerLinkActive="active" class="menu-item">
+          <a routerLink="/recetas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">3</span>
             <span class="menu-item__label">Recetas</span>
           </a>
-          <a routerLink="/ventas" routerLinkActive="active" class="menu-item">
+          <a routerLink="/ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">4</span>
             <span class="menu-item__label">Ventas</span>
           </a>
-          <a routerLink="/ajustes" routerLinkActive="active" class="menu-item">
+          <a routerLink="/ajustes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">5</span>
             <span class="menu-item__label">Ajustes</span>
           </a>
 
           <div class="menu-section">Operación</div>
-          <a routerLink="/inventario" routerLinkActive="active" class="menu-item">
+          <a routerLink="/inventario" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">📊</span>
             <span class="menu-item__label">Inventario</span>
           </a>
-          <a routerLink="/ordenes-compra" routerLinkActive="active" class="menu-item">
+          <a routerLink="/ordenes-compra" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">📝</span>
             <span class="menu-item__label">Órdenes de Compra</span>
           </a>
-          <a routerLink="/kardex" routerLinkActive="active" class="menu-item">
-            <span class="menu-item__icon">📋</span>
-            <span class="menu-item__label">Kardex</span>
-          </a>
-          <a routerLink="/alertas" routerLinkActive="active" class="menu-item">
+          <a routerLink="/alertas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">🔔</span>
             <span class="menu-item__label">Alertas</span>
             @if (data.activeAlerts().length > 0) {
@@ -81,19 +82,28 @@ import { BrandingService } from '../../core/services/branding.service';
               </ion-badge>
             }
           </a>
+          <a routerLink="/boosts" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+            <span class="menu-item__icon">⚡</span>
+            <span class="menu-item__label">Boosts de demanda</span>
+            @if (data.activeBoosts().length > 0) {
+              <ion-badge color="warning" class="menu-item__badge">
+                {{ data.activeBoosts().length }}
+              </ion-badge>
+            }
+          </a>
 
           <div class="menu-section">Análisis</div>
-          <a routerLink="/predicciones" routerLinkActive="active" class="menu-item">
+          <a routerLink="/predicciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">📈</span>
             <span class="menu-item__label">Predicciones</span>
           </a>
-          <a routerLink="/burn-down" routerLinkActive="active" class="menu-item">
+          <a routerLink="/burn-down" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">📉</span>
             <span class="menu-item__label">Análisis de stock</span>
           </a>
 
           <div class="menu-section">Cuenta</div>
-          <a routerLink="/mas" routerLinkActive="active" class="menu-item">
+          <a routerLink="/mas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <span class="menu-item__icon">⚙️</span>
             <span class="menu-item__label">Más</span>
           </a>
@@ -108,39 +118,10 @@ import { BrandingService } from '../../core/services/branding.service';
 
       <div class="ion-page" id="main-content">
         <ion-router-outlet></ion-router-outlet>
-
-        @if (bp.isMobile()) {
-          <ion-tab-bar slot="bottom">
-            <ion-tab-button (click)="go('/inventario')" [class.tab-active]="isActive('/inventario')">
-              <span class="tab-icon">📊</span>
-              <ion-label>Inventario</ion-label>
-            </ion-tab-button>
-            <ion-tab-button (click)="go('/alertas')" [class.tab-active]="isActive('/alertas')">
-              <span class="tab-icon">🔔</span>
-              <ion-label>Alertas</ion-label>
-              @if (data.activeAlerts().length > 0) {
-                <ion-badge color="danger">{{ data.activeAlerts().length }}</ion-badge>
-              }
-            </ion-tab-button>
-            <ion-tab-button (click)="go('/kardex')" [class.tab-active]="isActive('/kardex')">
-              <span class="tab-icon">📋</span>
-              <ion-label>Kardex</ion-label>
-            </ion-tab-button>
-            <ion-tab-button (click)="go('/mas')" [class.tab-active]="isActive('/mas')">
-              <span class="tab-icon">⚙️</span>
-              <ion-label>Más</ion-label>
-            </ion-tab-button>
-          </ion-tab-bar>
-        }
       </div>
     </ion-split-pane>
   `,
   styles: [`
-    ion-split-pane {
-      --side-min-width: 260px;
-      --side-max-width: 280px;
-      --side-width: 280px;
-    }
     ion-menu {
       --width: 280px;
       --background: var(--ui-surface);
@@ -262,23 +243,12 @@ import { BrandingService } from '../../core/services/branding.service';
       transform: translate(2px, 2px);
     }
 
-    ion-tab-bar {
-      border-top: var(--ui-border-w-md) solid var(--ui-border);
-    }
-    .tab-icon {
-      font-size: 24px;
-      line-height: 1;
-      margin-bottom: 2px;
-    }
-    ion-tab-button.tab-active {
-      color: var(--ui-primary);
-    }
   `],
 })
 export class ShellPage {
   protected readonly auth = inject(AuthService);
+  private readonly menuCtrl = inject(MenuController);
   protected readonly tenant = inject(TenantContextService);
-  protected readonly bp = inject(BreakpointService);
   protected readonly data = inject(DataService);
   protected readonly branding = inject(BrandingService);
   private readonly router = inject(Router);
@@ -287,12 +257,12 @@ export class ShellPage {
     return this.auth.isAdmin() ? 'Administrador' : 'Operador';
   }
 
-  isActive(path: string): boolean {
-    return this.router.url.startsWith(path);
-  }
-
-  go(path: string) {
-    this.router.navigateByUrl(path);
+  /**
+   * Cierra el menú overlay después de navegar.
+   * Aplica en todos los tamaños porque ya no hay sidebar persistente.
+   */
+  closeMenuOnMobile() {
+    this.menuCtrl.close().catch(() => { /* sin menú abierto, ignorar */ });
   }
 
   async logout() {
