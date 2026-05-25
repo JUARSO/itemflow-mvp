@@ -58,10 +58,6 @@ import { AuthService } from '../../core/services/auth.service';
               <span class="demo__role demo__role--admin">ADMIN</span>
               <span class="demo__email mono">admin&#64;panyco.cl</span>
             </button>
-            <button type="button" class="demo__row" (click)="fillDemo('ventas@panyco.cl')">
-              <span class="demo__role demo__role--sales">VENTAS</span>
-              <span class="demo__email mono">ventas&#64;panyco.cl</span>
-            </button>
             <button type="button" class="demo__row" (click)="fillDemo('produccion@panyco.cl')">
               <span class="demo__role demo__role--prod">PRODUCCIÓN</span>
               <span class="demo__email mono">produccion&#64;panyco.cl</span>
@@ -195,7 +191,6 @@ import { AuthService } from '../../core/services/auth.service';
       text-align: center;
     }
     .demo__role--admin { background: var(--ui-primary); }
-    .demo__role--sales { background: var(--ui-success); }
     .demo__role--prod  { background: var(--ui-transit); }
     .demo__role--ope   { background: var(--ui-warning); color: #000; }
     .demo__email {

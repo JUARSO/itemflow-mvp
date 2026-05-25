@@ -3,7 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonSearchbar, IonSegment, IonSegmentButton, IonLabel, IonButton,
+  IonSearchbar, IonSegment, IonSegmentButton, IonLabel, IonButton, IonIcon,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
@@ -22,7 +22,7 @@ type StatusFilter = 'todos' | StockStatus;
   imports: [
     DecimalPipe, RouterLink,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-    IonSearchbar, IonSegment, IonSegmentButton, IonLabel, IonButton,
+    IonSearchbar, IonSegment, IonSegmentButton, IonLabel, IonButton, IonIcon,
     PageHeaderComponent, KpiCardComponent, StatusBadgeComponent,
     EntradaFormModalComponent,
   ],
@@ -119,16 +119,22 @@ type StatusFilter = 'todos' | StockStatus;
       </section>
 
       <section class="block">
-        <h2 class="block__title">Productos sin receta ({{ filteredProducts().length }})</h2>
+        <h2 class="block__title">
+          Productos terminados ({{ filteredProducts().length }})
+        </h2>
+        <p class="block__hint">
+          Productos disponibles para entrega: reventa, sobras de producción y devoluciones de clientes.
+        </p>
         <div class="table table--products">
           <div class="table__head">
             <div>Producto</div>
             <div class="num">Stock</div>
             <div class="num">P. Reorden</div>
+            <div>Origen</div>
             <div>Estado</div>
           </div>
           @if (filteredProducts().length === 0) {
-            <div class="table__empty">Sin productos sin receta. Los productos con receta consumen insumos al venderse.</div>
+            <div class="table__empty">Sin productos terminados en inventario.</div>
           }
           @for (row of filteredProducts(); track row.id) {
             <div class="table__row">
@@ -140,6 +146,23 @@ type StatusFilter = 'todos' | StockStatus;
               <div class="num mono">
                 @if (row.reorderPoint != null) {
                   {{ row.reorderPoint | number:'1.0-0' }} {{ row.unit }}
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </div>
+              <div>
+                @if (pendingMermaForProduct(row.productId) > 0) {
+                  <a routerLink="/mermas" class="origin-badge origin-badge--pending"
+                    title="Hay unidades devueltas pendientes de revisar en Mermas">
+                    <ion-icon name="arrow-undo-outline"></ion-icon>
+                    {{ pendingMermaForProduct(row.productId) }} en revisión
+                  </a>
+                } @else if (returnsForProduct(row.productId) > 0) {
+                  <span class="origin-badge origin-badge--return"
+                    title="Unidades reintegradas desde la pantalla de Mermas (30 días)">
+                    <ion-icon name="arrow-undo-outline"></ion-icon>
+                    {{ returnsForProduct(row.productId) }} reintegrado(s)
+                  </span>
                 } @else {
                   <span class="muted">—</span>
                 }
@@ -214,8 +237,40 @@ type StatusFilter = 'todos' | StockStatus;
     }
     .table--products .table__head,
     .table--products .table__row {
-      grid-template-columns: 2fr 1fr 1fr 130px;
+      grid-template-columns: 2fr 1fr 1fr 1.2fr 130px;
     }
+
+    .block__hint {
+      margin: -8px 0 var(--ui-sp-3);
+      font-size: var(--ui-fs-sm);
+      color: var(--ui-text-muted);
+    }
+
+    .origin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: var(--ui-fw-black);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .origin-badge--return {
+      background: var(--ui-success);
+      color: #fff;
+      border: var(--ui-border-w-sm) solid var(--ui-success);
+    }
+    .origin-badge--pending {
+      background: var(--ui-warning);
+      color: #000;
+      border: var(--ui-border-w-sm) solid var(--ui-text);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .origin-badge--pending:hover { filter: brightness(0.92); }
+    .origin-badge ion-icon { font-size: 12px; }
+    .muted { color: var(--ui-text-muted); font-size: var(--ui-fs-xs); }
     .table__head {
       background: var(--ui-text);
       color: var(--ui-surface);
@@ -314,6 +369,7 @@ export class InventarioPage {
         const p = products.find(x => x.id === stock.productId);
         return {
           id: stock.id,
+          productId: stock.productId,
           name: p?.name ?? '—',
           sku: p?.sku ?? '',
           unit: p?.unit ?? 'unidad',
@@ -327,6 +383,39 @@ export class InventarioPage {
       )
       .sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
   });
+
+  /**
+   * Suma de unidades devueltas por clientes en los últimos 30 días para
+   * un producto. Usa el kardex con reason 'return_from_customer'.
+   */
+  private readonly recentReturnsByProduct = computed(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const map = new Map<string, number>();
+    for (const e of this.data.kardex()) {
+      if (e.reason !== 'return_from_customer') continue;
+      if (!e.productId) continue;
+      if (e.at.getTime() < cutoff) continue;
+      map.set(e.productId, (map.get(e.productId) ?? 0) + e.qty);
+    }
+    return map;
+  });
+
+  returnsForProduct(productId: string): number {
+    return this.recentReturnsByProduct().get(productId) ?? 0;
+  }
+
+  /** Suma de unidades en lotes de merma pendientes para un producto. */
+  private readonly pendingMermaByProduct = computed(() => {
+    const map = new Map<string, number>();
+    for (const lot of this.data.pendingReturnedLots()) {
+      map.set(lot.productId, (map.get(lot.productId) ?? 0) + lot.qty);
+    }
+    return map;
+  });
+
+  pendingMermaForProduct(productId: string): number {
+    return this.pendingMermaByProduct().get(productId) ?? 0;
+  }
 }
 
 function statusWeight(s: StockStatus): number {

@@ -9,7 +9,6 @@ import { DataService } from '../../core/services/data.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { PedidoDetailModalComponent } from '../pedidos/pedido-detail-modal.component';
-import { ReadOnlyBannerComponent } from '../../shared/components/readonly-banner/readonly-banner.component';
 import { CustomerOrder, OrderShortfall, OrderStatus } from '../../core/models';
 
 type Tab = 'all' | 'pending' | 'in_production';
@@ -22,26 +21,25 @@ type Tab = 'all' | 'pending' | 'in_production';
     DatePipe, DecimalPipe, RouterLink,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonSegment, IonSegmentButton, IonLabel, IonButton, IonIcon,
-    PageHeaderComponent, KpiCardComponent, PedidoDetailModalComponent, ReadOnlyBannerComponent,
+    PageHeaderComponent, KpiCardComponent, PedidoDetailModalComponent,
   ],
   template: `
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-        <ion-title>Producción</ion-title>
+        <ion-title>Pedidos de clientes</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content>
       <app-page-header
-        title="Cola de producción"
-        subtitle="Procesa las órdenes que ventas envía. Al completar, el producto se suma al stock disponible.">
+        title="Pedidos de clientes"
+        subtitle="Peticiones que los clientes envían desde el portal. Acepta cada pedido para iniciar producción.">
+        <ion-button fill="outline" routerLink="/clientes">Ver clientes</ion-button>
         <ion-button fill="outline" routerLink="/insumos">Ver insumos</ion-button>
-        <ion-button fill="outline" routerLink="/ordenes-compra">Órdenes de compra</ion-button>
       </app-page-header>
 
-      <app-readonly-banner></app-readonly-banner>
-
+      
       <div class="kpis">
         <app-kpi-card label="Pendientes" [value]="data.pendingOrders().length" tone="warning"></app-kpi-card>
         <app-kpi-card label="En producción" [value]="data.inProductionOrders().length" tone="transit"></app-kpi-card>
@@ -88,7 +86,19 @@ type Tab = 'all' | 'pending' | 'in_production';
             <div class="card__head">
               <div>
                 <div class="card__code mono">{{ o.code }}</div>
-                <div class="card__purpose">{{ o.purpose || 'Sin motivo' }}</div>
+                <div class="card__purpose">
+                  @if (customerNameOf(o); as cname) {
+                    <ion-icon name="person-outline"></ion-icon> {{ cname }}
+                  } @else {
+                    {{ o.purpose || 'Pedido interno' }}
+                  }
+                </div>
+                @if (o.requestedDeliveryDate) {
+                  <div class="card__delivery">
+                    <ion-icon name="calendar-outline"></ion-icon>
+                    Entrega: {{ o.requestedDeliveryDate | date:'dd-MM' }}
+                  </div>
+                }
               </div>
               <span class="status" [attr.data-status]="o.status">{{ statusLabel(o.status) }}</span>
             </div>
@@ -131,7 +141,6 @@ type Tab = 'all' | 'pending' | 'in_production';
       <app-pedido-detail-modal
         [isOpen]="detailOpen()"
         [order]="selected()"
-        mode="production"
         (closed)="closeDetail()"
         (mutated)="onMutated()">
       </app-pedido-detail-modal>
@@ -231,6 +240,13 @@ type Tab = 'all' | 'pending' | 'in_production';
       font-size: var(--ui-fs-md);
       margin-top: 2px;
     }
+    .card__purpose ion-icon { vertical-align: middle; font-size: 14px; color: var(--ui-primary); }
+    .card__delivery {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      margin-top: 2px;
+    }
+    .card__delivery ion-icon { vertical-align: middle; font-size: 12px; }
     .status {
       padding: 3px 8px;
       font-size: 10px;
@@ -340,6 +356,12 @@ export class ProduccionPage {
   shortNames(o: CustomerOrder): string {
     const names = o.shortfalls.slice(0, 3).map(s => s.itemName).join(', ');
     return o.shortfalls.length > 3 ? `${names}…` : names;
+  }
+
+  /** Nombre del cliente si el pedido vino del portal, sino null. */
+  customerNameOf(o: CustomerOrder): string | null {
+    if (!o.customerId) return null;
+    return this.data.customerById(o.customerId)?.name ?? null;
   }
 
   openDetail(o: CustomerOrder) {

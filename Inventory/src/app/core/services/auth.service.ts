@@ -6,8 +6,7 @@ const STORAGE_KEY = 'itemflow_session_v1';
 
 /** Landing route por defecto para cada rol. */
 const DEFAULT_ROUTE: Record<UserRole, string> = {
-  admin: '/admin',
-  sales: '/pedidos',
+  admin: '/produccion',
   production: '/produccion',
   operator: '/produccion',
 };
@@ -21,7 +20,6 @@ export class AuthService {
   readonly role = computed<UserRole | null>(() => this._user()?.role ?? null);
 
   readonly isAdmin = computed(() => this.role() === 'admin');
-  readonly isSales = computed(() => this.role() === 'sales');
   readonly isProduction = computed(() => this.role() === 'production');
   readonly isOperator = computed(() => this.role() === 'operator');
 
@@ -30,9 +28,9 @@ export class AuthService {
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as Member;
-        // Migración: rol legacy 'operator' → 'sales' por defecto
-        if ((parsed.role as string) === 'operator') {
-          parsed.role = 'sales';
+        // Migración: roles legacy 'sales' u 'operator-legacy' caen a 'production'
+        if ((parsed.role as string) === 'sales') {
+          parsed.role = 'production';
         }
         this._user.set(parsed);
       } catch { /* ignore */ }

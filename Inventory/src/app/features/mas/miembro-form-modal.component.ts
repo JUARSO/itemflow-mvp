@@ -33,8 +33,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 
         <app-form-field label="Rol" [required]="true" hint="Define qué pantallas y acciones puede usar el miembro">
           <select formControlName="role">
-            <option value="admin">Administrador (visualiza todo)</option>
-            <option value="sales">Encargado de Ventas</option>
+            <option value="admin">Administrador (acceso completo)</option>
             <option value="production">Encargado de Producción</option>
             <option value="operator">Operario (fabricación)</option>
           </select>
@@ -79,7 +78,7 @@ export class MiembroFormModalComponent {
   readonly form = this.fb.group({
     displayName: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     email: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    role: this.fb.control<UserRole>('sales', { nonNullable: true, validators: [Validators.required] }),
+    role: this.fb.control<UserRole>('production', { nonNullable: true, validators: [Validators.required] }),
   });
 
   constructor() {
@@ -88,14 +87,13 @@ export class MiembroFormModalComponent {
       if (m) {
         this.form.reset({ displayName: m.displayName, email: m.email, role: m.role });
       } else if (this.isOpen()) {
-        this.form.reset({ displayName: '', email: '', role: 'sales' });
+        this.form.reset({ displayName: '', email: '', role: 'production' });
       }
     });
   }
 
   private roleLabel(r: UserRole): string {
     if (r === 'admin') return 'Administrador';
-    if (r === 'sales') return 'Encargado de Ventas';
     if (r === 'production') return 'Encargado de Producción';
     return 'Operario';
   }

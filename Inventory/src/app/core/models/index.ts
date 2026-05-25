@@ -8,15 +8,13 @@ export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
 export type AlertPriority = 'high' | 'medium' | 'low';
 /**
  * Roles del sistema:
- *  - admin: SOLO LECTURA en datos operativos (visualiza dashboards y análisis).
- *    Únicas acciones: gestión de miembros y branding.
- *  - sales: encargado de ventas — pedidos, catálogo (lectura), vender, devoluciones
- *  - production: encargado de producción — cola, insumos, recetas, inventario,
- *    ajustes, órdenes de compra, alertas, boosts
+ *  - admin: gestión completa (todas las pantallas + análisis + miembros + branding)
+ *  - production: encargado de producción — órdenes de fabricación, cola, catálogo,
+ *    insumos, recetas, inventario, ajustes, órdenes de compra, alertas, boosts
  *  - operator: operario de fabricación — ve recetas (lectura) y cola de
  *    producción; puede iniciar y completar órdenes pero NO cancelarlas.
  */
-export type UserRole = 'admin' | 'sales' | 'production' | 'operator';
+export type UserRole = 'admin' | 'production' | 'operator';
 export type POStatus = 'pending' | 'received' | 'cancelled';
 
 export interface Member {
@@ -133,6 +131,42 @@ export interface KardexEntry {
   at: Date;
 }
 
+/**
+ * Lote devuelto por un cliente, pendiente de decidir cuánto es merma
+ * (descarte) y cuánto vuelve al inventario como producto utilizable.
+ *
+ * Flujo:
+ *  - Cliente confirma recepción con `receivedQty < fulfilledQty`. La diferencia
+ *    NO se añade al stock inmediatamente — se crea un lote `pending`.
+ *  - En la pantalla de Mermas el admin revisa el lote y procesa:
+ *      mermaQty = cuántas unidades descartar (0..qty)
+ *      usableQty = qty - mermaQty  → se agregan al stock como producto
+ *      utilizable (kardex `in` con reason `return_from_customer`).
+ *    El lote queda `reviewed`.
+ */
+export interface ReturnedLot {
+  id: string;
+  productId: string;
+  productName: string;
+  unit: Unit;
+  /** Unidades devueltas (igual a fulfilledQty - receivedQty del pedido). */
+  qty: number;
+  /** Unidades marcadas como merma al procesar el lote. */
+  mermaQty: number;
+  sourceOrderId: string;
+  sourceOrderCode: string;
+  customerId?: string;
+  customerName?: string;
+  /** Nota que dejó el cliente al confirmar la recepción. */
+  customerNote?: string;
+  createdAt: Date;
+  status: 'pending' | 'reviewed';
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  /** Nota interna que dejó el admin al procesar la merma. */
+  reviewNote?: string;
+}
+
 export interface SaleRecord {
   id: string;
   productId: string;
@@ -166,51 +200,6 @@ export interface Alert {
   acknowledgedBy?: string;
   resolvedAt?: Date;
   resolvedBy?: string;
-}
-
-// =========================================================
-//  Demand Boost (override administrativo de la demanda)
-// =========================================================
-
-export type BoostMode =
-  | 'multiplier'   // demanda diaria = histórico × value
-  | 'absoluteAdd'  // demanda diaria = histórico + value (u/día)
-  | 'eventTotal';  // se consumirán value unidades en TODO el período
-
-export type BoostReason =
-  | 'promo'
-  | 'evento'
-  | 'contrato'
-  | 'feriado'
-  | 'campaña'
-  | 'otro';
-
-export type BoostStatus = 'active' | 'expired' | 'cancelled';
-
-/**
- * Override declarativo de la demanda esperada para un item durante un período.
- * Se aplica a:
- *  - regenerateRestockAlerts (lookahead)
- *  - simulateBurnDown (consumo diario)
- *  - PredictionService.simulateLocally (trayectoria 180d)
- *
- * `status='expired'` se calcula on-the-fly por activeBoosts() en runtime —
- * lo guardado es 'active' o 'cancelled'.
- */
-export interface DemandBoost {
-  id: string;
-  itemKind: 'supply' | 'product';
-  itemId: string;
-  itemName: string;       // cacheado al crear para evitar lookups
-  startDate: Date;
-  endDate: Date;
-  mode: BoostMode;
-  value: number;
-  reason: BoostReason;
-  description?: string;
-  status: BoostStatus;
-  createdAt: Date;
-  createdBy: string;
 }
 
 // =========================================================
@@ -325,48 +314,17 @@ export interface PurchaseOrder {
   createdAt: Date;
 }
 
-// =========================================================
-//  Devoluciones (Ventas → Producción)
-// =========================================================
-
-/**
- * Motivos por los que ventas devuelve producto terminado a producción.
- * El stock siempre sale del inventario disponible al registrar la devolución.
- */
-export type ReturnReason =
-  | 'defective'   // mal hecho, quemado, mal cocido
-  | 'expired'     // vencido o en mal estado
-  | 'leftover'    // sobra de fin de día
-  | 'damaged'     // golpe, caída, mojadura
-  | 'other';
-
-export interface ProductReturn {
-  id: string;
-  productId: string;
-  productName: string;
-  qty: number;
-  unit: Unit;
-  reason: ReturnReason;
-  notes?: string;
-  /** Costo unitario al momento de devolver (snapshot para reporting). */
-  costAtReturn: number;
-  /** qty * costAtReturn — pérdida estimada del lote devuelto. */
-  totalLoss: number;
-  createdAt: Date;
-  createdBy: string;
-}
 
 // =========================================================
-//  Pedidos (Ventas → Producción)
+//  Órdenes de fabricación
 // =========================================================
 
 /**
- * Ciclo de vida de una orden de producción interna:
- *  - pending: ventas la registró, producción aún no la procesa
+ * Ciclo de vida de una orden de fabricación interna:
+ *  - pending: orden creada, producción aún no la procesa
  *  - in_production: producción reservó insumos disponibles; pueden faltar
  *  - completed: producción terminó la fabricación y el stock del producto
- *    terminado fue actualizado. La orden queda cerrada — la venta al consumidor
- *    final es un evento separado que descuenta del stock.
+ *    terminado fue actualizado. La orden queda cerrada.
  *  - cancelled: cancelada; libera reservas si las había
  */
 export type OrderStatus = 'pending' | 'in_production' | 'completed' | 'cancelled';
@@ -379,52 +337,49 @@ export interface OrderReservation {
   kind: 'supply' | 'product';
   itemId: string;
   itemName: string;
-  /** Unidad de medida del insumo/producto reservado. */
   unit: Unit;
   qty: number;
 }
 
-/**
- * Item solicitado en un pedido. `fulfilledQty` registra cuántas unidades del
- * producto se han podido reservar/producir (0 si aún no se inició producción,
- * menor a `qty` si hubo faltante de insumos).
- */
 export interface OrderItem {
   productId: string;
   productName: string;
-  /** Unidad del producto (unidad, kg, L, etc.) — cacheada al crear el pedido. */
   unit: Unit;
+  /** Cantidad solicitada por el cliente. */
   qty: number;
   unitPrice: number;
+  /** Cantidad producida y marcada como lista para entrega. */
   fulfilledQty: number;
+  /**
+   * Cantidad efectivamente recibida y aceptada por el cliente.
+   * Solo se setea cuando el cliente confirma la recepción.
+   * Si es menor que fulfilledQty, la diferencia se reintegra al stock.
+   */
+  receivedQty?: number;
 }
 
-/**
- * Faltante detectado al iniciar producción: lo que se requería vs lo que había.
- * Útil para que producción genere OC o avise a compras.
- */
 export interface OrderShortfall {
   kind: 'supply' | 'product';
   itemId: string;
   itemName: string;
-  /** Unidad de medida del insumo/producto (kg, L, unidad, etc.). */
   unit: Unit;
   required: number;
   available: number;
   short: number;
-  /** Sugerencia: el item del pedido que generó el faltante (productId). */
   forProductId?: string;
 }
 
 /**
- * Orden de producción interna creada por ventas para organizar el trabajo
- * de fábrica/cocina. NO representa un compromiso de entrega a cliente externo;
- * el producto fabricado queda en stock disponible para vender después.
+ * Orden de fabricación interna. Puede crearla producción directamente, o
+ * generarse automáticamente desde un pedido del portal cliente (en cuyo caso
+ * `customerId` apunta al cliente que la solicitó).
  */
 export interface CustomerOrder {
   id: string;
   code: string;
-  /** Motivo o destino interno del lote (ej: "Reposición stock", "Evento Sub-30"). Opcional. */
+  /** Cliente que originó la orden (si vino del portal). */
+  customerId?: string;
+  /** Motivo o destino interno del lote. Opcional. */
   purpose?: string;
   status: OrderStatus;
   items: OrderItem[];
@@ -432,12 +387,65 @@ export interface CustomerOrder {
   notes?: string;
   createdAt: Date;
   createdBy: string;
-  /** Reservas activas (poblado al pasar a in_production, vaciado al cancelar). */
   reservations: OrderReservation[];
-  /** Snapshot del análisis hecho al iniciar producción. */
   shortfalls: OrderShortfall[];
   productionStartedAt?: Date;
-  /** Cuándo producción terminó y se sumó al stock de producto terminado. */
   completedAt?: Date;
   cancelledAt?: Date;
+  /** Fecha de entrega solicitada por el cliente (solo si vino del portal). */
+  requestedDeliveryDate?: Date;
+  /** Fecha en que el cliente confirmó la recepción del pedido. */
+  customerConfirmedAt?: Date;
+  /** Nota del cliente al confirmar (motivo si reportó diferencias). */
+  customerNote?: string;
+  /**
+   * Monto final cobrado al cliente, calculado a partir de receivedQty.
+   * Solo presente tras la confirmación del cliente. Si todo se recibió
+   * completo, coincide con totalAmount.
+   */
+  finalAmount?: number;
+}
+
+// =========================================================
+//  Clientes (portal externo)
+// =========================================================
+
+/**
+ * Configuración de ventanas semanales: arrays con días de la semana
+ * (0=domingo, 1=lunes, ..., 6=sábado) en los que se permite la acción.
+ */
+export interface CustomerWindow {
+  /** Días de la semana en que el cliente puede crear pedidos. */
+  orderDays: number[];
+  /** Días de la semana en que se entregan los pedidos. */
+  deliveryDays: number[];
+}
+
+/**
+ * Cliente con acceso al portal externo. Cada cliente tiene un link público
+ * (token aleatorio en la URL) protegido por un PIN numérico.
+ *
+ * Los pedidos que crea el cliente desde el portal generan automáticamente
+ * una `CustomerOrder` con `customerId` apuntando aquí.
+ */
+export interface Customer {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  /** Token aleatorio para la URL pública (/c/:token). */
+  publicToken: string;
+  /** PIN numérico (4-6 dígitos) requerido para entrar al portal. */
+  accessPin: string;
+  /**
+   * IDs de productos del catálogo que este cliente puede pedir.
+   * Si el array está vacío → puede pedir todos los productos activos.
+   */
+  allowedProductIds: string[];
+  /** Ventanas de pedido y entrega (días de la semana). */
+  window: CustomerWindow;
+  notes?: string;
+  active: boolean;
+  createdAt: Date;
 }

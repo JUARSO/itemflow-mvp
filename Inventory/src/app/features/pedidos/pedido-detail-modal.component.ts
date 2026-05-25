@@ -8,13 +8,9 @@ import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 
-type ActionMode = 'sales' | 'production';
-
 /**
- * Modal que muestra el detalle completo de un pedido y las acciones
- * disponibles según el rol/área:
- *  - mode="sales": solo lectura + cancelar (si aún no entregado)
- *  - mode="production": acciones del ciclo (iniciar, listo, entregar, cancelar)
+ * Modal que muestra el detalle completo de una orden de fabricación y las
+ * acciones disponibles (iniciar, completar, cancelar) según el rol.
  */
 @Component({
   selector: 'app-pedido-detail-modal',
@@ -29,25 +25,28 @@ type ActionMode = 'sales' | 'production';
         (dismissed)="closed.emit()">
 
         <div body>
-          @if (mode() === 'sales' && o.status === 'in_production') {
-            <div class="flow-banner">
-              <ion-icon name="hammer-outline" class="flow-banner__icon"></ion-icon>
-              <span>
-                Esta orden está siendo procesada por <strong>Producción</strong>.
-                Al completarse, los productos se sumarán al stock disponible.
-              </span>
-            </div>
-          }
-          @if (mode() === 'production' && o.status === 'pending') {
+          @if (o.status === 'pending') {
             <div class="flow-banner flow-banner--in">
               <ion-icon name="arrow-down-circle-outline" class="flow-banner__icon"></ion-icon>
               <span>
-                Nueva orden recibida desde <strong>Ventas</strong>.
+                Orden pendiente de fabricación.
                 Al iniciar producción se reservarán los insumos disponibles.
               </span>
             </div>
           }
           <div class="meta">
+            @if (customerName(o); as cname) {
+              <div class="meta__row">
+                <span class="meta__label">Cliente</span>
+                <span class="meta__value">{{ cname }}</span>
+              </div>
+            }
+            @if (o.requestedDeliveryDate) {
+              <div class="meta__row">
+                <span class="meta__label">Fecha entrega</span>
+                <span class="meta__value mono">{{ o.requestedDeliveryDate | date:'dd-MM-yyyy' }}</span>
+              </div>
+            }
             @if (o.purpose) {
               <div class="meta__row">
                 <span class="meta__label">Motivo</span>
@@ -174,25 +173,19 @@ type ActionMode = 'sales' | 'production';
         <div footer>
           <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cerrar</ion-button>
 
-          @if (mode() === 'production') {
-            @if (o.status === 'pending') {
-              @if (tenant.canCancelOrder()) {
-                <ion-button color="danger" fill="outline" (click)="onCancel(o)">Cancelar</ion-button>
-              }
-              @if (tenant.canOperateProduction()) {
-                <ion-button color="primary" (click)="onStart(o)">Iniciar producción</ion-button>
-              }
-            } @else if (o.status === 'in_production') {
-              @if (tenant.canCancelOrder()) {
-                <ion-button color="danger" fill="outline" (click)="onCancel(o)">Cancelar</ion-button>
-              }
-              @if (tenant.canOperateProduction()) {
-                <ion-button color="success" (click)="onComplete(o)">Marcar completada</ion-button>
-              }
+          @if (o.status === 'pending') {
+            @if (tenant.canCancelOrder()) {
+              <ion-button color="danger" fill="outline" (click)="onCancel(o)">Cancelar</ion-button>
             }
-          } @else if (mode() === 'sales' && tenant.canCancelOrderFromSales()) {
-            @if (o.status === 'pending' || o.status === 'in_production') {
-              <ion-button color="danger" fill="outline" (click)="onCancel(o)">Cancelar orden</ion-button>
+            @if (tenant.canOperateProduction()) {
+              <ion-button color="primary" (click)="onStart(o)">Iniciar producción</ion-button>
+            }
+          } @else if (o.status === 'in_production') {
+            @if (tenant.canCancelOrder()) {
+              <ion-button color="danger" fill="outline" (click)="onCancel(o)">Cancelar</ion-button>
+            }
+            @if (tenant.canOperateProduction()) {
+              <ion-button color="success" (click)="onComplete(o)">Marcar completada</ion-button>
             }
           }
         </div>
@@ -378,7 +371,6 @@ export class PedidoDetailModalComponent {
 
   readonly isOpen = input.required<boolean>();
   readonly order = input<CustomerOrder | null>(null);
-  readonly mode = input<ActionMode>('production');
   readonly closed = output<void>();
   readonly mutated = output<void>();
 
@@ -391,6 +383,11 @@ export class PedidoDetailModalComponent {
     }
     return { shortfalls: o.shortfalls, itemAnalysis: [] };
   });
+
+  customerName(o: CustomerOrder): string | null {
+    if (!o.customerId) return null;
+    return this.data.customerById(o.customerId)?.name ?? null;
+  }
 
   statusLabel(s: OrderStatus): string {
     return {

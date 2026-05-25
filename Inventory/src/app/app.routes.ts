@@ -1,60 +1,70 @@
 import { Routes } from '@angular/router';
 import {
-  authGuard, guestGuard, requireRoles, roleHomeRedirect, adminGuard,
+  authGuard, guestGuard, requireRoles, roleHomeRedirect,
 } from './core/guards/auth.guard';
 
 // Combos de roles reutilizables
 const adminOnly = requireRoles('admin');
-const adminOrSales = requireRoles('admin', 'sales');
 const adminOrProduction = requireRoles('admin', 'production');
-/** Cola de producción: production + operator + admin (lectura). */
+/** Cola/recetas accesibles por admin/production/operator */
 const productionOrOperator = requireRoles('admin', 'production', 'operator');
-/** Recetas: production edita, operator/admin solo lectura. */
-const recipesAccess = requireRoles('admin', 'production', 'operator');
 
 export const routes: Routes = [
+  // ===== Portal externo del cliente (sin shell, sin auth interna) =====
+  {
+    path: 'c/:token',
+    loadComponent: () => import('./features/portal-cliente/portal-cliente.page').then(m => m.PortalClientePage),
+  },
+
+  // ===== Auth =====
   {
     path: 'auth/login',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login.page').then(m => m.LoginPage),
   },
+
+  // ===== App principal con shell =====
   {
     path: '',
     canActivate: [authGuard],
     loadComponent: () => import('./features/shell/shell.page').then(m => m.ShellPage),
     children: [
-      // Raíz: redirigir según rol del usuario
       { path: '', pathMatch: 'full', canActivate: [roleHomeRedirect], children: [] },
 
-      // ===== Ventas (admin + sales) =====
+      // Clientes (portal management)
       {
-        path: 'pedidos',
-        canActivate: [adminOrSales],
-        loadComponent: () => import('./features/pedidos/pedidos.page').then(m => m.PedidosPage),
-      },
-      {
-        path: 'ventas',
-        canActivate: [adminOrSales],
-        loadComponent: () => import('./features/ventas/ventas.page').then(m => m.VentasPage),
-      },
-      {
-        path: 'devoluciones',
-        canActivate: [adminOrSales],
-        loadComponent: () => import('./features/devoluciones/devoluciones.page').then(m => m.DevolucionesPage),
-      },
-      {
-        // Catálogo es lectura para sales; admin sí puede editar (los botones de editar
-        // ya están condicionados a tenant.isAdmin() dentro del componente)
-        path: 'catalogo',
-        canActivate: [adminOrSales],
-        loadComponent: () => import('./features/catalogo/catalogo.page').then(m => m.CatalogoPage),
+        path: 'clientes',
+        canActivate: [adminOrProduction],
+        loadComponent: () => import('./features/clientes/clientes.page').then(m => m.ClientesPage),
       },
 
-      // ===== Producción (admin + production) =====
+      // Cola de pedidos de clientes
       {
         path: 'produccion',
         canActivate: [productionOrOperator],
         loadComponent: () => import('./features/produccion/produccion.page').then(m => m.ProduccionPage),
+      },
+      {
+        path: 'crear-pedido',
+        canActivate: [adminOrProduction],
+        loadComponent: () => import('./features/crear-pedido/crear-pedido.page').then(m => m.CrearPedidoPage),
+      },
+      {
+        path: 'planificacion',
+        canActivate: [productionOrOperator],
+        loadComponent: () => import('./features/planificacion/planificacion.page').then(m => m.PlanificacionPage),
+      },
+      {
+        path: 'historial-pedidos',
+        canActivate: [adminOrProduction],
+        loadComponent: () => import('./features/historial-pedidos/historial-pedidos.page').then(m => m.HistorialPedidosPage),
+      },
+
+      // Inventario y catálogo
+      {
+        path: 'catalogo',
+        canActivate: [adminOrProduction],
+        loadComponent: () => import('./features/catalogo/catalogo.page').then(m => m.CatalogoPage),
       },
       {
         path: 'inventario',
@@ -68,13 +78,18 @@ export const routes: Routes = [
       },
       {
         path: 'recetas',
-        canActivate: [recipesAccess],
+        canActivate: [productionOrOperator],
         loadComponent: () => import('./features/recetas/recetas.page').then(m => m.RecetasPage),
       },
       {
         path: 'ajustes',
         canActivate: [adminOrProduction],
         loadComponent: () => import('./features/ajustes/ajustes.page').then(m => m.AjustesPage),
+      },
+      {
+        path: 'mermas',
+        canActivate: [adminOrProduction],
+        loadComponent: () => import('./features/mermas/mermas.page').then(m => m.MermasPage),
       },
       {
         path: 'ordenes-compra',
@@ -86,13 +101,23 @@ export const routes: Routes = [
         canActivate: [adminOrProduction],
         loadComponent: () => import('./features/alertas/alertas.page').then(m => m.AlertasPage),
       },
-      {
-        path: 'boosts',
-        canActivate: [adminOrProduction],
-        loadComponent: () => import('./features/boosts/boosts.page').then(m => m.BoostsPage),
-      },
 
-      // ===== Solo admin =====
+      // Solo admin — paneles administrativos
+      {
+        path: 'panel-pedidos',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./features/panel-pedidos/panel-pedidos.page').then(m => m.PanelPedidosPage),
+      },
+      {
+        path: 'panel-inventario',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./features/panel-inventario/panel-inventario.page').then(m => m.PanelInventarioPage),
+      },
+      {
+        path: 'panel-contable',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./features/panel-contable/panel-contable.page').then(m => m.PanelContablePage),
+      },
       {
         path: 'predicciones',
         canActivate: [adminOnly],
@@ -103,33 +128,8 @@ export const routes: Routes = [
         canActivate: [adminOnly],
         loadComponent: () => import('./features/burn-down/burn-down.page').then(m => m.BurnDownPage),
       },
-      {
-        path: 'admin',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/admin/admin-dashboard.page').then(m => m.AdminDashboardPage),
-      },
-      {
-        path: 'admin/ventas',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/admin/admin-ventas.page').then(m => m.AdminVentasPage),
-      },
-      {
-        path: 'admin/produccion',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/admin/admin-produccion.page').then(m => m.AdminProduccionPage),
-      },
-      {
-        path: 'admin/financiero',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/admin/admin-financiero.page').then(m => m.AdminFinancieroPage),
-      },
-      {
-        path: 'admin/devoluciones',
-        canActivate: [adminGuard],
-        loadComponent: () => import('./features/admin/admin-devoluciones.page').then(m => m.AdminDevolucionesPage),
-      },
 
-      // ===== Todos =====
+      // Todos
       {
         path: 'mas',
         loadComponent: () => import('./features/mas/mas.page').then(m => m.MasPage),

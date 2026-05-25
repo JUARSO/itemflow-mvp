@@ -228,9 +228,6 @@ import { Member, UserRole } from '../../core/models';
           <ion-button (click)="switchTo('admin')" [disabled]="auth.isAdmin()">
             Admin
           </ion-button>
-          <ion-button (click)="switchTo('sales')" [disabled]="auth.isSales()" color="success">
-            Ventas
-          </ion-button>
           <ion-button (click)="switchTo('production')" [disabled]="auth.isProduction()" color="tertiary">
             Producción
           </ion-button>
@@ -595,7 +592,6 @@ export class MasPage {
 
   roleLabel(): string {
     if (this.auth.isAdmin()) return 'Administrador';
-    if (this.auth.isSales()) return 'Encargado de Ventas';
     if (this.auth.isProduction()) return 'Encargado de Producción';
     if (this.auth.isOperator()) return 'Operario';
     return '—';
@@ -603,7 +599,6 @@ export class MasPage {
 
   roleColor(): string {
     if (this.auth.isAdmin()) return 'primary';
-    if (this.auth.isSales()) return 'success';
     if (this.auth.isProduction()) return 'tertiary';
     if (this.auth.isOperator()) return 'warning';
     return 'medium';

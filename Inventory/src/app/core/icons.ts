@@ -38,6 +38,17 @@ import {
   arrowForwardOutline,
   addOutline,
   closeOutline,
+  // Clientes / acciones de card
+  trashOutline,
+  copyOutline,
+  refreshOutline,
+  linkOutline,
+  chevronDownOutline,
+  chevronUpOutline,
+  timeOutline,
+  calendarOutline,
+  archiveOutline,
+  arrowUndoOutline,
 } from 'ionicons/icons';
 
 /**
@@ -87,5 +98,16 @@ export function registerAppIcons(): void {
     'arrow-forward-outline': arrowForwardOutline,
     'add-outline': addOutline,
     'close-outline': closeOutline,
+    // Clientes / acciones
+    'trash-outline': trashOutline,
+    'copy-outline': copyOutline,
+    'refresh-outline': refreshOutline,
+    'link-outline': linkOutline,
+    'chevron-down-outline': chevronDownOutline,
+    'chevron-up-outline': chevronUpOutline,
+    'time-outline': timeOutline,
+    'calendar-outline': calendarOutline,
+    'archive-outline': archiveOutline,
+    'arrow-undo-outline': arrowUndoOutline,
   });
 }

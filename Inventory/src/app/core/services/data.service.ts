@@ -1,14 +1,14 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
-  Alert, CustomerOrder, DemandBoost, DemandPrediction, KardexEntry, Member,
-  OrderItem, OrderReservation, OrderShortfall, OrderStatus, Product,
-  ProductReturn, PurchaseOrder, Recipe, ReturnReason, SaleRecord, StockItem,
+  Alert, Customer, CustomerOrder, DemandPrediction, KardexEntry, Member,
+  OrderItem, OrderReservation, OrderShortfall, Product,
+  PurchaseOrder, Recipe, ReturnedLot, SaleRecord, StockItem,
   Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
 } from '../models';
 import {
-  MOCK_ALERTS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
+  MOCK_ALERTS, MOCK_CUSTOMERS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
   MOCK_PRODUCTS, MOCK_PRODUCT_STOCK, MOCK_PURCHASE_ORDERS, MOCK_RECIPES,
-  MOCK_RETURNS, MOCK_SALES, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
+  MOCK_RETURNED_LOTS, MOCK_SALES, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
 } from '../mocks/dummy-data';
 
 /**
@@ -29,9 +29,9 @@ export class DataService {
   private readonly _predictions = signal<DemandPrediction[]>([...MOCK_PREDICTIONS]);
   private readonly _pos = signal<PurchaseOrder[]>([...MOCK_PURCHASE_ORDERS]);
   private readonly _members = signal<Member[]>([...MOCK_MEMBERS]);
-  private readonly _boosts = signal<DemandBoost[]>([]);
   private readonly _orders = signal<CustomerOrder[]>([...MOCK_ORDERS]);
-  private readonly _returns = signal<ProductReturn[]>([...MOCK_RETURNS]);
+  private readonly _customers = signal<Customer[]>([...MOCK_CUSTOMERS]);
+  private readonly _returnedLots = signal<ReturnedLot[]>([...MOCK_RETURNED_LOTS]);
 
   constructor() {
     // Sembrar alertas auto-derivadas a partir del stock inicial.
@@ -53,8 +53,18 @@ export class DataService {
   readonly predictions = this._predictions.asReadonly();
   readonly purchaseOrders = this._pos.asReadonly();
   readonly members = this._members.asReadonly();
-  readonly boosts = this._boosts.asReadonly();
   readonly orders = this._orders.asReadonly();
+  readonly customers = this._customers.asReadonly();
+  readonly activeCustomers = computed(() => this._customers().filter(c => c.active));
+  readonly returnedLots = this._returnedLots.asReadonly();
+  readonly pendingReturnedLots = computed(() =>
+    this._returnedLots().filter(l => l.status === 'pending')
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  );
+  readonly processedReturnedLots = computed(() =>
+    this._returnedLots().filter(l => l.status === 'reviewed')
+      .sort((a, b) => (b.reviewedAt?.getTime() ?? 0) - (a.reviewedAt?.getTime() ?? 0))
+  );
 
   /** Órdenes que aún están abiertas en el flujo (no completadas ni canceladas). */
   readonly openOrders = computed(() =>
@@ -69,17 +79,6 @@ export class DataService {
   readonly completedOrders = computed(() =>
     this._orders().filter(o => o.status === 'completed')
   );
-
-  readonly returns = this._returns.asReadonly();
-
-  /**
-   * Boosts no cancelados cuyo período cubre la fecha actual o el futuro
-   * (no expirados todavía). Útil para mostrar listas y badges.
-   */
-  readonly activeBoosts = computed(() => {
-    const now = Date.now();
-    return this._boosts().filter(b => b.status === 'active' && b.endDate.getTime() >= now);
-  });
 
   // ----- KPIs computed -----
   readonly totalProducts = computed(() => this._products().filter(p => p.active).length);
@@ -546,153 +545,6 @@ export class DataService {
   }
 
   // ============================================================
-  //  Ventas
-  // ============================================================
-  /**
-   * Registra una venta al cliente final: descuenta del stock del producto
-   * terminado (poblado por producción al completar órdenes) y genera el
-   * SaleRecord para histórico/predicción.
-   *
-   * Ya NO explosiona BOM: los insumos se descuentan durante la fabricación
-   * (en startProduction), no al vender. El producto terminado tiene su propio
-   * stock que se incrementa cuando producción completa una orden.
-   */
-  registerSale(input: {
-    productId: string; qty: number; unitPrice: number;
-    userId: string; userName: string;
-  }): SaleRecord {
-    const product = this.productById(input.productId);
-    if (!product) throw new Error('Producto no encontrado.');
-
-    const sale: SaleRecord = {
-      id: `sale-${Date.now()}`,
-      productId: input.productId,
-      productName: product.name,
-      qty: input.qty,
-      unitPrice: input.unitPrice,
-      total: input.qty * input.unitPrice,
-      dayOfWeek: new Date().getDay(),
-      month: new Date().getMonth() + 1,
-      date: new Date(),
-      isOutlier: false,
-    };
-
-    {
-      const stock = this.productStockFor(input.productId);
-      if (!stock || stock.quantity < input.qty) {
-        throw new Error(`Stock insuficiente: ${stock?.quantity ?? 0} disponible, ${input.qty} solicitadas. Fabrica una orden de producción primero.`);
-      }
-      const newQty = stock.quantity - input.qty;
-      const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
-      this._productStock.update(list => list.map(s =>
-        s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
-      ));
-      this.registerKardexEntry({
-        id: `k-${Date.now()}-${product.id}`,
-        productId: product.id,
-        itemName: product.name,
-        type: 'out',
-        qty: input.qty,
-        balance: newQty,
-        // Usar costo efectivo (incluye cálculo desde receta si aplica).
-        cost: this.effectiveProductCost(product.id),
-        reason: 'sale',
-        userId: input.userId,
-        userName: input.userName,
-        at: new Date(),
-      });
-    }
-
-    this._sales.update(list => [sale, ...list]);
-    this.regenerateRestockAlerts();
-    return sale;
-  }
-
-  /**
-   * Importa ventas históricas sin tocar stock ni kardex.
-   * Pensado para migrar data desde otro sistema o cargar histórico para predicciones.
-   */
-  createSalesBulk(sales: SaleRecord[]) {
-    this._sales.update(list => [...sales, ...list]);
-  }
-
-  /**
-   * Registra múltiples ventas como una sola transacción atómica:
-   *  1. Valida que TODOS los items tengan stock suficiente
-   *  2. Si alguno falla, no se descuenta nada (rollback implícito)
-   *  3. Si todos pasan, descuenta stock + kardex + crea SaleRecord(s)
-   *
-   * Soporta varias líneas del mismo producto (las suma para validación).
-   */
-  registerSalesBatch(input: {
-    items: { productId: string; qty: number; unitPrice: number }[];
-    userId: string; userName: string;
-  }): SaleRecord[] {
-    if (input.items.length === 0) {
-      throw new Error('El carrito está vacío.');
-    }
-
-    // Agregar requeridos por producto (para validar contra stock disponible total)
-    const required = new Map<string, number>();
-    for (const it of input.items) {
-      required.set(it.productId, (required.get(it.productId) ?? 0) + it.qty);
-    }
-
-    // Validación previa: TODO o nada
-    for (const [productId, qty] of required) {
-      const product = this.productById(productId);
-      if (!product) throw new Error(`Producto no encontrado.`);
-      const stock = this.productStockFor(productId);
-      const have = stock?.quantity ?? 0;
-      if (have < qty) {
-        throw new Error(`Stock insuficiente de "${product.name}": ${have} disponible, ${qty} requerido.`);
-      }
-    }
-
-    // Aplicar mutaciones
-    const now = new Date();
-    const created: SaleRecord[] = [];
-    for (const it of input.items) {
-      const product = this.productById(it.productId)!;
-      const stock = this.productStockFor(it.productId)!;
-      const newQty = stock.quantity - it.qty;
-      const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
-      this._productStock.update(list => list.map(s =>
-        s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
-      ));
-      this.registerKardexEntry({
-        id: `k-${Date.now()}-${product.id}-${Math.random().toString(36).slice(2, 7)}`,
-        productId: product.id,
-        itemName: product.name,
-        type: 'out',
-        qty: it.qty,
-        balance: newQty,
-        cost: this.effectiveProductCost(product.id),
-        reason: 'sale',
-        userId: input.userId,
-        userName: input.userName,
-        at: now,
-      });
-      const sale: SaleRecord = {
-        id: `sale-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        productId: product.id,
-        productName: product.name,
-        qty: it.qty,
-        unitPrice: it.unitPrice,
-        total: it.qty * it.unitPrice,
-        dayOfWeek: now.getDay(),
-        month: now.getMonth() + 1,
-        date: now,
-        isOutlier: false,
-      };
-      created.push(sale);
-    }
-    this._sales.update(list => [...created, ...list]);
-    this.regenerateRestockAlerts();
-    return created;
-  }
-
-  // ============================================================
   //  Movimientos manuales de stock
   // ============================================================
   registerKardexEntry(entry: KardexEntry) {
@@ -908,132 +760,13 @@ export class DataService {
     this.regenerateRestockAlerts();
   }
 
-  // ============================================================
-  //  Demand Boosts (overrides administrativos de demanda)
-  // ============================================================
-
-  /**
-   * Registra un nuevo boost de demanda. El status inicial siempre es 'active';
-   * `activeBoosts` filtra automáticamente los expirados por fecha.
-   */
-  createBoost(input: Omit<DemandBoost, 'id' | 'status' | 'createdAt'>): DemandBoost {
-    const boost: DemandBoost = {
-      ...input,
-      id: `boost-${Date.now()}`,
-      status: 'active',
-      createdAt: new Date(),
-    };
-    this._boosts.update(list => [boost, ...list]);
-    this.regenerateRestockAlerts();
-    return boost;
-  }
-
-  cancelBoost(id: string) {
-    this._boosts.update(list => list.map(b =>
-      b.id === id ? { ...b, status: 'cancelled' as const } : b
-    ));
-    this.regenerateRestockAlerts();
-  }
-
-  deleteBoost(id: string) {
-    this._boosts.update(list => list.filter(b => b.id !== id));
-    this.regenerateRestockAlerts();
-  }
-
-  /** Boosts activos que aplican a un item específico. */
-  boostsForItem(itemKind: 'supply' | 'product', itemId: string): DemandBoost[] {
-    return this.activeBoosts().filter(b => b.itemKind === itemKind && b.itemId === itemId);
-  }
-
   /**
    * Demanda diaria efectiva para un item en una fecha futura.
-   *
-   * Reglas:
-   *  - Los boosts SIEMPRE son de productos (no insumos directos).
-   *  - Para un PRODUCTO de reventa (hasRecipe=false): los boosts directos del
-   *    producto modifican su consumo propio.
-   *  - Para un INSUMO: la demanda extra surge de las recetas de los productos
-   *    con boost activo. Cada unidad extra del producto consume `qty/yield`
-   *    del insumo según su receta. Sin propagación si el producto es reventa.
-   *
-   * Modos:
-   *  - multiplier  → demanda extra = base × (value - 1)
-   *  - absoluteAdd → demanda extra = value (u/día)
-   *  - eventTotal  → demanda extra = value / días_rango (u/día durante el período)
+   * Versión sin boosts: simplemente la media móvil 7d del histórico.
+   * Mantenida porque burn-down y predicciones la consumen.
    */
-  effectiveDailyDemand(itemKind: 'supply' | 'product', itemId: string, dayOffset: number): number {
-    const base = this.rollingMean(itemKind, itemId, 7);
-    const target = new Date();
-    target.setHours(0, 0, 0, 0);
-    target.setDate(target.getDate() + dayOffset);
-    const targetTs = target.getTime();
-
-    // Helper: ¿este boost cubre la fecha objetivo? Devuelve días del rango si sí.
-    const boostCoversDate = (b: DemandBoost): number => {
-      const start = new Date(b.startDate); start.setHours(0, 0, 0, 0);
-      const end = new Date(b.endDate); end.setHours(23, 59, 59, 999);
-      if (targetTs < start.getTime() || targetTs > end.getTime()) return 0;
-      return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
-    };
-
-    // Helper: demanda extra por día del producto según el boost.
-    const productExtraPerDay = (b: DemandBoost, productBaseDemand: number, rangeDays: number): number => {
-      switch (b.mode) {
-        case 'multiplier':  return productBaseDemand * Math.max(0, b.value - 1);
-        case 'absoluteAdd': return b.value;
-        case 'eventTotal':  return b.value / rangeDays;
-      }
-    };
-
-    if (itemKind === 'product') {
-      // Boost directo al producto (reventa o con receta, igual lo respetamos).
-      const boosts = this.boostsForItem('product', itemId);
-      if (boosts.length === 0) return base;
-
-      let result = base;
-      for (const b of boosts) {
-        const days = boostCoversDate(b);
-        if (days === 0) continue;
-        if (b.mode === 'multiplier') {
-          result = result * b.value;
-        } else if (b.mode === 'absoluteAdd') {
-          result += b.value;
-        } else {
-          result += b.value / days;
-        }
-      }
-      return Math.max(0, result);
-    }
-
-    // itemKind === 'supply' → propagación vía receta
-    let extra = 0;
-    const products = this._products();
-    for (const boost of this.activeBoosts()) {
-      // Skip boosts que no son de producto (no debería haber, pero defensivo)
-      if (boost.itemKind !== 'product') continue;
-      const days = boostCoversDate(boost);
-      if (days === 0) continue;
-
-      const product = products.find(p => p.id === boost.itemId);
-      if (!product || !product.hasRecipe) continue;  // reventa no propaga
-
-      const recipe = this.recipeFor(product.id);
-      if (!recipe) continue;
-
-      // ¿esta receta usa nuestro insumo?
-      const recipeItem = recipe.items.find(ri => ri.supplyId === itemId);
-      if (!recipeItem) continue;
-
-      // Demanda extra de producto por día
-      const productBase = this.rollingMean('product', product.id, 7);
-      const extraProductPerDay = productExtraPerDay(boost, productBase, days);
-
-      // Cada unidad extra de producto consume (item.qty / recipe.yieldQty) del insumo
-      const consumptionPerProductUnit = recipeItem.qty / Math.max(1, recipe.yieldQty);
-      extra += extraProductPerDay * consumptionPerProductUnit;
-    }
-
-    return Math.max(0, base + extra);
+  effectiveDailyDemand(itemKind: 'supply' | 'product', itemId: string, _dayOffset: number): number {
+    return this.rollingMean(itemKind, itemId, 7);
   }
 
   // ============================================================
@@ -1093,8 +826,6 @@ export class DataService {
     incomingPOs: { code: string; arrivalDay: number; qty: number }[];
     /** Cantidad sugerida a ordenar para llegar al máximo cuando entre la OC. */
     suggestedOrderQty: number;
-    /** Boosts activos que tocan el horizonte (para UI). */
-    activeBoostsInHorizon: DemandBoost[];
   } {
     // Estado base del item
     let item: { stock: number; reorderPoint: number; minStock: number; maxStock: number; leadTime: number } | null = null;
@@ -1182,12 +913,6 @@ export class DataService {
       : baselineDailyDemand;
     const daysOfCoverage = avgDemand > 0 ? initialStock / avgDemand : 0;
 
-    // Boosts que tocan el horizonte
-    const horizonEnd = now + horizonDays * 86_400_000;
-    const activeBoostsInHorizon = this.boostsForItem(itemKind, itemId).filter(b =>
-      b.endDate.getTime() >= now && b.startDate.getTime() <= horizonEnd
-    );
-
     return {
       trayectoria,
       demandPerDay,
@@ -1203,7 +928,6 @@ export class DataService {
       dayToOrder,
       incomingPOs,
       suggestedOrderQty,
-      activeBoostsInHorizon,
     };
   }
 
@@ -1223,7 +947,6 @@ export class DataService {
       dayToOrder: null,
       incomingPOs: [],
       suggestedOrderQty: 0,
-      activeBoostsInHorizon: [],
     };
   }
 
@@ -1233,10 +956,16 @@ export class DataService {
 
   /**
    * Calcula el promedio diario de consumo en los últimos N días.
-   *  - Para `supply`: usa entradas de kardex tipo `out` (incluye ventas vía receta
-   *    y mermas).
-   *  - Para `product` (de reventa): usa registros de venta directos.
-   * Si no hay actividad en la ventana, devuelve 0.
+   *
+   * En ambos casos se usa el kardex (sin depender ya de `SaleRecord`):
+   *  - Para `supply`: cualquier `out` (producción consumiendo recetas para
+   *    pedidos completados, mermas, etc.).
+   *  - Para `product`: `out` con reason `sale` — corresponde a las unidades
+   *    efectivamente entregadas al cliente vía `confirmOrderReception`.
+   *
+   * Así la demanda predicha refleja los pedidos completados a clientes (no
+   * ventas fantasma de tabla aparte) y los insumos se descuentan en línea
+   * con cómo se gastan al fabricar esos pedidos.
    */
   rollingMean(itemKind: 'supply' | 'product', itemId: string, windowDays: number): number {
     const total = this.sumConsumption(itemKind, itemId, windowDays);
@@ -1301,9 +1030,11 @@ export class DataService {
         .filter(k => k.supplyId === itemId && k.type === 'out' && k.at.getTime() >= cutoff)
         .reduce((s, k) => s + k.qty, 0);
     }
-    return this._sales()
-      .filter(s => s.productId === itemId && s.date.getTime() >= cutoff)
-      .reduce((s, x) => s + x.qty, 0);
+    // Productos: kardex `out` reason `sale` = entregado al cliente.
+    return this._kardex()
+      .filter(k => k.productId === itemId && k.type === 'out' && k.reason === 'sale'
+        && k.at.getTime() >= cutoff)
+      .reduce((s, k) => s + k.qty, 0);
   }
 
   /** Devuelve un array de N elementos con el consumo de cada día (día 0 = más antiguo). */
@@ -1314,9 +1045,9 @@ export class DataService {
       ? this._kardex()
           .filter(k => k.supplyId === itemId && k.type === 'out')
           .map(k => ({ at: k.at, qty: k.qty }))
-      : this._sales()
-          .filter(s => s.productId === itemId)
-          .map(s => ({ at: s.date, qty: s.qty }));
+      : this._kardex()
+          .filter(k => k.productId === itemId && k.type === 'out' && k.reason === 'sale')
+          .map(k => ({ at: k.at, qty: k.qty }));
     for (const it of items) {
       const ageDays = Math.floor((now - it.at.getTime()) / 86_400_000);
       if (ageDays < 0 || ageDays >= windowDays) continue;
@@ -1409,65 +1140,10 @@ export class DataService {
       });
     }
 
-    // Pasada extra: alertas proactivas por boosts activos.
-    // Si un boost va a tirar el stock por debajo del ROP dentro del lookahead
-    // (= lead time + 3 días buffer), emitir alerta aunque el stock actual esté OK.
-    // Estas alertas usan prefijo `auto-restock-boost-` para no duplicar las normales.
-    for (const boost of this.activeBoosts()) {
-      const sameKindKey = `${boost.itemKind}-${boost.itemId}`;
-      const normalAlertId = `auto-restock-${sameKindKey}`;
-      // Si ya hay una alerta normal para este item, skip (más prioritaria).
-      if (autoNext.some(a => a.id === normalAlertId)) continue;
-
-      // Stock + datos del item
-      let stockNow = 0; let ropItem = 0; let leadTime = 0; let unit = ''; let itemName = boost.itemName;
-      if (boost.itemKind === 'supply') {
-        const s = supplies.find(x => x.id === boost.itemId);
-        if (!s || !s.active) continue;
-        const stk = supplyStock.find(x => x.supplyId === boost.itemId);
-        stockNow = stk?.quantity ?? 0;
-        ropItem = s.reorderPoint; leadTime = s.leadTime; unit = s.unit; itemName = s.name;
-      } else {
-        const p = products.find(x => x.id === boost.itemId);
-        if (!p || !p.active || p.hasRecipe) continue;
-        if (p.reorderPoint == null) continue;
-        const stk = productStock.find(x => x.productId === boost.itemId);
-        stockNow = stk?.quantity ?? 0;
-        ropItem = p.reorderPoint; leadTime = p.leadTime; unit = p.unit; itemName = p.name;
-      }
-
-      const lookahead = Math.max(leadTime + 3, 7);
-      let projected = stockNow;
-      for (let d = 0; d < lookahead; d++) {
-        projected -= this.effectiveDailyDemand(boost.itemKind, boost.itemId, d);
-        if (projected < 0) projected = 0;
-      }
-      if (projected >= ropItem) continue; // el stock aguanta con el boost
-
-      const id = `auto-restock-boost-${sameKindKey}`;
-      const prev = existing.find(a => a.id === id);
-      autoNext.push({
-        id,
-        type: 'stockout_risk',
-        status: prev?.status === 'acknowledged' ? 'acknowledged' : 'active',
-        priority: 'high',
-        ...(boost.itemKind === 'supply' ? { supplyId: boost.itemId } : { productId: boost.itemId }),
-        itemName,
-        message: `Boost activo "${boost.reason}" va a llevar el stock de ${Math.round(stockNow)} a ~${Math.round(projected)} ${unit} en ${lookahead} días (ROP: ${ropItem}). Considera generar OC anticipada.`,
-        currentQty: stockNow,
-        reorderPoint: ropItem,
-        projectedDaysUntilStockout: lookahead,
-        createdAt: prev?.createdAt ?? new Date(),
-        acknowledgedAt: prev?.acknowledgedAt,
-        acknowledgedBy: prev?.acknowledgedBy,
-      });
-    }
-
     // Preservar alertas no-auto (manuales, históricas, excess, stockout_risk creadas a mano)
     const manual = existing.filter(a => !a.id.startsWith('auto-restock-'));
     this._alerts.set([...autoNext, ...manual]);
   }
-
   // ============================================================
   //  Pedidos (Ventas → Producción)
   // ============================================================
@@ -1600,6 +1276,10 @@ export class DataService {
     notes?: string;
     userId: string;
     userName: string;
+    /** Cliente que originó el pedido (cuando viene del portal). */
+    customerId?: string;
+    /** Fecha de entrega solicitada (solo en pedidos desde portal). */
+    requestedDeliveryDate?: Date;
   }): CustomerOrder {
     if (input.items.length === 0) {
       throw new Error('La orden debe tener al menos un item.');
@@ -1620,6 +1300,7 @@ export class DataService {
     const order: CustomerOrder = {
       id: `ord-${Date.now()}`,
       code,
+      customerId: input.customerId,
       purpose: input.purpose?.trim() || undefined,
       status: 'pending',
       items: orderItems,
@@ -1629,6 +1310,7 @@ export class DataService {
       createdBy: input.userName,
       reservations: [],
       shortfalls: [],
+      requestedDeliveryDate: input.requestedDeliveryDate,
     };
     this._orders.update(list => [order, ...list]);
     return order;
@@ -1888,73 +1570,296 @@ export class DataService {
     return updated;
   }
 
-  // ============================================================
-  //  Devoluciones (Ventas → Producción)
-  // ============================================================
-
   /**
-   * Registra una devolución de producto terminado a producción.
-   * Descuenta del stock disponible y genera kardex `out` con reason
-   * 'return_to_production'. La pérdida monetaria se calcula con el costo
-   * efectivo del producto al momento de devolver.
+   * Confirmación de recepción por parte del cliente. Recibe el detalle real
+   * por producto (cuánto se aceptó de lo entregado).
+   *
+   * Movimientos por cada item:
+   *  1. Salida `sale` por el `fulfilledQty` (entrega total al cliente).
+   *  2. Si el cliente reportó menos (`receivedQty < fulfilledQty`), se crea
+   *     un `ReturnedLot` `pending` por la diferencia. Las unidades devueltas
+   *     NO se reincorporan automáticamente al stock — esperan revisión en la
+   *     pantalla de Mermas, donde el admin decide cuánto descartar y cuánto
+   *     vuelve al inventario como producto utilizable.
+   *
+   * El monto final se recalcula con los precios unitarios originales.
    */
-  registerReturn(input: {
-    productId: string;
-    qty: number;
-    reason: ReturnReason;
-    notes?: string;
-    userId: string;
-    userName: string;
-  }): ProductReturn {
-    if (input.qty <= 0) throw new Error('La cantidad debe ser mayor a 0.');
-    const product = this.productById(input.productId);
-    if (!product) throw new Error('Producto no encontrado.');
-    const stock = this.productStockFor(input.productId);
-    const have = stock?.quantity ?? 0;
-    if (have < input.qty) {
-      throw new Error(`Stock insuficiente de "${product.name}": ${have} disponible, ${input.qty} a devolver.`);
+  confirmOrderReception(
+    orderId: string,
+    receipt: Array<{ productId: string; receivedQty: number }>,
+    note: string | undefined,
+    userId: string,
+    userName: string,
+  ): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (order.status !== 'completed') {
+      throw new Error('Solo se confirman pedidos ya producidos y completados.');
+    }
+    if (order.customerConfirmedAt) {
+      throw new Error('Este pedido ya fue confirmado por el cliente.');
     }
 
-    const newQty = have - input.qty;
-    const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
-    this._productStock.update(list => list.map(s =>
-      s.id === stock!.id ? { ...s, quantity: newQty, status: newStatus } : s
-    ));
+    const receiptMap = new Map(receipt.map(r => [r.productId, r.receivedQty]));
+    const now = new Date();
+    let finalAmount = 0;
 
-    const costAtReturn = this.effectiveProductCost(input.productId);
-    const totalLoss = +(costAtReturn * input.qty).toFixed(2);
-
-    this.registerKardexEntry({
-      id: `k-${Date.now()}-${product.id}-ret`,
-      productId: product.id,
-      itemName: product.name,
-      type: 'out',
-      qty: input.qty,
-      balance: newQty,
-      cost: costAtReturn,
-      reason: 'return_to_production',
-      note: `Devolución (${input.reason})${input.notes ? ' — ' + input.notes : ''}`,
-      userId: input.userId,
-      userName: input.userName,
-      at: new Date(),
+    const updatedItems: OrderItem[] = order.items.map(it => {
+      const raw = receiptMap.get(it.productId);
+      const received = Math.max(0, Math.min(raw ?? it.fulfilledQty, it.fulfilledQty));
+      finalAmount += received * it.unitPrice;
+      return { ...it, receivedQty: received };
     });
 
-    const ret: ProductReturn = {
-      id: `ret-${Date.now()}`,
-      productId: product.id,
-      productName: product.name,
-      qty: input.qty,
-      unit: product.unit,
-      reason: input.reason,
-      notes: input.notes?.trim() || undefined,
-      costAtReturn,
-      totalLoss,
-      createdAt: new Date(),
-      createdBy: input.userName,
+    const customerLabel = order.customerId
+      ? this.customerById(order.customerId)?.name ?? 'cliente'
+      : 'cliente';
+
+    for (const it of updatedItems) {
+      const received = it.receivedQty ?? 0;
+      const diff = it.fulfilledQty - received;
+
+      const product = this.productById(it.productId);
+      if (!product) continue;
+
+      // Asegurar StockItem (productos con receta podrían no tenerlo).
+      let stock = this.productStockFor(it.productId);
+      if (!stock) {
+        stock = {
+          id: it.productId,
+          productId: it.productId,
+          quantity: 0,
+          reservedQty: 0,
+          status: 'out',
+        };
+        this._productStock.update(list => [...list, stock!]);
+      }
+
+      // 1) Salida total: entrega al cliente del fulfilledQty
+      if (it.fulfilledQty > 0) {
+        const afterOut = Math.max(0, stock.quantity - it.fulfilledQty);
+        const statusAfterOut = this.computeProductStatus(afterOut, product.reorderPoint, product.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.productId === it.productId ? { ...s, quantity: afterOut, status: statusAfterOut } : s
+        ));
+
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${it.productId}-out-${Math.random().toString(36).slice(2, 6)}`,
+          productId: it.productId,
+          itemName: it.productName,
+          type: 'out',
+          qty: it.fulfilledQty,
+          balance: afterOut,
+          cost: this.effectiveProductCost(it.productId),
+          reason: 'sale',
+          note: `Pedido ${order.code} entregado a ${customerLabel}`,
+          userId,
+          userName,
+          at: now,
+        });
+      }
+
+      // 2) Devolución: crear ReturnedLot pendiente de revisión (no toca stock).
+      if (diff > 0) {
+        const lot: ReturnedLot = {
+          id: `lot-${Date.now()}-${it.productId}-${Math.random().toString(36).slice(2, 7)}`,
+          productId: it.productId,
+          productName: it.productName,
+          unit: it.unit,
+          qty: diff,
+          mermaQty: 0,
+          sourceOrderId: order.id,
+          sourceOrderCode: order.code,
+          customerId: order.customerId,
+          customerName: order.customerId ? this.customerById(order.customerId)?.name : undefined,
+          customerNote: note?.trim() || undefined,
+          createdAt: now,
+          status: 'pending',
+        };
+        this._returnedLots.update(list => [lot, ...list]);
+      }
+    }
+
+    const updated: CustomerOrder = {
+      ...order,
+      items: updatedItems,
+      customerConfirmedAt: now,
+      customerNote: note?.trim() || undefined,
+      finalAmount,
     };
-    this._returns.update(list => [ret, ...list]);
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
     this.regenerateRestockAlerts();
-    return ret;
+    return updated;
+  }
+
+  /**
+   * Procesa un lote devuelto:
+   *  - `mermaQty`: cantidad a descartar (0..lot.qty).
+   *  - `usableQty = lot.qty - mermaQty`: vuelve al stock como producto
+   *    utilizable (kardex `in` con reason `return_from_customer`).
+   *  - El lote queda `reviewed`.
+   *
+   * Si `mermaQty === lot.qty` toda la devolución se descarta y no se mueve
+   * stock. Si `mermaQty === 0` se reintegra todo al inventario.
+   */
+  processReturnedLot(
+    lotId: string,
+    mermaQty: number,
+    reviewNote: string | undefined,
+    userId: string,
+    userName: string,
+  ): ReturnedLot {
+    const lot = this._returnedLots().find(l => l.id === lotId);
+    if (!lot) throw new Error('Lote de devolución no encontrado.');
+    if (lot.status !== 'pending') {
+      throw new Error('Este lote ya fue procesado.');
+    }
+    const merma = Math.max(0, Math.min(Math.floor(mermaQty), lot.qty));
+    const usable = lot.qty - merma;
+    const product = this.productById(lot.productId);
+    if (!product) throw new Error('Producto no encontrado para el lote.');
+
+    // Reintegrar al stock la porción utilizable
+    if (usable > 0) {
+      let stock = this.productStockFor(lot.productId);
+      if (!stock) {
+        stock = {
+          id: lot.productId,
+          productId: lot.productId,
+          quantity: 0,
+          reservedQty: 0,
+          status: 'out',
+        };
+        this._productStock.update(list => [...list, stock!]);
+      }
+      const newQty = stock.quantity + usable;
+      const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+      this._productStock.update(list => list.map(s =>
+        s.productId === lot.productId ? { ...s, quantity: newQty, status: newStatus } : s
+      ));
+
+      const customerLabel = lot.customerName ?? 'cliente';
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${lot.productId}-reuse-${Math.random().toString(36).slice(2, 6)}`,
+        productId: lot.productId,
+        itemName: lot.productName,
+        type: 'in',
+        qty: usable,
+        balance: newQty,
+        cost: this.effectiveProductCost(lot.productId),
+        reason: 'return_from_customer',
+        note: `Reintegrado tras revisión — devolución pedido ${lot.sourceOrderCode} (${customerLabel})`
+          + (reviewNote?.trim() ? ` · ${reviewNote.trim()}` : ''),
+        userId,
+        userName,
+        at: new Date(),
+      });
+    }
+
+    const reviewed: ReturnedLot = {
+      ...lot,
+      mermaQty: merma,
+      status: 'reviewed',
+      reviewedAt: new Date(),
+      reviewedBy: userName,
+      reviewNote: reviewNote?.trim() || undefined,
+    };
+    this._returnedLots.update(list => list.map(l => l.id === lotId ? reviewed : l));
+    this.regenerateRestockAlerts();
+    return reviewed;
+  }
+
+  // ============================================================
+  //  Clientes (portal externo)
+  // ============================================================
+
+  customerById(id: string): Customer | undefined {
+    return this._customers().find(c => c.id === id);
+  }
+
+  /** Busca un cliente por su token público (URL /c/:token). */
+  customerByToken(token: string): Customer | undefined {
+    if (!token) return undefined;
+    return this._customers().find(c => c.publicToken === token && c.active);
+  }
+
+  /** Valida el PIN del cliente. */
+  validateCustomerPin(customerId: string, pin: string): boolean {
+    const c = this.customerById(customerId);
+    if (!c) return false;
+    return c.accessPin === pin;
+  }
+
+  /** Genera un token aleatorio de 16 chars hex. */
+  private generateToken(): string {
+    return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+  }
+
+  /** Genera un PIN de 6 dígitos. */
+  private generatePin(): string {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+
+  createCustomer(input: Omit<Customer, 'id' | 'publicToken' | 'accessPin' | 'createdAt'> & {
+    publicToken?: string; accessPin?: string;
+  }): Customer {
+    const c: Customer = {
+      ...input,
+      id: `cust-${Date.now()}`,
+      publicToken: input.publicToken || this.generateToken(),
+      accessPin: input.accessPin || this.generatePin(),
+      createdAt: new Date(),
+    };
+    this._customers.update(list => [c, ...list]);
+    return c;
+  }
+
+  updateCustomer(c: Customer) {
+    this._customers.update(list => list.map(x => x.id === c.id ? c : x));
+  }
+
+  deleteCustomer(id: string) {
+    this._customers.update(list => list.filter(c => c.id !== id));
+  }
+
+  /** Regenera el PIN del cliente y devuelve el nuevo PIN. */
+  regenerateCustomerPin(id: string): string | null {
+    const c = this.customerById(id);
+    if (!c) return null;
+    const newPin = this.generatePin();
+    this.updateCustomer({ ...c, accessPin: newPin });
+    return newPin;
+  }
+
+  /** Regenera el token del cliente (invalida el link anterior). */
+  regenerateCustomerToken(id: string): string | null {
+    const c = this.customerById(id);
+    if (!c) return null;
+    const newToken = this.generateToken();
+    this.updateCustomer({ ...c, publicToken: newToken });
+    return newToken;
+  }
+
+  /**
+   * ¿El día actual permite crear pedidos para este cliente?
+   * (revisa la ventana de orderDays).
+   */
+  canCustomerOrderToday(customerId: string): boolean {
+    const c = this.customerById(customerId);
+    if (!c) return false;
+    if (c.window.orderDays.length === 0) return true; // sin restricción
+    return c.window.orderDays.includes(new Date().getDay());
+  }
+
+  /**
+   * Devuelve los productos del catálogo que este cliente puede pedir.
+   * Si allowedProductIds está vacío → devuelve todos los productos activos.
+   */
+  customerProducts(customerId: string): Product[] {
+    const c = this.customerById(customerId);
+    if (!c) return [];
+    if (c.allowedProductIds.length === 0) return this.activeProducts();
+    return this.activeProducts().filter(p => c.allowedProductIds.includes(p.id));
   }
 
   /** Próximo correlativo ORD-NNN basado en los pedidos existentes. */

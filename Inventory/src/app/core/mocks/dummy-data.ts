@@ -1,7 +1,8 @@
 import {
   Member, Company, Product, Supply, Recipe,
   StockItem, SupplyStockItem, KardexEntry, SaleRecord,
-  Alert, DemandPrediction, PurchaseOrder, CustomerOrder, ProductReturn
+  Alert, DemandPrediction, PurchaseOrder, CustomerOrder, Customer,
+  ReturnedLot,
 } from '../models';
 
 export const MOCK_COMPANY: Company = {
@@ -14,7 +15,6 @@ export const MOCK_COMPANY: Company = {
 
 export const MOCK_MEMBERS: Member[] = [
   { uid: 'u-admin', email: 'admin@panyco.cl', displayName: 'María González', role: 'admin', active: true },
-  { uid: 'u-ventas', email: 'ventas@panyco.cl', displayName: 'Juan Pérez', role: 'sales', active: true },
   { uid: 'u-produccion', email: 'produccion@panyco.cl', displayName: 'Sofía Rojas', role: 'production', active: true },
   { uid: 'u-operario', email: 'operario@panyco.cl', displayName: 'Carlos Mora', role: 'operator', active: true },
 ];
@@ -41,10 +41,10 @@ export const MOCK_PRODUCTS: Product[] = [
   { id: 'p-baguette', sku: 'PROD-BAG-001', name: 'Baguette tradicional', category: 'Panes', unit: 'unidad', buyPrice: 380, sellPrice: 1200, leadTime: 1, active: true, hasRecipe: true },
   { id: 'p-marraqueta', sku: 'PROD-MAR-001', name: 'Marraqueta', category: 'Panes', unit: 'unidad', buyPrice: 120, sellPrice: 350, leadTime: 1, active: true, hasRecipe: true },
   { id: 'p-hallulla', sku: 'PROD-HAL-001', name: 'Hallulla', category: 'Panes', unit: 'unidad', buyPrice: 90, sellPrice: 300, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-croissant', sku: 'PROD-CRO-001', name: 'Croissant mantequilla', category: 'Pastelería', unit: 'unidad', buyPrice: 650, sellPrice: 1900, leadTime: 1, active: true, hasRecipe: true },
+  { id: 'p-croissant', sku: 'PROD-CRO-001', name: 'Croissant mantequilla', category: 'Pastelería', unit: 'unidad', buyPrice: 650, sellPrice: 1900, leadTime: 2, active: true, hasRecipe: true },
   { id: 'p-empanada', sku: 'PROD-EMP-001', name: 'Empanada queso', category: 'Salados', unit: 'unidad', buyPrice: 550, sellPrice: 1700, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-brownie', sku: 'PROD-BRO-001', name: 'Brownie chocolate', category: 'Pastelería', unit: 'unidad', buyPrice: 720, sellPrice: 2200, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-pie', sku: 'PROD-PIE-001', name: 'Pie de limón', category: 'Pastelería', unit: 'unidad', buyPrice: 5800, sellPrice: 18000, leadTime: 1, active: true, hasRecipe: true },
+  { id: 'p-brownie', sku: 'PROD-BRO-001', name: 'Brownie chocolate', category: 'Pastelería', unit: 'unidad', buyPrice: 720, sellPrice: 2200, leadTime: 2, active: true, hasRecipe: true },
+  { id: 'p-pie', sku: 'PROD-PIE-001', name: 'Pie de limón', category: 'Pastelería', unit: 'unidad', buyPrice: 5800, sellPrice: 18000, leadTime: 3, active: true, hasRecipe: true },
   { id: 'p-galleta', sku: 'PROD-GAL-001', name: 'Galleta avena pasas', category: 'Galletas', unit: 'unidad', buyPrice: 180, sellPrice: 600, leadTime: 1, active: true, hasRecipe: true },
   { id: 'p-cafe', sku: 'PROD-CAF-001', name: 'Café molido 250g (reventa)', category: 'Bebidas', unit: 'unidad', buyPrice: 3500, sellPrice: 5900, leadTime: 7, active: true, hasRecipe: false, reorderPoint: 12, minStock: 4 },
   { id: 'p-mermelada-rev', sku: 'PROD-MER-001', name: 'Mermelada artesanal (reventa)', category: 'Conservas', unit: 'unidad', buyPrice: 2800, sellPrice: 4900, leadTime: 7, active: true, hasRecipe: false, reorderPoint: 8, minStock: 3 },
@@ -168,13 +168,15 @@ export const MOCK_SUPPLY_STOCK: SupplyStockItem[] = (() => {
 })();
 
 export const MOCK_PRODUCT_STOCK: StockItem[] = (() => {
-  // solo productos sin receta tienen stock propio
+  // Productos sin receta: stock de reventa.
+  // Productos con receta: aparecen aquí solo si tienen unidades disponibles
+  // (sobras de producción o devoluciones ya procesadas en Mermas).
   const stockByItem: Record<string, number> = {
     'p-cafe':           7,   // low (entre minStock=4 y reorderPoint=12)
     'p-mermelada-rev':  2,   // critical (≤ minStock=3)
   };
   return MOCK_PRODUCTS
-    .filter(p => !p.hasRecipe)
+    .filter(p => !p.hasRecipe || stockByItem[p.id] !== undefined)
     .map(product => {
       const qty = stockByItem[product.id] ?? 0;
       return {
@@ -197,11 +199,67 @@ function statusOfProduct(qty: number, reorderPoint?: number, minStock?: number):
 // Helper para fechas relativas
 const daysAgo = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000);
 const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000);
+const daysFromNow = (d: number) => {
+  const x = new Date();
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() + d);
+  return x;
+};
+
+/**
+ * Genera 30 días de kardex 'out' para productos terminados, simulando
+ * entregas a clientes (pedidos completados). Esto es lo que alimenta las
+ * predicciones: el rolling-mean/std se computa sobre estas entradas.
+ *
+ * La distribución usa los mismos baseQty / multiplicadores semanales que el
+ * generador anterior basado en SaleRecord, así las predicciones mantienen
+ * su realismo histórico ahora que dependen de "productos completados a
+ * clientes" en vez de un stream de ventas separado.
+ */
+const HISTORICAL_PRODUCT_DELIVERIES_KARDEX: KardexEntry[] = (() => {
+  const entries: KardexEntry[] = [];
+  let id = 1;
+  for (let d = 0; d < 30; d++) {
+    const date = daysAgo(d);
+    const dayMultiplier = [0.6, 1.0, 1.0, 1.1, 1.1, 1.3, 1.5][date.getDay()];
+    for (const product of MOCK_PRODUCTS) {
+      const baseQty = product.id === 'p-baguette' ? 35 :
+                      product.id === 'p-marraqueta' ? 80 :
+                      product.id === 'p-hallulla' ? 60 :
+                      product.id === 'p-croissant' ? 20 :
+                      product.id === 'p-empanada' ? 18 :
+                      product.id === 'p-brownie' ? 12 :
+                      product.id === 'p-galleta' ? 30 :
+                      product.id === 'p-cafe' ? 5 :
+                      product.id === 'p-mermelada-rev' ? 3 :
+                      product.id === 'p-pie' ? 1 : 5;
+      const qty = Math.max(0, Math.round(baseQty * dayMultiplier * (0.7 + Math.random() * 0.6)));
+      if (qty === 0) continue;
+      const isOutlier = Math.random() < 0.04;
+      const finalQty = isOutlier ? Math.round(qty * 2.5) : qty;
+      entries.push({
+        id: `k-hist-${id++}`,
+        productId: product.id,
+        itemName: product.name,
+        type: 'out',
+        qty: finalQty,
+        balance: 0, // histórico — balance no es relevante para predicciones
+        cost: product.buyPrice,
+        reason: 'sale',
+        note: 'Pedido completado entregado al cliente',
+        userId: 'u-produccion',
+        userName: 'Sofía Rojas',
+        at: date,
+      });
+    }
+  }
+  return entries;
+})();
 
 export const MOCK_KARDEX: KardexEntry[] = [
   { id: 'k-1', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'in', qty: 50, balance: 163, cost: 850, reason: 'purchase', note: 'OC #142 recibida', userId: 'u-admin', userName: 'María González', at: hoursAgo(3) },
 
-  { id: 'k-2', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 7.5, balance: 113, cost: 850, reason: 'sale', userId: 'u-ventas', userName: 'Juan Pérez', at: hoursAgo(8) },
+  { id: 'k-2', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 7.5, balance: 113, cost: 850, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: hoursAgo(8) },
   { id: 'k-3', supplyId: 's-levadura', itemName: 'Levadura fresca', type: 'out', qty: 0.5, balance: 11, cost: 4200, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: hoursAgo(12) },
   { id: 'k-6', supplyId: 's-azucar', itemName: 'Azúcar granulada', type: 'adjustment', qty: 2, balance: 97, cost: 950, reason: 'count_correction', note: 'Diferencia inventario físico', userId: 'u-admin', userName: 'María González', at: daysAgo(2) },
   { id: 'k-7', supplyId: 's-cacao', itemName: 'Cacao en polvo', type: 'out', qty: 0.3, balance: 0, cost: 6500, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(2) },
@@ -209,7 +267,13 @@ export const MOCK_KARDEX: KardexEntry[] = [
   { id: 'k-9', supplyId: 's-huevos', itemName: 'Huevos', type: 'in', qty: 180, balance: 600, cost: 220, reason: 'purchase', userId: 'u-admin', userName: 'María González', at: daysAgo(3) },
   { id: 'k-10', supplyId: 's-leche', itemName: 'Leche entera', type: 'adjustment', qty: -2, balance: 86, cost: 1100, reason: 'damaged', note: 'Cartones vencidos', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(4) },
   { id: 'k-11', supplyId: 's-harina', itemName: 'Harina de trigo', type: 'out', qty: 12, balance: 120, cost: 850, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(5) },
-  { id: 'k-12', productId: 'p-cafe', itemName: 'Café molido 250g', type: 'out', qty: 1, balance: 33, cost: 3500, reason: 'sale', userId: 'u-produccion', userName: 'Sofía Rojas', at: daysAgo(6) },
+
+  // ORD-009 confirmado con devolución (24 entregados, 4 devueltos). El reintegro al
+  // stock ocurre cuando el lote se procesa en la pantalla de Mermas.
+  { id: 'k-ord9-out', productId: 'p-croissant', itemName: 'Croissant mantequilla', type: 'out', qty: 24, balance: 0, cost: 650, reason: 'sale', note: 'Pedido ORD-009 entregado a Cafetería La Esquina', userId: 'cust-1', userName: 'Cafetería La Esquina', at: daysAgo(2) },
+
+  // 30 días de historial de entregas de pedidos completados (alimenta predicciones)
+  ...HISTORICAL_PRODUCT_DELIVERIES_KARDEX,
 ];
 
 export const MOCK_SALES: SaleRecord[] = (() => {
@@ -379,6 +443,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
   {
     id: 'ord-1', code: 'ORD-001', purpose: 'Reposición vitrina mañana',
     status: 'pending',
+    customerId: 'cust-1',
+    requestedDeliveryDate: daysFromNow(2),
     items: [
       { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 24, unitPrice: 1200, fulfilledQty: 0 },
       { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 18, unitPrice: 1900, fulfilledQty: 0 },
@@ -393,6 +459,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
   {
     id: 'ord-2', code: 'ORD-002', purpose: 'Stock del fin de semana',
     status: 'pending',
+    customerId: 'cust-2',
+    requestedDeliveryDate: daysFromNow(3),
     items: [
       { productId: 'p-marraqueta', productName: 'Marraqueta', unit: 'unidad', qty: 80, unitPrice: 320, fulfilledQty: 0 },
       { productId: 'p-hallulla', productName: 'Hallulla', unit: 'unidad', qty: 60, unitPrice: 280, fulfilledQty: 0 },
@@ -406,8 +474,10 @@ export const MOCK_ORDERS: CustomerOrder[] = [
   {
     id: 'ord-3', code: 'ORD-003', purpose: 'Lote tarde',
     status: 'in_production',
+    customerId: 'cust-3',
+    requestedDeliveryDate: daysFromNow(1),
     items: [
-      { productId: 'p-empanada', productName: 'Empanada queso', unit: 'unidad', qty: 30, unitPrice: 1700, fulfilledQty: 30 },
+      { productId: 'p-empanada', productName: 'Empanada queso', unit: 'unidad', qty: 30, unitPrice: 1700, fulfilledQty: 20 },
       { productId: 'p-brownie', productName: 'Brownie chocolate', unit: 'unidad', qty: 20, unitPrice: 2200, fulfilledQty: 20 },
     ],
     totalAmount: 30 * 1700 + 20 * 2200,
@@ -424,6 +494,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
   {
     id: 'ord-4', code: 'ORD-004', purpose: 'Pedido evento especial',
     status: 'in_production',
+    customerId: 'cust-3',
+    requestedDeliveryDate: daysFromNow(5),
     items: [
       { productId: 'p-pie', productName: 'Pie de limón', unit: 'unidad', qty: 6, unitPrice: 18000, fulfilledQty: 4 },
       { productId: 'p-galleta', productName: 'Galleta avena pasas', unit: 'unidad', qty: 100, unitPrice: 600, fulfilledQty: 100 },
@@ -477,47 +549,135 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     ],
     shortfalls: [],
   },
+  {
+    id: 'ord-7', code: 'ORD-007', purpose: 'Pedido cliente segundo',
+    status: 'pending',
+    customerId: 'cust-2',
+    requestedDeliveryDate: daysFromNow(2),
+    items: [
+      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 12, unitPrice: 1900, fulfilledQty: 0 },
+      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 10, unitPrice: 1200, fulfilledQty: 0 },
+    ],
+    totalAmount: 12 * 1900 + 10 * 1200,
+    notes: 'Mismo día que ORD-001: produce todo junto',
+    createdAt: hoursAgo(2),
+    createdBy: 'Cliente: Hotel Plaza Centro',
+    reservations: [],
+    shortfalls: [],
+  },
+  // Pedido completed esperando confirmación del cliente
+  {
+    id: 'ord-8', code: 'ORD-008', purpose: 'Lote vitrina',
+    status: 'completed',
+    customerId: 'cust-1',
+    requestedDeliveryDate: daysAgo(0),
+    items: [
+      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 20, unitPrice: 1200, fulfilledQty: 20 },
+      { productId: 'p-empanada', productName: 'Empanada queso', unit: 'unidad', qty: 15, unitPrice: 1700, fulfilledQty: 15 },
+    ],
+    totalAmount: 20 * 1200 + 15 * 1700,
+    createdAt: daysAgo(2),
+    createdBy: 'Cliente: Cafetería La Esquina',
+    productionStartedAt: daysAgo(1),
+    completedAt: hoursAgo(2),
+    reservations: [
+      { kind: 'supply', itemId: 's-harina', itemName: 'Harina de trigo', unit: 'kg', qty: 5 },
+      { kind: 'supply', itemId: 's-queso', itemName: 'Queso crema', unit: 'kg', qty: 0.9 },
+    ],
+    shortfalls: [],
+  },
+  // Pedido ya confirmado por el cliente con diferencia (muestra historial con monto final)
+  {
+    id: 'ord-9', code: 'ORD-009', purpose: 'Reposición semanal',
+    status: 'completed',
+    customerId: 'cust-1',
+    requestedDeliveryDate: daysAgo(3),
+    items: [
+      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 24, unitPrice: 1900, fulfilledQty: 24, receivedQty: 20 },
+      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 15, unitPrice: 1200, fulfilledQty: 15, receivedQty: 15 },
+    ],
+    totalAmount: 24 * 1900 + 15 * 1200,
+    finalAmount: 20 * 1900 + 15 * 1200,
+    customerConfirmedAt: daysAgo(2),
+    customerNote: '4 croissants llegaron quebrados, los devolvimos',
+    createdAt: daysAgo(5),
+    createdBy: 'Cliente: Cafetería La Esquina',
+    productionStartedAt: daysAgo(4),
+    completedAt: daysAgo(3),
+    reservations: [],
+    shortfalls: [],
+  },
 ];
 
-// Devoluciones de muestra (Ventas → Producción).
-export const MOCK_RETURNS: ProductReturn[] = [
+
+// Clientes de muestra con sus tokens públicos y PINs.
+export const MOCK_CUSTOMERS: Customer[] = [
   {
-    id: 'ret-1',
-    productId: 'p-baguette', productName: 'Baguette tradicional',
-    qty: 4, unit: 'unidad',
-    reason: 'defective',
-    notes: 'Sobrecocidas, muy oscuras',
-    costAtReturn: 380, totalLoss: 1520,
-    createdAt: hoursAgo(2),
-    createdBy: 'Juan Pérez',
+    id: 'cust-1',
+    name: 'Cafetería La Esquina',
+    contactPerson: 'Daniel Vargas',
+    email: 'daniel@laesquina.cr',
+    phone: '+506 8888-1111',
+    publicToken: 'esquina-abc123',
+    accessPin: '482915',
+    allowedProductIds: ['p-baguette', 'p-croissant', 'p-empanada'],
+    window: {
+      orderDays: [1, 2, 3, 4, 5],  // lunes a viernes
+      deliveryDays: [2, 3, 4, 5, 6], // martes a sábado
+    },
+    notes: 'Entregar a las 7:00 AM al ingreso de carga.',
+    active: true,
+    createdAt: daysAgo(30),
   },
   {
-    id: 'ret-2',
-    productId: 'p-croissant', productName: 'Croissant mantequilla',
-    qty: 6, unit: 'unidad',
-    reason: 'leftover',
-    notes: 'Quedaron del cierre de ayer',
-    costAtReturn: 650, totalLoss: 3900,
-    createdAt: hoursAgo(14),
-    createdBy: 'Sofía Rojas',
+    id: 'cust-2',
+    name: 'Hotel Plaza Centro',
+    contactPerson: 'Sandra Mora',
+    email: 'compras@hotelplaza.cr',
+    phone: '+506 2222-3333',
+    publicToken: 'plaza-xyz789',
+    accessPin: '731264',
+    allowedProductIds: ['p-marraqueta', 'p-hallulla', 'p-baguette', 'p-croissant', 'p-cafe'],
+    window: {
+      orderDays: [0, 1, 2, 3, 4, 5, 6],   // todos los días
+      deliveryDays: [1, 3, 5],            // lun, mié, vie
+    },
+    active: true,
+    createdAt: daysAgo(15),
   },
   {
-    id: 'ret-3',
-    productId: 'p-galleta', productName: 'Galleta avena pasas',
-    qty: 3, unit: 'unidad',
-    reason: 'damaged',
-    costAtReturn: 180, totalLoss: 540,
-    createdAt: daysAgo(1),
-    createdBy: 'María González',
+    id: 'cust-3',
+    name: 'Catering Eventos Sur',
+    contactPerson: 'Roberto Soto',
+    email: 'eventos@cateringsur.cr',
+    publicToken: 'catering-def456',
+    accessPin: '109238',
+    allowedProductIds: [],   // vacío → todos los productos
+    window: {
+      orderDays: [1, 4],     // lun y jue
+      deliveryDays: [5, 6],  // vie y sáb
+    },
+    notes: 'Pedidos para eventos con al menos 48h de anticipación.',
+    active: true,
+    createdAt: daysAgo(7),
   },
+];
+
+// Lotes devueltos pendientes de revisar en la pantalla de Mermas.
+export const MOCK_RETURNED_LOTS: ReturnedLot[] = [
   {
-    id: 'ret-4',
-    productId: 'p-cafe', productName: 'Café molido 250g (reventa)',
-    qty: 1, unit: 'unidad',
-    reason: 'expired',
-    notes: 'Pasó la fecha del envase',
-    costAtReturn: 3500, totalLoss: 3500,
+    id: 'lot-ord9-croissant',
+    productId: 'p-croissant',
+    productName: 'Croissant mantequilla',
+    unit: 'unidad',
+    qty: 4,
+    mermaQty: 0,
+    sourceOrderId: 'ord-9',
+    sourceOrderCode: 'ORD-009',
+    customerId: 'cust-1',
+    customerName: 'Cafetería La Esquina',
+    customerNote: '4 croissants llegaron quebrados, los devolvimos',
     createdAt: daysAgo(2),
-    createdBy: 'María González',
+    status: 'pending',
   },
 ];

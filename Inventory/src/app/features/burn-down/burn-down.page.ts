@@ -9,7 +9,6 @@ import {
 import { DataService } from '../../core/services/data.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ProjectionChartComponent, ProjectionMarker } from '../predicciones/projection-chart.component';
-import { DemandBoost } from '../../core/models';
 
 type CatalogItemKind = 'supply' | 'product';
 interface CatalogItem { kind: CatalogItemKind; id: string; name: string; sku: string; unit: string; }
@@ -41,29 +40,8 @@ interface CatalogItem { kind: CatalogItemKind; id: string; name: string; sku: st
     <ion-content>
       <app-page-header
         title="Análisis de stock (burn-down)"
-        subtitle="Proyecta cuánto stock queda día a día y cuándo conviene generar la orden de compra. Los boosts activos en /boosts modifican automáticamente las proyecciones.">
+        subtitle="Proyecta cuánto stock queda día a día y cuándo conviene generar la orden de compra.">
       </app-page-header>
-
-      <!-- Resumen de boosts activos (sin gestión — esa vive en /boosts) -->
-      @if (data.activeBoosts().length > 0) {
-        <section class="boosts-banner">
-          <div class="boosts-banner__icon">⚡</div>
-          <div class="boosts-banner__body">
-            <div class="boosts-banner__title">
-              {{ data.activeBoosts().length }}
-              boost{{ data.activeBoosts().length === 1 ? '' : 's' }} de demanda activo{{ data.activeBoosts().length === 1 ? '' : 's' }}
-            </div>
-            <div class="boosts-banner__detail">
-              Productos afectados: {{ activeBoostProductNames() }}.
-              Las proyecciones de stock las consideran automáticamente, incluyendo el efecto
-              cascada hacia insumos vía receta.
-            </div>
-          </div>
-          <a routerLink="/boosts" class="boosts-banner__link">
-            Gestionar boosts →
-          </a>
-        </section>
-      }
 
       <!-- Selector de item -->
       <section class="picker">
@@ -120,19 +98,10 @@ interface CatalogItem { kind: CatalogItemKind; id: string; name: string; sku: st
               <div class="kpi__value mono">{{ sim()!.daysOfCoverage | number:'1.0-1' }}</div>
               <div class="kpi__unit">días al consumo actual</div>
             </div>
-            <div class="kpi" [class.kpi--boost]="hasBoostInHorizon()">
-              <div class="kpi__label">
-                Demanda diaria
-                @if (hasBoostInHorizon()) { · <span class="kpi__hint">con boost</span> }
-              </div>
+            <div class="kpi">
+              <div class="kpi__label">Demanda diaria</div>
               <div class="kpi__value mono">{{ avgDemandWithBoost() | number:'1.0-2' }}</div>
-              <div class="kpi__unit">
-                @if (hasBoostInHorizon()) {
-                  base {{ sim()!.baselineDailyDemand | number:'1.0-2' }} {{ unitLabel() }}/día
-                } @else {
-                  {{ unitLabel() }}/día (rolling 7d)
-                }
-              </div>
+              <div class="kpi__unit">{{ unitLabel() }}/día (rolling 7d)</div>
             </div>
             <div class="kpi">
               <div class="kpi__label">Lead time</div>
@@ -409,50 +378,6 @@ interface CatalogItem { kind: CatalogItemKind; id: string; name: string; sku: st
       line-height: var(--ui-lh-base);
     }
 
-    /* === Banner de boosts (link a /boosts para gestión) === */
-    .boosts-banner {
-      display: flex;
-      gap: var(--ui-sp-3);
-      align-items: center;
-      margin: 0 var(--ui-sp-4) var(--ui-sp-3);
-      padding: var(--ui-sp-3);
-      background: var(--ui-warning-tint);
-      border: var(--ui-border-w-sm) solid var(--ui-warning);
-      border-left: 4px solid var(--ui-warning);
-      border-radius: var(--ui-radius);
-    }
-    .boosts-banner__icon {
-      font-size: 28px;
-    }
-    .boosts-banner__body {
-      flex: 1;
-      min-width: 0;
-    }
-    .boosts-banner__title {
-      font-size: var(--ui-fs-md);
-      font-weight: var(--ui-fw-semibold);
-      color: var(--ui-warning);
-    }
-    .boosts-banner__detail {
-      font-size: var(--ui-fs-xs);
-      color: var(--ui-text);
-      margin-top: 4px;
-    }
-    .boosts-banner__link {
-      padding: 8px 14px;
-      background: var(--ui-warning);
-      color: #fff;
-      text-decoration: none;
-      border-radius: var(--ui-radius);
-      font-size: var(--ui-fs-sm);
-      font-weight: var(--ui-fw-semibold);
-      white-space: nowrap;
-      box-shadow: var(--ui-shadow-sm);
-    }
-    .boosts-banner__link:hover { box-shadow: var(--ui-shadow-md); }
-
-    .kpi--boost { border-left-color: var(--ui-warning); background: var(--ui-warning-tint); }
-    .kpi__hint { font-weight: var(--ui-fw-bold); color: var(--ui-warning); }
   `],
 })
 export class BurnDownPage {
@@ -461,13 +386,6 @@ export class BurnDownPage {
 
   selectedRef = '';
   horizon = 60;
-
-  /** Nombres de productos con boost activo, para mostrar en el banner. */
-  readonly activeBoostProductNames = computed(() => {
-    const names = this.data.activeBoosts().map(b => b.itemName);
-    if (names.length <= 3) return names.join(', ');
-    return `${names.slice(0, 3).join(', ')} y ${names.length - 3} más`;
-  });
 
   private readonly _selection = signal<{ kind: CatalogItemKind; id: string } | null>(null);
 
@@ -564,9 +482,6 @@ export class BurnDownPage {
     // Navega a OC. (En una iteración futura podríamos pasar item+qty pre-cargados.)
     this.router.navigateByUrl('/ordenes-compra');
   }
-
-  // ---------- Boosts ----------
-  readonly hasBoostInHorizon = computed(() => (this.sim()?.activeBoostsInHorizon.length ?? 0) > 0);
 
   readonly avgDemandWithBoost = computed<number>(() => {
     const s = this.sim();

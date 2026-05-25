@@ -24,7 +24,20 @@
       "Bash(disown)",
       "Bash(tail -40 /tmp/ngserve.log)",
       "Read(//private/tmp/**)",
-      "Bash(curl -s -o /dev/null -w \"dev server: %{http_code}\\\\n\" --max-time 5 http://localhost:4200/)"
+      "Bash(curl -s -o /dev/null -w \"dev server: %{http_code}\\\\n\" --max-time 5 http://localhost:4200/)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh run *)",
+      "Bash(grep -rln '\\\\\\\\\\\\$' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src --include=\"*.ts\")",
+      "Bash(grep -rln \"'\\\\\\\\\\\\$'\" /Users/juansolis/Desktop/gestion_inventarios/Inventory/src --include=\"*.ts\")",
+      "Bash(grep -rln \"valuePrefix=\\\\\"\\\\\\\\\\\\$\\\\\"\" /Users/juansolis/Desktop/gestion_inventarios/Inventory/src --include=\"*.ts\")",
+      "Bash(grep -rn \"'\\\\\\\\\\\\$' +\\\\|\\\\\"\\\\\\\\\\\\$\\\\\"\" /Users/juansolis/Desktop/gestion_inventarios/Inventory/src --include=\"*.ts\")",
+      "Bash(grep -rn '\\\\\\\\\\\\$\\\\|\"\\\\$\"\\\\|'\\\\''\\\\$'\\\\''\\\\|· \\\\$' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src --include=\"*.ts\")",
+      "Bash(perl -i -pe 's/u-op-1/u-ventas/g; s/u-op-2/u-produccion/g' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/core/mocks/dummy-data.ts)",
+      "Bash(perl -i -pe 's/tenant\\\\.isAdmin\\\\\\(\\\\\\)/tenant.canManageMembers\\(\\)/g' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/features/mas/mas.page.ts)",
+      "Bash(perl -i -pe \"s/\\(productName: '[^']+',\\) \\(qty:\\)/\\\\$1 unit: 'unidad', \\\\$2/g\" /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/core/mocks/dummy-data.ts)",
+      "Bash(perl -i -pe 's/^\\(\\\\s*\\)unit: string;/$1unit: Unit;/' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/core/models/index.ts)",
+      "Bash(perl -i -pe 's|this\\\\._allowed\\\\.value|this._allowed\\(\\)|g; s|this\\\\._orderDays\\\\.value|this._orderDays\\(\\)|g; s|this\\\\._deliveryDays\\\\.value|this._deliveryDays\\(\\)|g' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/features/clientes/cliente-form-modal.component.ts)",
+      "Bash(grep -n \"^export const MOCK_\\\\|^export const MOCK_CUSTOMERS\\\\|^\\\\];$\" src/app/core/mocks/dummy-data.ts)"
     ]
   }
 }
