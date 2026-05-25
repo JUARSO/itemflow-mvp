@@ -37,7 +37,7 @@ import { Member, UserRole } from '../../core/models';
     <ion-content>
       <app-page-header
         title="Más"
-        subtitle="Cuenta, miembros, configuración y demo">
+        subtitle="Cuenta, miembros y configuración">
       </app-page-header>
 
       <section class="card">
@@ -204,8 +204,8 @@ import { Member, UserRole } from '../../core/models';
                 <div class="member__email mono">{{ m.email }}</div>
               </div>
               <div class="member__right">
-                <ion-badge [color]="m.role === 'admin' ? 'primary' : 'medium'">
-                  {{ m.role === 'admin' ? 'Admin' : 'Operador' }}
+                <ion-badge [color]="memberBadgeColor(m.role)">
+                  {{ memberBadgeLabel(m.role) }}
                 </ion-badge>
                 @if (tenant.canManageMembers() && m.uid !== auth.user()?.uid) {
                   <div class="member__actions">
@@ -217,25 +217,6 @@ import { Member, UserRole } from '../../core/models';
             </div>
           }
         </div>
-      </section>
-
-      <section class="card demo-card">
-        <h3>Demo · cambio rápido de rol</h3>
-        <p class="muted">
-          Este MVP usa datos en memoria. Cambia entre los 3 roles para ver permisos y pantallas diferentes.
-        </p>
-        <div class="actions">
-          <ion-button (click)="switchTo('admin')" [disabled]="auth.isAdmin()">
-            Admin
-          </ion-button>
-          <ion-button (click)="switchTo('production')" [disabled]="auth.isProduction()" color="tertiary">
-            Producción
-          </ion-button>
-          <ion-button (click)="switchTo('operator')" [disabled]="auth.isOperator()" color="warning">
-            Operario
-          </ion-button>
-        </div>
-
       </section>
 
       <section class="card">
@@ -333,7 +314,6 @@ import { Member, UserRole } from '../../core/models';
     .link-btn--danger { color: var(--ui-danger); }
 
     .actions { display: flex; gap: var(--ui-sp-2); flex-wrap: wrap; }
-    .demo-card { background: var(--ui-warning-tint); border-color: var(--ui-border); }
 
     .brand-hint { font-size: var(--ui-fs-sm); margin: 0 0 var(--ui-sp-3); }
     .dirty-pill {
@@ -586,22 +566,38 @@ export class MasPage {
     return name.split(' ').map(s => s[0]?.toUpperCase()).slice(0, 2).join('');
   }
 
-  switchTo(role: UserRole) {
-    this.auth.switchRole(role);
-  }
-
   roleLabel(): string {
-    if (this.auth.isAdmin()) return 'Administrador';
+    if (this.auth.isAdmin()) return 'Administrativo';
     if (this.auth.isProduction()) return 'Encargado de Producción';
-    if (this.auth.isOperator()) return 'Operario';
+    if (this.auth.isInventory()) return 'Encargado de Inventario';
+    if (this.auth.isOperator()) return 'Operario de Producción';
     return '—';
   }
 
   roleColor(): string {
     if (this.auth.isAdmin()) return 'primary';
     if (this.auth.isProduction()) return 'tertiary';
+    if (this.auth.isInventory()) return 'success';
     if (this.auth.isOperator()) return 'warning';
     return 'medium';
+  }
+
+  memberBadgeLabel(r: UserRole): string {
+    switch (r) {
+      case 'admin': return 'Administrativo';
+      case 'production': return 'Producción';
+      case 'inventory': return 'Inventario';
+      case 'operator': return 'Operario';
+    }
+  }
+
+  memberBadgeColor(r: UserRole): string {
+    switch (r) {
+      case 'admin': return 'primary';
+      case 'production': return 'tertiary';
+      case 'inventory': return 'success';
+      case 'operator': return 'warning';
+    }
   }
 
   abrirInvitar() {

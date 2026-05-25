@@ -235,15 +235,24 @@ export class InsumosPage {
     entityLabel: 'insumo',
     entityLabelPlural: 'insumos',
     templateFilename: 'plantilla-insumos.csv',
-    headers: ['sku', 'nombre', 'categoria', 'unidad', 'costo', 'stock_min', 'stock_max', 'punto_reorden', 'lead_time_dias', 'proveedor'],
-    templateRows: [
-      ['INS-XXX-001', 'Harina especial', 'Cereales', 'kg', '900', '20', '200', '50', '3', 'Molinos del Sur'],
-      ['INS-XXX-002', 'Azúcar morena', 'Endulzantes', 'kg', '1100', '10', '100', '25', '2', 'IANSA'],
+    headers: [
+      'sku', 'nombre', 'descripcion', 'categoria', 'unidad', 'costo',
+      'stock_min', 'stock_max', 'punto_reorden', 'lead_time_dias', 'proveedor',
     ],
-    hint: 'Columnas: sku, nombre, categoria, unidad (kg/g/L/ml/unidad), costo, stock_min, stock_max, punto_reorden, lead_time_dias, proveedor. SKU debe ser único. Stock_min ≤ punto_reorden ≤ stock_max.',
+    templateRows: [
+      ['INS-XXX-001', 'Harina especial', 'Harina 000 panadería', 'Cereales', 'kg', '900', '20', '200', '50', '3', 'Molinos del Sur'],
+      ['INS-XXX-002', 'Azúcar morena', '', 'Endulzantes', 'kg', '1100', '10', '100', '25', '2', 'IANSA'],
+      ['INS-XXX-003', 'Vainilla líquida', 'Esencia natural 250ml', 'Aromas', 'ml', '8500', '500', '5000', '1500', '5', ''],
+    ],
+    hint: `Columnas obligatorias: sku, nombre, unidad, costo, stock_min, stock_max, punto_reorden, lead_time_dias.
+Opcionales: descripcion, categoria, proveedor.
+Unidades válidas: ${[...VALID_UNITS].join(', ')}.
+SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
+"proveedor" se intenta vincular por nombre exacto con los proveedores registrados; si no existe se guarda como texto libre.`,
     process: (rows) => {
       const existing = new Set(this.data.supplies().map(s => s.sku.toLowerCase()));
       const seen = new Set<string>();
+      const suppliersByName = new Map(this.data.suppliers().map(s => [s.name.toLowerCase(), s]));
       const valid: Omit<Supply, 'id'>[] = [];
       const errors: { row: number; raw: Record<string, string>; message: string }[] = [];
       rows.forEach((r, i) => {
@@ -265,16 +274,22 @@ export class InsumosPage {
         }
         if (existing.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU ya existe' }); return; }
         if (seen.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU duplicado en el archivo' }); return; }
-        if (!isFinite(costo) || costo < 0) { errors.push({ row: rowNum, raw: r, message: 'Costo inválido' }); return; }
-        if (!isFinite(min) || min < 0) { errors.push({ row: rowNum, raw: r, message: 'Stock mínimo inválido' }); return; }
-        if (!isFinite(max) || max <= 0) { errors.push({ row: rowNum, raw: r, message: 'Stock máximo inválido' }); return; }
-        if (!isFinite(rop) || rop < 0) { errors.push({ row: rowNum, raw: r, message: 'Punto de reorden inválido' }); return; }
-        if (!isFinite(lead) || lead < 0) { errors.push({ row: rowNum, raw: r, message: 'Lead time inválido' }); return; }
-        if (!(min <= rop && rop <= max)) { errors.push({ row: rowNum, raw: r, message: 'Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max' }); return; }
+        if (!isFinite(costo) || costo < 0) { errors.push({ row: rowNum, raw: r, message: 'Costo inválido (debe ser número ≥ 0)' }); return; }
+        if (!isFinite(min) || min < 0) { errors.push({ row: rowNum, raw: r, message: 'stock_min inválido (debe ser número ≥ 0)' }); return; }
+        if (!isFinite(max) || max <= 0) { errors.push({ row: rowNum, raw: r, message: 'stock_max inválido (debe ser número > 0)' }); return; }
+        if (!isFinite(rop) || rop < 0) { errors.push({ row: rowNum, raw: r, message: 'punto_reorden inválido (debe ser número ≥ 0)' }); return; }
+        if (!isFinite(lead) || lead < 0) { errors.push({ row: rowNum, raw: r, message: 'lead_time_dias inválido (debe ser número ≥ 0)' }); return; }
+        if (!(min <= rop && rop <= max)) {
+          errors.push({ row: rowNum, raw: r, message: `Debe cumplirse stock_min(${min}) ≤ punto_reorden(${rop}) ≤ stock_max(${max})` });
+          return;
+        }
         seen.add(sku.toLowerCase());
+        const proveedorText = (r['proveedor'] ?? '').trim();
+        const matched = proveedorText ? suppliersByName.get(proveedorText.toLowerCase()) : undefined;
         valid.push({
           sku,
           name: nombre,
+          description: (r['descripcion'] ?? '').trim() || undefined,
           category: (r['categoria'] ?? '').trim() || undefined,
           unit: unidad as Unit,
           cost: costo,
@@ -282,7 +297,8 @@ export class InsumosPage {
           maxStock: max,
           reorderPoint: rop,
           leadTime: lead,
-          supplier: (r['proveedor'] ?? '').trim() || undefined,
+          supplier: proveedorText || undefined,
+          supplierId: matched?.id,
           active: true,
         });
       });

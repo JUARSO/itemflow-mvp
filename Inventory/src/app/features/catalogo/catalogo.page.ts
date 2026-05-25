@@ -225,12 +225,21 @@ export class CatalogoPage {
     entityLabel: 'producto',
     entityLabelPlural: 'productos',
     templateFilename: 'plantilla-productos.csv',
-    headers: ['sku', 'nombre', 'categoria', 'unidad', 'precio_compra', 'precio_venta', 'lead_time_dias', 'usa_receta', 'punto_reorden', 'stock_min'],
-    templateRows: [
-      ['PROD-XXX-001', 'Pan Especial', 'Panes', 'unidad', '300', '900', '1', 'true', '', ''],
-      ['PROD-XXX-002', 'Bebida 500ml', 'Bebidas', 'unidad', '500', '1200', '7', 'false', '20', '5'],
+    headers: [
+      'sku', 'nombre', 'descripcion', 'categoria', 'unidad',
+      'precio_compra', 'precio_venta', 'lead_time_dias', 'usa_receta',
+      'punto_reorden', 'stock_min',
     ],
-    hint: 'punto_reorden y stock_min son OPCIONALES y solo aplican a productos de reventa (usa_receta=false). Disparan alertas automáticas de restock cuando el stock baja.',
+    templateRows: [
+      ['PROD-XXX-001', 'Pan Especial', 'Pan artesanal con masa madre', 'Panes', 'unidad', '300', '900', '1', 'true', '', ''],
+      ['PROD-XXX-002', 'Bebida 500ml', '', 'Bebidas', 'unidad', '500', '1200', '7', 'false', '20', '5'],
+    ],
+    hint: `Columnas obligatorias: sku, nombre, unidad, precio_compra, precio_venta, lead_time_dias, usa_receta.
+Opcionales: descripcion, categoria, punto_reorden, stock_min.
+Unidades válidas: ${[...VALID_UNITS].join(', ')}.
+usa_receta: true/false/1/0/sí/no — productos fabricados (true) consumen insumos según receta;
+productos de reventa (false) admiten punto_reorden y stock_min para alertas automáticas.
+Debe cumplirse stock_min ≤ punto_reorden. SKU único.`,
     process: (rows) => {
       const existing = new Set(this.data.products().map(p => p.sku.toLowerCase()));
       const seen = new Set<string>();
@@ -285,6 +294,7 @@ export class CatalogoPage {
         valid.push({
           sku,
           name: nombre,
+          description: (r['descripcion'] ?? '').trim() || undefined,
           category: (r['categoria'] ?? '').trim() || undefined,
           unit: unidad as Unit,
           buyPrice: buy,

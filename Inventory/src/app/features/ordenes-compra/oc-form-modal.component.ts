@@ -24,12 +24,39 @@ type LineGroup = ReturnType<OcFormModalComponent['buildLineGroup']>;
       <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <div class="row">
           <app-form-field label="Proveedor" [required]="true">
-            <input type="text" formControlName="supplier" placeholder="Ej. Molinos del Sur" />
+            <select formControlName="supplierId" (change)="onSupplierChange()">
+              <option value="">— Selecciona proveedor —</option>
+              @for (s of data.activeSuppliers(); track s.id) {
+                <option [value]="s.id">{{ s.name }}</option>
+              }
+              <option value="__other__">Otro (escribir nombre)</option>
+            </select>
           </app-form-field>
           <app-form-field label="Fecha esperada de entrega">
             <input type="date" formControlName="expectedDate" />
           </app-form-field>
         </div>
+
+        @if (form.controls.supplierId.value === '__other__') {
+          <app-form-field label="Nombre del proveedor (manual)" [required]="true">
+            <input type="text" formControlName="supplierName" placeholder="Ej. Molinos del Sur" />
+          </app-form-field>
+        } @else if (selectedSupplier(); as s) {
+          <div class="supplier-meta">
+            <span>
+              <strong>Lead time:</strong> {{ s.leadTimeDays }} día(s)
+              · <strong>Pago:</strong> {{ s.paymentTerms || '—' }}
+            </span>
+            @if (s.suppliedItems.length > 0) {
+              <small>{{ s.suppliedItems.length }} item(s) registrados → aparecen primero abajo.</small>
+            } @else {
+              <small class="warn">
+                Este proveedor no tiene insumos vinculados.
+                Podés editarlo en Proveedores para verlos prioritarios.
+              </small>
+            }
+          </div>
+        }
 
         <div class="items">
           <div class="items__head">
@@ -46,13 +73,23 @@ type LineGroup = ReturnType<OcFormModalComponent['buildLineGroup']>;
               <div [formGroupName]="$index" class="line">
                 <select formControlName="itemRef" class="line__supply">
                   <option value="">— Selecciona insumo o producto —</option>
-                  <optgroup label="Insumos">
-                    @for (s of data.activeSupplies(); track s.id) {
+                  @if (supplierItemRefs().length > 0) {
+                    <optgroup [label]="'Asignados a ' + (selectedSupplier()?.name ?? '')">
+                      @for (s of supplierSupplies(); track s.id) {
+                        <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit }})</option>
+                      }
+                      @for (p of supplierProducts(); track p.id) {
+                        <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit }}) · reventa</option>
+                      }
+                    </optgroup>
+                  }
+                  <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros insumos' : 'Insumos'">
+                    @for (s of nonSupplierSupplies(); track s.id) {
                       <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit }})</option>
                     }
                   </optgroup>
-                  <optgroup label="Productos de reventa">
-                    @for (p of reventaProducts(); track p.id) {
+                  <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros productos de reventa' : 'Productos de reventa'">
+                    @for (p of nonSupplierProducts(); track p.id) {
                       <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit }})</option>
                     }
                   </optgroup>
@@ -82,6 +119,18 @@ type LineGroup = ReturnType<OcFormModalComponent['buildLineGroup']>;
   styles: [`
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-sp-3); }
     @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+
+    .supplier-meta {
+      margin-top: var(--ui-sp-2);
+      padding: var(--ui-sp-2) var(--ui-sp-3);
+      background: var(--ui-surface-2);
+      border-left: 4px solid var(--ui-primary);
+      display: flex; flex-direction: column;
+      gap: 2px;
+      font-size: var(--ui-fs-sm);
+    }
+    .supplier-meta small { font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
+    .supplier-meta small.warn { color: var(--ui-danger); font-weight: var(--ui-fw-bold); }
 
     .items {
       border: var(--ui-border-w-md) solid var(--ui-border);
@@ -150,9 +199,43 @@ export class OcFormModalComponent {
   readonly saved = output<void>();
 
   readonly form = this.fb.group({
-    supplier: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
+    /** Id del proveedor registrado, o '__other__' para nombre manual. */
+    supplierId: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
+    /** Solo usado si supplierId === '__other__'. */
+    supplierName: this.fb.control('', { nonNullable: true }),
     expectedDate: this.fb.control(''),
     items: this.fb.array<LineGroup>([]),
+  });
+
+  /** Proveedor estructurado seleccionado (null si '' o '__other__'). */
+  readonly selectedSupplier = computed(() => {
+    const id = this.form.controls.supplierId.value;
+    if (!id || id === '__other__') return null;
+    return this.data.supplierById(id) ?? null;
+  });
+
+  /** Set de "kind:itemId" que entrega el proveedor seleccionado. */
+  readonly supplierItemRefs = computed(() => {
+    const s = this.selectedSupplier();
+    if (!s) return [] as string[];
+    return s.suppliedItems.map(i => `${i.kind}:${i.itemId}`);
+  });
+
+  readonly supplierSupplies = computed(() => {
+    const refs = new Set(this.supplierItemRefs());
+    return this.data.activeSupplies().filter(s => refs.has(`supply:${s.id}`));
+  });
+  readonly supplierProducts = computed(() => {
+    const refs = new Set(this.supplierItemRefs());
+    return this.reventaProducts().filter(p => refs.has(`product:${p.id}`));
+  });
+  readonly nonSupplierSupplies = computed(() => {
+    const refs = new Set(this.supplierItemRefs());
+    return this.data.activeSupplies().filter(s => !refs.has(`supply:${s.id}`));
+  });
+  readonly nonSupplierProducts = computed(() => {
+    const refs = new Set(this.supplierItemRefs());
+    return this.reventaProducts().filter(p => !refs.has(`product:${p.id}`));
   });
 
   get lines(): FormArray<LineGroup> {
@@ -180,11 +263,23 @@ export class OcFormModalComponent {
   addLine() { this.lines.push(this.buildLineGroup()); }
   removeLine(i: number) { this.lines.removeAt(i); }
 
+  /** Al elegir un proveedor registrado: precarga expectedDate con today + leadTime. */
+  onSupplierChange() {
+    const s = this.selectedSupplier();
+    if (!s) return;
+    if (!this.form.controls.expectedDate.value) {
+      const d = new Date();
+      d.setDate(d.getDate() + s.leadTimeDays);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      this.form.controls.expectedDate.setValue(iso);
+    }
+  }
+
   constructor() {
     effect(() => {
       if (this.isOpen()) {
         this.lines.clear();
-        this.form.reset({ supplier: '', expectedDate: '', items: [] });
+        this.form.reset({ supplierId: '', supplierName: '', expectedDate: '', items: [] });
         this.addLine();
       }
     });
@@ -197,6 +292,24 @@ export class OcFormModalComponent {
       return;
     }
     const v = this.form.getRawValue();
+
+    // Resolver nombre del proveedor (registrado o manual)
+    let supplierName = '';
+    if (v.supplierId === '__other__') {
+      supplierName = v.supplierName.trim();
+      if (!supplierName) {
+        await this.toast.show('Escribí el nombre del proveedor.', 'danger');
+        return;
+      }
+    } else {
+      const s = this.data.supplierById(v.supplierId);
+      if (!s) {
+        await this.toast.show('Proveedor no encontrado.', 'danger');
+        return;
+      }
+      supplierName = s.name;
+    }
+
     const items: PurchaseOrderItem[] = [];
     for (const it of v.items) {
       const ref = (it.itemRef ?? '').toString();
@@ -217,13 +330,13 @@ export class OcFormModalComponent {
     }
     const totalCost = items.reduce((s, it) => s + it.qty * it.unitCost, 0);
     this.data.createPurchaseOrder({
-      supplier: v.supplier.trim(),
+      supplier: supplierName,
       status: 'pending',
       items,
       totalCost,
       expectedDate: v.expectedDate ? new Date(v.expectedDate) : undefined,
     });
-    await this.toast.show(`OC para ${v.supplier} creada.`);
+    await this.toast.show(`OC para ${supplierName} creada.`);
     this.saved.emit();
   }
 }

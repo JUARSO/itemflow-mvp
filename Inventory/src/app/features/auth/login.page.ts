@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { IonContent, IonButton, IonIcon } from '@ionic/angular/standalone';
+import { IonContent, IonButton } from '@ionic/angular/standalone';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -10,16 +10,16 @@ import { AuthService } from '../../core/services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
-    IonContent, IonButton, IonIcon,
+    IonContent, IonButton,
   ],
   template: `
     <ion-content [fullscreen]="true">
       <div class="page">
         <div class="card">
           <div class="brand">
-            <ion-icon name="cube-outline" class="brand__logo"></ion-icon>
-            <h1 class="brand__title">ItemFlow</h1>
-            <p class="brand__tagline">Tu inventario te avisa qué pedir, antes de que te quedes sin nada.</p>
+            <img src="assets/branding/noble-logo.png" alt="NOBLE" class="brand__logo-img" />
+            <h1 class="brand__title">NOBLE</h1>
+            <p class="brand__tagline">Panadería artesanal de estilo europeo. Calma, sofisticación y oficio honesto.</p>
           </div>
 
           <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
@@ -54,17 +54,21 @@ import { AuthService } from '../../core/services/auth.service';
 
           <div class="demo">
             <div class="demo__title">Usuarios demo</div>
-            <button type="button" class="demo__row" (click)="fillDemo('admin@panyco.cl')">
+            <button type="button" class="demo__row" (click)="fillDemo('admin@noble.cr')">
               <span class="demo__role demo__role--admin">ADMIN</span>
-              <span class="demo__email mono">admin&#64;panyco.cl</span>
+              <span class="demo__email mono">admin&#64;noble.cr</span>
             </button>
-            <button type="button" class="demo__row" (click)="fillDemo('produccion@panyco.cl')">
+            <button type="button" class="demo__row" (click)="fillDemo('produccion@noble.cr')">
               <span class="demo__role demo__role--prod">PRODUCCIÓN</span>
-              <span class="demo__email mono">produccion&#64;panyco.cl</span>
+              <span class="demo__email mono">produccion&#64;noble.cr</span>
             </button>
-            <button type="button" class="demo__row" (click)="fillDemo('operario@panyco.cl')">
+            <button type="button" class="demo__row" (click)="fillDemo('inventario@noble.cr')">
+              <span class="demo__role demo__role--inv">INVENTARIO</span>
+              <span class="demo__email mono">inventario&#64;noble.cr</span>
+            </button>
+            <button type="button" class="demo__row" (click)="fillDemo('operario@noble.cr')">
               <span class="demo__role demo__role--ope">OPERARIO</span>
-              <span class="demo__email mono">operario&#64;panyco.cl</span>
+              <span class="demo__email mono">operario&#64;noble.cr</span>
             </button>
             <p class="demo__hint">Contraseña: cualquiera ≥ 4 caracteres. Tap en un usuario para autocompletar.</p>
           </div>
@@ -100,17 +104,17 @@ import { AuthService } from '../../core/services/auth.service';
       padding: var(--ui-sp-8) var(--ui-sp-6);
     }
     .brand { text-align: center; margin-bottom: var(--ui-sp-6); }
-    .brand__logo {
-      font-size: 56px;
-      line-height: 1;
-      margin-bottom: var(--ui-sp-2);
-      color: var(--ui-primary);
-      display: inline-block;
+    .brand__logo-img {
+      width: 80px;
+      height: auto;
+      margin: 0 auto var(--ui-sp-3);
+      display: block;
     }
     .brand__title {
       font-family: var(--ui-font-display);
       font-weight: var(--ui-fw-black);
       font-size: var(--ui-fs-2xl);
+      letter-spacing: 0.12em;
       margin: 0 0 var(--ui-sp-2);
       color: var(--ui-text);
     }
@@ -192,6 +196,7 @@ import { AuthService } from '../../core/services/auth.service';
     }
     .demo__role--admin { background: var(--ui-primary); }
     .demo__role--prod  { background: var(--ui-transit); }
+    .demo__role--inv   { background: var(--ui-success); }
     .demo__role--ope   { background: var(--ui-warning); color: #000; }
     .demo__email {
       font-family: var(--ui-font-mono);
@@ -214,7 +219,7 @@ export class LoginPage {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.group({
-    email: this.fb.control('admin@panyco.cl', { nonNullable: true, validators: [Validators.required, Validators.email] }),
+    email: this.fb.control('admin@noble.cr', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     password: this.fb.control('demo1234', { nonNullable: true, validators: [Validators.required, Validators.minLength(4)] }),
   });
 

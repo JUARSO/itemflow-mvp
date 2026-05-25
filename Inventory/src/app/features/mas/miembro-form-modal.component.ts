@@ -33,9 +33,10 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 
         <app-form-field label="Rol" [required]="true" hint="Define qué pantallas y acciones puede usar el miembro">
           <select formControlName="role">
-            <option value="admin">Administrador (acceso completo)</option>
+            <option value="admin">Administrativo (acceso completo)</option>
             <option value="production">Encargado de Producción</option>
-            <option value="operator">Operario (fabricación)</option>
+            <option value="inventory">Encargado de Inventario</option>
+            <option value="operator">Operario de Producción</option>
           </select>
         </app-form-field>
 
@@ -93,9 +94,10 @@ export class MiembroFormModalComponent {
   }
 
   private roleLabel(r: UserRole): string {
-    if (r === 'admin') return 'Administrador';
+    if (r === 'admin') return 'Administrativo';
     if (r === 'production') return 'Encargado de Producción';
-    return 'Operario';
+    if (r === 'inventory') return 'Encargado de Inventario';
+    return 'Operario de Producción';
   }
 
   async onSubmit() {

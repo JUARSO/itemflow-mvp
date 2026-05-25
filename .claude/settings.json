@@ -37,7 +37,14 @@
       "Bash(perl -i -pe \"s/\\(productName: '[^']+',\\) \\(qty:\\)/\\\\$1 unit: 'unidad', \\\\$2/g\" /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/core/mocks/dummy-data.ts)",
       "Bash(perl -i -pe 's/^\\(\\\\s*\\)unit: string;/$1unit: Unit;/' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/core/models/index.ts)",
       "Bash(perl -i -pe 's|this\\\\._allowed\\\\.value|this._allowed\\(\\)|g; s|this\\\\._orderDays\\\\.value|this._orderDays\\(\\)|g; s|this\\\\._deliveryDays\\\\.value|this._deliveryDays\\(\\)|g' /Users/juansolis/Desktop/gestion_inventarios/Inventory/src/app/features/clientes/cliente-form-modal.component.ts)",
-      "Bash(grep -n \"^export const MOCK_\\\\|^export const MOCK_CUSTOMERS\\\\|^\\\\];$\" src/app/core/mocks/dummy-data.ts)"
+      "Bash(grep -n \"^export const MOCK_\\\\|^export const MOCK_CUSTOMERS\\\\|^\\\\];$\" src/app/core/mocks/dummy-data.ts)",
+      "Bash(kill 4334)",
+      "WebFetch(domain:noble.cr)",
+      "Bash(curl -sL https://noble.cr/ -A \"Mozilla/5.0\")",
+      "Bash(curl -sL \"https://noble.cr/assets/index-DMbYvuFW.css\" -A \"Mozilla/5.0\")",
+      "Bash(grep -oE '#[0-9a-fA-F]{3,6}|rgb\\\\\\([^\\)]*\\\\\\)|hsl\\\\\\([^\\)]*\\\\\\)')",
+      "Bash(curl -sL \"https://noble.cr/favicon.png\" -A \"Mozilla/5.0\" -o src/assets/branding/noble-logo.png)",
+      "Bash(curl -sL \"https://noble.cr/assets/favicon-4su_cL8D.png\" -A \"Mozilla/5.0\" -o src/assets/branding/noble-logo.png)"
     ]
   }
 }

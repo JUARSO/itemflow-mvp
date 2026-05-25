@@ -3,12 +3,12 @@ import {
   Alert, Customer, CustomerOrder, DemandPrediction, KardexEntry, Member,
   OrderItem, OrderReservation, OrderShortfall, Product,
   PurchaseOrder, Recipe, ReturnedLot, SaleRecord, StockItem,
-  Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
+  Supplier, Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
 } from '../models';
 import {
   MOCK_ALERTS, MOCK_CUSTOMERS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
   MOCK_PRODUCTS, MOCK_PRODUCT_STOCK, MOCK_PURCHASE_ORDERS, MOCK_RECIPES,
-  MOCK_RETURNED_LOTS, MOCK_SALES, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
+  MOCK_RETURNED_LOTS, MOCK_SALES, MOCK_SUPPLIERS, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
 } from '../mocks/dummy-data';
 
 /**
@@ -32,6 +32,7 @@ export class DataService {
   private readonly _orders = signal<CustomerOrder[]>([...MOCK_ORDERS]);
   private readonly _customers = signal<Customer[]>([...MOCK_CUSTOMERS]);
   private readonly _returnedLots = signal<ReturnedLot[]>([...MOCK_RETURNED_LOTS]);
+  private readonly _suppliers = signal<Supplier[]>([...MOCK_SUPPLIERS]);
 
   constructor() {
     // Sembrar alertas auto-derivadas a partir del stock inicial.
@@ -65,6 +66,8 @@ export class DataService {
     this._returnedLots().filter(l => l.status === 'reviewed')
       .sort((a, b) => (b.reviewedAt?.getTime() ?? 0) - (a.reviewedAt?.getTime() ?? 0))
   );
+  readonly suppliers = this._suppliers.asReadonly();
+  readonly activeSuppliers = computed(() => this._suppliers().filter(s => s.active));
 
   /** Órdenes que aún están abiertas en el flujo (no completadas ni canceladas). */
   readonly openOrders = computed(() =>
@@ -1869,5 +1872,138 @@ export class DataService {
       .filter(n => Number.isFinite(n));
     const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
     return `ORD-${String(next).padStart(3, '0')}`;
+  }
+
+  // ============================================================
+  //  Proveedores
+  // ============================================================
+
+  supplierById(id: string): Supplier | undefined {
+    return this._suppliers().find(s => s.id === id);
+  }
+
+  createSupplier(input: Omit<Supplier, 'id' | 'createdAt'>): Supplier {
+    const s: Supplier = {
+      ...input,
+      id: `sup-${Date.now()}`,
+      createdAt: new Date(),
+    };
+    this._suppliers.update(list => [s, ...list]);
+    return s;
+  }
+
+  updateSupplier(id: string, patch: Partial<Omit<Supplier, 'id' | 'createdAt'>>): void {
+    this._suppliers.update(list => list.map(s => s.id === id ? { ...s, ...patch } : s));
+  }
+
+  deleteSupplier(id: string): void {
+    this._suppliers.update(list => list.filter(s => s.id !== id));
+  }
+
+  /** True si hoy es día de pedidos según la ventana del proveedor. */
+  canOrderToSupplierToday(supplierId: string): boolean {
+    const s = this.supplierById(supplierId);
+    if (!s) return false;
+    if (s.orderDays.length === 0) return true;
+    return s.orderDays.includes(new Date().getDay());
+  }
+
+  // ============================================================
+  //  Ingresos de inventario (recepciones)
+  // ============================================================
+
+  /**
+   * Registra el ingreso de uno o más insumos al inventario en un solo evento
+   * (típicamente la entrega de un proveedor). Por cada línea:
+   *  - Suma la qty al stock del insumo.
+   *  - Recomputa el status (out/critical/low/available).
+   *  - Inserta una entrada de kardex `in` con reason 'purchase' (o el
+   *    pasado por el caller).
+   *
+   * Es la versión sin OC: para registrar recepciones rápidas cuando el
+   * proveedor entrega mercadería sin que haya una orden formal en sistema.
+   */
+  registerInventoryReceipt(input: {
+    supplierId?: string;
+    supplierName?: string;
+    reference?: string;
+    receivedAt: Date;
+    reason?: string;
+    notes?: string;
+    /** Cada línea es insumo o producto sin receta. */
+    items: Array<{ kind: 'supply' | 'product'; itemId: string; qty: number; unitCost?: number }>;
+    userId: string;
+    userName: string;
+  }): { kardexIds: string[] } {
+    if (input.items.length === 0) {
+      throw new Error('Debe registrar al menos un item.');
+    }
+    const kardexIds: string[] = [];
+    const reason = input.reason ?? 'purchase';
+    const supplierLabel = input.supplierName
+      ?? (input.supplierId ? this.supplierById(input.supplierId)?.name : undefined)
+      ?? 'proveedor';
+
+    for (const it of input.items) {
+      if (it.qty <= 0) continue;
+
+      const noteText = [
+        `Recepción de ${supplierLabel}`,
+        input.reference ? `Ref ${input.reference}` : '',
+        input.notes ?? '',
+      ].filter(Boolean).join(' · ');
+
+      if (it.kind === 'supply') {
+        const supply = this.supplyById(it.itemId);
+        if (!supply) continue;
+        let stock = this.supplyStockFor(it.itemId);
+        if (!stock) {
+          stock = { id: it.itemId, supplyId: it.itemId, quantity: 0, status: 'out' };
+          this._supplyStock.update(list => [...list, stock!]);
+        }
+        const newQty = stock.quantity + it.qty;
+        const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
+        this._supplyStock.update(list => list.map(s =>
+          s.id === stock!.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+
+        const kid = `k-${Date.now()}-${it.itemId}-${Math.random().toString(36).slice(2, 6)}`;
+        this.registerKardexEntry({
+          id: kid, supplyId: it.itemId, itemName: supply.name,
+          type: 'in', qty: it.qty, balance: newQty,
+          cost: it.unitCost ?? supply.cost,
+          reason, note: noteText,
+          userId: input.userId, userName: input.userName, at: input.receivedAt,
+        });
+        kardexIds.push(kid);
+      } else {
+        // Producto sin receta (reventa)
+        const product = this.productById(it.itemId);
+        if (!product) continue;
+        let stock = this.productStockFor(it.itemId);
+        if (!stock) {
+          stock = { id: it.itemId, productId: it.itemId, quantity: 0, reservedQty: 0, status: 'out' };
+          this._productStock.update(list => [...list, stock!]);
+        }
+        const newQty = stock.quantity + it.qty;
+        const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.productId === it.itemId ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+
+        const kid = `k-${Date.now()}-${it.itemId}-${Math.random().toString(36).slice(2, 6)}`;
+        this.registerKardexEntry({
+          id: kid, productId: it.itemId, itemName: product.name,
+          type: 'in', qty: it.qty, balance: newQty,
+          cost: it.unitCost ?? product.buyPrice,
+          reason, note: noteText,
+          userId: input.userId, userName: input.userName, at: input.receivedAt,
+        });
+        kardexIds.push(kid);
+      }
+    }
+
+    this.regenerateRestockAlerts();
+    return { kardexIds };
   }
 }

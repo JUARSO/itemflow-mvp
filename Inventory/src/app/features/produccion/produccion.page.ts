@@ -93,14 +93,33 @@ type Tab = 'all' | 'pending' | 'in_production';
                     {{ o.purpose || 'Pedido interno' }}
                   }
                 </div>
-                @if (o.requestedDeliveryDate) {
-                  <div class="card__delivery">
-                    <ion-icon name="calendar-outline"></ion-icon>
-                    Entrega: {{ o.requestedDeliveryDate | date:'dd-MM' }}
-                  </div>
-                }
               </div>
               <span class="status" [attr.data-status]="o.status">{{ statusLabel(o.status) }}</span>
+            </div>
+
+            <!-- Bloque de fechas: ingreso vs entrega -->
+            <div class="dates">
+              <div class="date-cell">
+                <div class="date-cell__label">
+                  <ion-icon name="time-outline"></ion-icon> Ingreso
+                </div>
+                <div class="date-cell__value mono">{{ o.createdAt | date:'dd-MM-yyyy' }}</div>
+                <div class="date-cell__sub mono">{{ o.createdAt | date:'HH:mm' }}</div>
+              </div>
+              <div class="date-cell date-cell--delivery"
+                [class.date-cell--overdue]="isOverdue(o)"
+                [class.date-cell--soon]="isSoon(o)">
+                <div class="date-cell__label">
+                  <ion-icon name="calendar-outline"></ion-icon> Entrega
+                </div>
+                @if (o.requestedDeliveryDate) {
+                  <div class="date-cell__value mono">{{ o.requestedDeliveryDate | date:'dd-MM-yyyy' }}</div>
+                  <div class="date-cell__sub mono">{{ deliveryHint(o) }}</div>
+                } @else {
+                  <div class="date-cell__value muted">Sin fecha</div>
+                  <div class="date-cell__sub">—</div>
+                }
+              </div>
             </div>
 
             <div class="card__items">
@@ -126,7 +145,6 @@ type Tab = 'all' | 'pending' | 'in_production';
             }
 
             <div class="card__foot">
-              <span class="mono">{{ o.createdAt | date:'dd-MM HH:mm' }}</span>
               <span class="cta">
                 @switch (o.status) {
                   @case ('pending') { Iniciar → }
@@ -260,6 +278,55 @@ type Tab = 'all' | 'pending' | 'in_production';
     .status[data-status="pending"]       { background: var(--ui-warning); color: #000; }
     .status[data-status="in_production"] { background: var(--ui-transit); color: #fff; }
 
+    /* === Bloque de fechas (ingreso / entrega) === */
+    .dates {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--ui-border);
+      border: var(--ui-border-w-sm) solid var(--ui-border);
+    }
+    .date-cell {
+      background: var(--ui-surface-2);
+      padding: 6px 8px;
+      display: flex; flex-direction: column;
+      gap: 1px;
+    }
+    .date-cell__label {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 10px;
+      font-weight: var(--ui-fw-black);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+    }
+    .date-cell__label ion-icon { font-size: 11px; }
+    .date-cell__value {
+      font-size: var(--ui-fs-sm);
+      font-weight: var(--ui-fw-black);
+      color: var(--ui-text);
+    }
+    .date-cell__value.muted { color: var(--ui-text-muted); font-style: italic; font-weight: var(--ui-fw-bold); }
+    .date-cell__sub {
+      font-size: 10px;
+      color: var(--ui-text-muted);
+    }
+    .date-cell--delivery { background: var(--ui-surface); }
+    .date-cell--soon {
+      background: var(--ui-warning);
+      color: #000;
+    }
+    .date-cell--soon .date-cell__label,
+    .date-cell--soon .date-cell__value,
+    .date-cell--soon .date-cell__sub { color: #000; }
+    .date-cell--overdue {
+      background: var(--ui-danger);
+      color: #fff;
+    }
+    .date-cell--overdue .date-cell__label,
+    .date-cell--overdue .date-cell__value,
+    .date-cell--overdue .date-cell__sub { color: #fff; }
+
     .card__items {
       display: grid;
       gap: 4px;
@@ -362,6 +429,31 @@ export class ProduccionPage {
   customerNameOf(o: CustomerOrder): string | null {
     if (!o.customerId) return null;
     return this.data.customerById(o.customerId)?.name ?? null;
+  }
+
+  /** Días entre hoy y la fecha de entrega (negativo si ya pasó). */
+  private daysToDelivery(o: CustomerOrder): number | null {
+    if (!o.requestedDeliveryDate) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const target = new Date(o.requestedDeliveryDate); target.setHours(0, 0, 0, 0);
+    return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+  }
+
+  isOverdue(o: CustomerOrder): boolean {
+    const d = this.daysToDelivery(o);
+    return d !== null && d < 0;
+  }
+  isSoon(o: CustomerOrder): boolean {
+    const d = this.daysToDelivery(o);
+    return d !== null && d >= 0 && d <= 1;
+  }
+  deliveryHint(o: CustomerOrder): string {
+    const d = this.daysToDelivery(o);
+    if (d === null) return '';
+    if (d === 0) return 'HOY';
+    if (d === 1) return 'mañana';
+    if (d < 0) return `hace ${-d} día(s)`;
+    return `en ${d} día(s)`;
   }
 
   openDetail(o: CustomerOrder) {

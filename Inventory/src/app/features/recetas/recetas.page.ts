@@ -238,22 +238,26 @@ export class RecetasPage {
     entityLabel: 'receta',
     entityLabelPlural: 'recetas',
     templateFilename: 'plantilla-recetas.csv',
-    headers: ['producto_sku', 'rinde', 'tipo', 'componente_sku', 'cantidad'],
+    headers: ['producto_sku', 'rinde', 'tipo', 'componente_sku', 'cantidad', 'notas'],
     templateRows: [
-      ['PROD-BAG-001', '10', 'insumo', 'INS-HARINA-001', '1.5'],
-      ['PROD-BAG-001', '10', 'insumo', 'INS-SAL-001', '0.03'],
-      ['PROD-BAG-001', '10', 'insumo', 'INS-LEVADURA-001', '0.02'],
-      ['PROD-SANDWICH-001', '1', 'subproducto', 'PROD-BAG-001', '1'],
-      ['PROD-SANDWICH-001', '1', 'insumo', 'INS-QUESO-001', '0.05'],
+      ['PROD-BAG-001', '10', 'insumo', 'INS-HARINA-001', '1.5', 'Reposar 30min antes de hornear'],
+      ['PROD-BAG-001', '10', 'insumo', 'INS-SAL-001', '0.03', ''],
+      ['PROD-BAG-001', '10', 'insumo', 'INS-LEVADURA-001', '0.02', ''],
+      ['PROD-SANDWICH-001', '1', 'subproducto', 'PROD-BAG-001', '1', 'Cortar baguette en diagonal'],
+      ['PROD-SANDWICH-001', '1', 'insumo', 'INS-QUESO-001', '0.05', ''],
     ],
-    hint: 'Una fila por componente. Columna "tipo" acepta "insumo" o "subproducto" (default: insumo si está vacío). componente_sku busca el SKU según el tipo. El producto destino y los componentes deben existir.',
+    hint: `Una fila por componente — la receta se agrupa por "producto_sku".
+Columnas: producto_sku, rinde, tipo, componente_sku, cantidad (obligatorias) + notas (opcional, se toma de la primera fila de cada producto).
+tipo: "insumo" o "subproducto" (default: insumo). El componente_sku se busca como insumo o como producto según el tipo.
+El producto destino y los componentes deben existir previamente. No se permite auto-referencia (un producto no puede ser su propio subproducto).
+"rinde" debe ser consistente entre todas las filas del mismo producto.`,
     process: (rows) => {
       const errors: { row: number; raw: Record<string, string>; message: string }[] = [];
       const products = new Map(this.data.activeProducts().map(p => [p.sku.toLowerCase(), p]));
       const supplies = new Map(this.data.activeSupplies().map(s => [s.sku.toLowerCase(), s]));
 
       // Agrupar filas por producto_sku
-      const grouped = new Map<string, { yieldQty: number | null; items: RecipeItem[]; rowNums: number[] }>();
+      const grouped = new Map<string, { yieldQty: number | null; items: RecipeItem[]; rowNums: number[]; notes?: string }>();
       rows.forEach((r, i) => {
         const rowNum = i + 2;
         const prodSku = (r['producto_sku'] ?? '').trim();
@@ -286,16 +290,19 @@ export class RecetasPage {
           recipeItem = { productId: subProd.id, itemName: subProd.name, qty: cantidad, unit: subProd.unit };
         }
 
+        const notas = (r['notas'] ?? '').trim();
         const key = prod.id;
         let group = grouped.get(key);
         if (!group) {
-          group = { yieldQty: rinde, items: [], rowNums: [] };
+          group = { yieldQty: rinde, items: [], rowNums: [], notes: notas || undefined };
           grouped.set(key, group);
         }
         if (group.yieldQty !== rinde) {
           errors.push({ row: rowNum, raw: r, message: `Rinde inconsistente para ${prodSku} (esperaba ${group.yieldQty})` });
           return;
         }
+        // Si la primera fila no traía notas y esta sí, las adoptamos.
+        if (!group.notes && notas) group.notes = notas;
         const duplicateId = recipeItem.supplyId ?? recipeItem.productId;
         const exists = group.items.some(it => (it.supplyId ?? it.productId) === duplicateId);
         if (exists) {
@@ -318,6 +325,7 @@ export class RecetasPage {
           productName: prod.name,
           yieldQty: g.yieldQty,
           items: g.items,
+          notes: g.notes,
         });
       });
       return { valid, errors };

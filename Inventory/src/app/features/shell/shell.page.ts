@@ -44,8 +44,9 @@ import { BrandingService } from '../../core/services/branding.service';
             </div>
           </div>
 
+          <!-- OPERARIO DE PRODUCCIÓN: opera la cola + lectura del resto -->
           @if (auth.isOperator()) {
-            <div class="menu-section">Operario</div>
+            <div class="menu-section">Operario de producción</div>
             <a routerLink="/produccion" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="receipt-outline"></ion-icon>
               <span class="menu-item__label">Pedidos de clientes</span>
@@ -59,6 +60,23 @@ import { BrandingService } from '../../core/services/branding.service';
               <ion-icon class="menu-item__icon" name="calendar-outline"></ion-icon>
               <span class="menu-item__label">Planificación</span>
             </a>
+
+            <div class="menu-section">Consulta (solo lectura)</div>
+            <a routerLink="/clientes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="person-outline"></ion-icon>
+              <span class="menu-item__label">Clientes</span>
+              <span class="menu-item__hint">solo lectura</span>
+            </a>
+            <a routerLink="/historial-pedidos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="archive-outline"></ion-icon>
+              <span class="menu-item__label">Historial de pedidos</span>
+              <span class="menu-item__hint">solo lectura</span>
+            </a>
+            <a routerLink="/catalogo" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="library-outline"></ion-icon>
+              <span class="menu-item__label">Catálogo</span>
+              <span class="menu-item__hint">solo lectura</span>
+            </a>
             <a routerLink="/recetas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="book-outline"></ion-icon>
               <span class="menu-item__label">Recetas</span>
@@ -66,6 +84,24 @@ import { BrandingService } from '../../core/services/branding.service';
             </a>
           }
 
+          <!-- 1. PANEL ADMINISTRATIVO (admin) -->
+          @if (auth.isAdmin()) {
+            <div class="menu-section">Panel administrativo</div>
+            <a routerLink="/panel-pedidos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="receipt-outline"></ion-icon>
+              <span class="menu-item__label">Control de pedidos</span>
+            </a>
+            <a routerLink="/panel-inventario" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
+              <span class="menu-item__label">Gestión de inventario</span>
+            </a>
+            <a routerLink="/panel-contable" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="cash-outline"></ion-icon>
+              <span class="menu-item__label">Contabilidad y PDFs</span>
+            </a>
+          }
+
+          <!-- 2. CLIENTES Y PEDIDOS (admin + production) -->
           @if (auth.isAdmin() || auth.isProduction()) {
             <div class="menu-section">Clientes y pedidos</div>
             <a routerLink="/clientes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
@@ -93,27 +129,31 @@ import { BrandingService } from '../../core/services/branding.service';
               <ion-icon class="menu-item__icon" name="archive-outline"></ion-icon>
               <span class="menu-item__label">Historial de pedidos</span>
             </a>
+          }
 
-            <div class="menu-section">Inventario</div>
+          <!-- 3. CATÁLOGO (admin + production solamente; inventory no entra) -->
+          @if (auth.isAdmin() || auth.isProduction()) {
+            <div class="menu-section">Catálogo</div>
             <a routerLink="/catalogo" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="library-outline"></ion-icon>
               <span class="menu-item__label">Catálogo</span>
-            </a>
-            <a routerLink="/insumos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="leaf-outline"></ion-icon>
-              <span class="menu-item__label">Insumos</span>
             </a>
             <a routerLink="/recetas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="book-outline"></ion-icon>
               <span class="menu-item__label">Recetas</span>
             </a>
+          }
+
+          <!-- 4. INVENTARIO (stock + ajustes + mermas + alertas) -->
+          @if (auth.isAdmin() || auth.isInventory() || auth.isProduction()) {
+            <div class="menu-section">Inventario</div>
             <a routerLink="/inventario" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
               <span class="menu-item__label">Inventario</span>
             </a>
-            <a routerLink="/ajustes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="create-outline"></ion-icon>
-              <span class="menu-item__label">Ajustes</span>
+            <a routerLink="/insumos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="leaf-outline"></ion-icon>
+              <span class="menu-item__label">Insumos</span>
             </a>
             <a routerLink="/mermas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="arrow-undo-outline"></ion-icon>
@@ -124,9 +164,9 @@ import { BrandingService } from '../../core/services/branding.service';
                 </ion-badge>
               }
             </a>
-            <a routerLink="/ordenes-compra" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="document-text-outline"></ion-icon>
-              <span class="menu-item__label">Órdenes de Compra</span>
+            <a routerLink="/ajustes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="create-outline"></ion-icon>
+              <span class="menu-item__label">Ajustes</span>
             </a>
             <a routerLink="/alertas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="notifications-outline"></ion-icon>
@@ -137,23 +177,25 @@ import { BrandingService } from '../../core/services/branding.service';
                 </ion-badge>
               }
             </a>
+
+            <!-- 5. COMPRAS Y PROVEEDORES (sección aparte) -->
+            <div class="menu-section">Compras y proveedores</div>
+            <a routerLink="/proveedores" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="person-outline"></ion-icon>
+              <span class="menu-item__label">Proveedores</span>
+            </a>
+            <a routerLink="/ordenes-compra" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="document-text-outline"></ion-icon>
+              <span class="menu-item__label">Órdenes de Compra</span>
+            </a>
+            <a routerLink="/ingresos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="arrow-down-circle-outline"></ion-icon>
+              <span class="menu-item__label">Registrar ingresos</span>
+            </a>
           }
 
-          @if (auth.isAdmin()) {
-            <div class="menu-section">Paneles administrativos</div>
-            <a routerLink="/panel-pedidos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="receipt-outline"></ion-icon>
-              <span class="menu-item__label">Control de pedidos</span>
-            </a>
-            <a routerLink="/panel-inventario" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
-              <span class="menu-item__label">Gestión de inventario</span>
-            </a>
-            <a routerLink="/panel-contable" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="cash-outline"></ion-icon>
-              <span class="menu-item__label">Contabilidad y PDFs</span>
-            </a>
-
+          <!-- 5. ANÁLISIS (admin + production + inventory) -->
+          @if (auth.isAdmin() || auth.isProduction() || auth.isInventory()) {
             <div class="menu-section">Análisis</div>
             <a routerLink="/predicciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="trending-up-outline"></ion-icon>
@@ -165,6 +207,7 @@ import { BrandingService } from '../../core/services/branding.service';
             </a>
           }
 
+          <!-- 6. MÁS -->
           <div class="menu-section">Cuenta</div>
           <a routerLink="/mas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <ion-icon class="menu-item__icon" name="settings-outline"></ion-icon>
@@ -210,19 +253,25 @@ import { BrandingService } from '../../core/services/branding.service';
     .brand__logo {
       font-size: 32px;
       line-height: 1;
-      width: 48px;
-      height: 48px;
+      width: 52px;
+      height: 52px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: var(--ui-surface);
       border: var(--ui-border-w-md) solid var(--ui-border);
       overflow: hidden;
+      padding: 4px;
+      flex-shrink: 0;
     }
     .brand__logo-img {
       width: 100%;
       height: 100%;
       object-fit: contain;
+      /* Si el header tiene fondo oscuro, mantenemos el logo original sobre
+         su contenedor blanco (no aplicamos invert). Si en algún momento
+         se quiere logo blanco directo sobre el header, usar:
+         filter: brightness(0) invert(1); */
     }
     .brand__logo-icon {
       font-size: 28px;
@@ -234,6 +283,8 @@ import { BrandingService } from '../../core/services/branding.service';
       font-weight: var(--ui-fw-black);
       font-size: var(--ui-fs-lg);
       line-height: 1.1;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
     .brand__company {
       font-size: var(--ui-fs-xs);
@@ -331,9 +382,10 @@ export class ShellPage {
   private readonly router = inject(Router);
 
   roleLabel(): string {
-    if (this.auth.isAdmin()) return 'Administrador';
-    if (this.auth.isProduction()) return 'Encargado de Producción';
-    if (this.auth.isOperator()) return 'Operario';
+    if (this.auth.isAdmin()) return 'Administrativo';
+    if (this.auth.isProduction()) return 'Encargado de producción';
+    if (this.auth.isInventory()) return 'Encargado de inventario';
+    if (this.auth.isOperator()) return 'Operario de producción';
     return '—';
   }
 

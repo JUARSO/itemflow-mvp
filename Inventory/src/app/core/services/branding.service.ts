@@ -19,8 +19,9 @@ export interface Branding {
 const STORAGE_KEY = 'itemflow_branding_v1';
 
 const DEFAULTS: Branding = {
-  displayName: 'ItemFlow',
-  logo: '📦',
+  displayName: 'NOBLE',
+  logo: 'N',
+  logoImage: 'assets/branding/noble-logo.png',
 };
 
 /** Tamaño máximo (lado mayor) al que se redimensiona la imagen subida. */

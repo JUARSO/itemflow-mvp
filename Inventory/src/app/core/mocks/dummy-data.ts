@@ -1,22 +1,23 @@
 import {
-  Member, Company, Product, Supply, Recipe,
+  Member, Company, Product, Supply, Supplier, Recipe,
   StockItem, SupplyStockItem, KardexEntry, SaleRecord,
   Alert, DemandPrediction, PurchaseOrder, CustomerOrder, Customer,
   ReturnedLot,
 } from '../models';
 
 export const MOCK_COMPANY: Company = {
-  id: 'tenant-demo',
-  name: 'Panadería Pan & Co',
-  adminEmail: 'admin@panyco.cl',
+  id: 'tenant-noble',
+  name: 'NOBLE',
+  adminEmail: 'hola@noble.cr',
   currency: 'CRC',
   timezone: 'America/Costa_Rica',
 };
 
 export const MOCK_MEMBERS: Member[] = [
-  { uid: 'u-admin', email: 'admin@panyco.cl', displayName: 'María González', role: 'admin', active: true },
-  { uid: 'u-produccion', email: 'produccion@panyco.cl', displayName: 'Sofía Rojas', role: 'production', active: true },
-  { uid: 'u-operario', email: 'operario@panyco.cl', displayName: 'Carlos Mora', role: 'operator', active: true },
+  { uid: 'u-admin', email: 'admin@noble.cr', displayName: 'María González', role: 'admin', active: true },
+  { uid: 'u-produccion', email: 'produccion@noble.cr', displayName: 'Sofía Rojas', role: 'production', active: true },
+  { uid: 'u-inventario', email: 'inventario@noble.cr', displayName: 'Diego Soto', role: 'inventory', active: true },
+  { uid: 'u-operario', email: 'operario@noble.cr', displayName: 'Carlos Mora', role: 'operator', active: true },
 ];
 
 export const MOCK_SUPPLIES: Supply[] = [
@@ -38,21 +39,25 @@ export const MOCK_SUPPLIES: Supply[] = [
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
-  { id: 'p-baguette', sku: 'PROD-BAG-001', name: 'Baguette tradicional', category: 'Panes', unit: 'unidad', buyPrice: 380, sellPrice: 1200, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-marraqueta', sku: 'PROD-MAR-001', name: 'Marraqueta', category: 'Panes', unit: 'unidad', buyPrice: 120, sellPrice: 350, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-hallulla', sku: 'PROD-HAL-001', name: 'Hallulla', category: 'Panes', unit: 'unidad', buyPrice: 90, sellPrice: 300, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-croissant', sku: 'PROD-CRO-001', name: 'Croissant mantequilla', category: 'Pastelería', unit: 'unidad', buyPrice: 650, sellPrice: 1900, leadTime: 2, active: true, hasRecipe: true },
-  { id: 'p-empanada', sku: 'PROD-EMP-001', name: 'Empanada queso', category: 'Salados', unit: 'unidad', buyPrice: 550, sellPrice: 1700, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-brownie', sku: 'PROD-BRO-001', name: 'Brownie chocolate', category: 'Pastelería', unit: 'unidad', buyPrice: 720, sellPrice: 2200, leadTime: 2, active: true, hasRecipe: true },
-  { id: 'p-pie', sku: 'PROD-PIE-001', name: 'Pie de limón', category: 'Pastelería', unit: 'unidad', buyPrice: 5800, sellPrice: 18000, leadTime: 3, active: true, hasRecipe: true },
-  { id: 'p-galleta', sku: 'PROD-GAL-001', name: 'Galleta avena pasas', category: 'Galletas', unit: 'unidad', buyPrice: 180, sellPrice: 600, leadTime: 1, active: true, hasRecipe: true },
-  { id: 'p-cafe', sku: 'PROD-CAF-001', name: 'Café molido 250g (reventa)', category: 'Bebidas', unit: 'unidad', buyPrice: 3500, sellPrice: 5900, leadTime: 7, active: true, hasRecipe: false, reorderPoint: 12, minStock: 4 },
-  { id: 'p-mermelada-rev', sku: 'PROD-MER-001', name: 'Mermelada artesanal (reventa)', category: 'Conservas', unit: 'unidad', buyPrice: 2800, sellPrice: 4900, leadTime: 7, active: true, hasRecipe: false, reorderPoint: 8, minStock: 3 },
+  // Pan de masa madre
+  { id: 'p-baguette', sku: 'PROD-BAG-001', name: 'Baguette de masa madre', description: 'Fermentación lenta 24h, corteza dorada', category: 'Pan masa madre', unit: 'unidad', buyPrice: 950, sellPrice: 2400, leadTime: 2, active: true, hasRecipe: true },
+  { id: 'p-marraqueta', sku: 'PROD-PCA-001', name: 'Pain de campagne', description: 'Hogaza rústica de masa madre con centeno', category: 'Pan masa madre', unit: 'unidad', buyPrice: 1800, sellPrice: 4200, leadTime: 2, active: true, hasRecipe: true },
+  { id: 'p-hallulla', sku: 'PROD-SDB-001', name: 'Sourdough boule', description: 'Pan redondo de masa madre, miga abierta', category: 'Pan masa madre', unit: 'unidad', buyPrice: 2200, sellPrice: 5500, leadTime: 2, active: true, hasRecipe: true },
+  // Viennoiserie
+  { id: 'p-croissant', sku: 'PROD-CRO-001', name: 'Croissant au beurre', description: 'Hojaldre de mantequilla, 72 capas', category: 'Viennoiserie', unit: 'unidad', buyPrice: 850, sellPrice: 2200, leadTime: 2, active: true, hasRecipe: true },
+  { id: 'p-empanada', sku: 'PROD-FOC-001', name: 'Focaccia rústica', description: 'Aceite de oliva, romero y sal en escamas', category: 'Panes especiales', unit: 'unidad', buyPrice: 1400, sellPrice: 3600, leadTime: 1, active: true, hasRecipe: true },
+  // Pastelería
+  { id: 'p-brownie', sku: 'PROD-BRO-001', name: 'Brownie chocolate 70%', description: 'Cacao de origen único, textura fudge', category: 'Pastelería', unit: 'unidad', buyPrice: 950, sellPrice: 2600, leadTime: 2, active: true, hasRecipe: true },
+  { id: 'p-pie', sku: 'PROD-TAR-001', name: 'Tarta de limón meringue', description: 'Base sablée, lemon curd y merengue italiano', category: 'Pastelería', unit: 'unidad', buyPrice: 6800, sellPrice: 19500, leadTime: 3, active: true, hasRecipe: true },
+  { id: 'p-galleta', sku: 'PROD-MAC-001', name: 'Macaron surtido', description: 'Edición de la semana — 6 sabores', category: 'Pastelería', unit: 'unidad', buyPrice: 380, sellPrice: 1100, leadTime: 1, active: true, hasRecipe: true },
+  // Reventa
+  { id: 'p-cafe', sku: 'PROD-CAF-001', name: 'Café de altura Tarrazú 250g', description: 'Tueste medio · Los Santos · grano entero', category: 'Café & bebidas', unit: 'unidad', buyPrice: 4200, sellPrice: 7500, leadTime: 7, active: true, hasRecipe: false, reorderPoint: 12, minStock: 4 },
+  { id: 'p-mermelada-rev', sku: 'PROD-MER-001', name: 'Mermelada artesanal fresa', description: 'Sin pectina añadida · 280g', category: 'Conservas', unit: 'unidad', buyPrice: 3200, sellPrice: 5800, leadTime: 7, active: true, hasRecipe: false, reorderPoint: 8, minStock: 3 },
 ];
 
 export const MOCK_RECIPES: Recipe[] = [
   {
-    id: 'p-baguette', productId: 'p-baguette', productName: 'Baguette tradicional', yieldQty: 10,
+    id: 'p-baguette', productId: 'p-baguette', productName: 'Baguette de masa madre', yieldQty: 10,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 1.5, unit: 'kg' },
       { supplyId: 's-sal', itemName: 'Sal de mesa', qty: 0.03, unit: 'kg' },
@@ -61,7 +66,7 @@ export const MOCK_RECIPES: Recipe[] = [
     notes: 'Amasar 12 min. Primera fermentación 1h en bloque. Formar baguettes y fermentar 45 min más. Hornear a 220°C con vapor por 22 min.',
   },
   {
-    id: 'p-marraqueta', productId: 'p-marraqueta', productName: 'Marraqueta', yieldQty: 20,
+    id: 'p-marraqueta', productId: 'p-marraqueta', productName: 'Pain de campagne', yieldQty: 20,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 2.0, unit: 'kg' },
       { supplyId: 's-sal', itemName: 'Sal de mesa', qty: 0.04, unit: 'kg' },
@@ -69,7 +74,7 @@ export const MOCK_RECIPES: Recipe[] = [
     ],
   },
   {
-    id: 'p-hallulla', productId: 'p-hallulla', productName: 'Hallulla', yieldQty: 20,
+    id: 'p-hallulla', productId: 'p-hallulla', productName: 'Sourdough boule', yieldQty: 20,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 1.8, unit: 'kg' },
       { supplyId: 's-sal', itemName: 'Sal de mesa', qty: 0.035, unit: 'kg' },
@@ -77,7 +82,7 @@ export const MOCK_RECIPES: Recipe[] = [
     ],
   },
   {
-    id: 'p-croissant', productId: 'p-croissant', productName: 'Croissant mantequilla', yieldQty: 12,
+    id: 'p-croissant', productId: 'p-croissant', productName: 'Croissant au beurre', yieldQty: 12,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 0.6, unit: 'kg' },
       { supplyId: 's-mantequilla', itemName: 'Mantequilla sin sal', qty: 0.3, unit: 'kg' },
@@ -88,7 +93,7 @@ export const MOCK_RECIPES: Recipe[] = [
     notes: 'Mantequilla SIEMPRE fría. 3 vueltas dobles con reposo de 30 min entre cada una. Fermentar 2h antes de hornear. 200°C por 18 min.',
   },
   {
-    id: 'p-empanada', productId: 'p-empanada', productName: 'Empanada queso', yieldQty: 10,
+    id: 'p-empanada', productId: 'p-empanada', productName: 'Focaccia rústica', yieldQty: 10,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 0.5, unit: 'kg' },
       { supplyId: 's-queso', itemName: 'Queso crema', qty: 0.35, unit: 'kg' },
@@ -97,7 +102,7 @@ export const MOCK_RECIPES: Recipe[] = [
     ],
   },
   {
-    id: 'p-brownie', productId: 'p-brownie', productName: 'Brownie chocolate', yieldQty: 16,
+    id: 'p-brownie', productId: 'p-brownie', productName: 'Brownie chocolate 70%', yieldQty: 16,
     items: [
       { supplyId: 's-choco', itemName: 'Chocolate cobertura', qty: 0.25, unit: 'kg' },
       { supplyId: 's-mantequilla', itemName: 'Mantequilla sin sal', qty: 0.2, unit: 'kg' },
@@ -108,7 +113,7 @@ export const MOCK_RECIPES: Recipe[] = [
     ],
   },
   {
-    id: 'p-pie', productId: 'p-pie', productName: 'Pie de limón', yieldQty: 1,
+    id: 'p-pie', productId: 'p-pie', productName: 'Tarta de limón meringue', yieldQty: 1,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 0.25, unit: 'kg' },
       { supplyId: 's-mantequilla', itemName: 'Mantequilla sin sal', qty: 0.15, unit: 'kg' },
@@ -118,7 +123,7 @@ export const MOCK_RECIPES: Recipe[] = [
     ],
   },
   {
-    id: 'p-galleta', productId: 'p-galleta', productName: 'Galleta avena pasas', yieldQty: 24,
+    id: 'p-galleta', productId: 'p-galleta', productName: 'Macaron surtido', yieldQty: 24,
     items: [
       { supplyId: 's-harina', itemName: 'Harina de trigo', qty: 0.3, unit: 'kg' },
       { supplyId: 's-mantequilla', itemName: 'Mantequilla sin sal', qty: 0.15, unit: 'kg' },
@@ -270,7 +275,7 @@ export const MOCK_KARDEX: KardexEntry[] = [
 
   // ORD-009 confirmado con devolución (24 entregados, 4 devueltos). El reintegro al
   // stock ocurre cuando el lote se procesa en la pantalla de Mermas.
-  { id: 'k-ord9-out', productId: 'p-croissant', itemName: 'Croissant mantequilla', type: 'out', qty: 24, balance: 0, cost: 650, reason: 'sale', note: 'Pedido ORD-009 entregado a Cafetería La Esquina', userId: 'cust-1', userName: 'Cafetería La Esquina', at: daysAgo(2) },
+  { id: 'k-ord9-out', productId: 'p-croissant', itemName: 'Croissant au beurre', type: 'out', qty: 24, balance: 0, cost: 650, reason: 'sale', note: 'Pedido ORD-009 entregado a Cafetería La Esquina', userId: 'cust-1', userName: 'Cafetería La Esquina', at: daysAgo(2) },
 
   // 30 días de historial de entregas de pedidos completados (alimenta predicciones)
   ...HISTORICAL_PRODUCT_DELIVERIES_KARDEX,
@@ -430,7 +435,7 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
   {
     id: 'po-6', code: 'OC-2025-145', supplier: 'Tostaduría Origen',
     status: 'pending',
-    items: [{ productId: 'p-cafe', itemName: 'Café molido 250g', qty: 30, unitCost: 3500 }],
+    items: [{ productId: 'p-cafe', itemName: 'Café de altura Tarrazú 250g', qty: 30, unitCost: 3500 }],
     totalCost: 105000,
     expectedDate: daysAgo(-5), createdAt: hoursAgo(2),
   },
@@ -446,8 +451,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-1',
     requestedDeliveryDate: daysFromNow(2),
     items: [
-      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 24, unitPrice: 1200, fulfilledQty: 0 },
-      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 18, unitPrice: 1900, fulfilledQty: 0 },
+      { productId: 'p-baguette', productName: 'Baguette de masa madre', unit: 'unidad', qty: 24, unitPrice: 1200, fulfilledQty: 0 },
+      { productId: 'p-croissant', productName: 'Croissant au beurre', unit: 'unidad', qty: 18, unitPrice: 1900, fulfilledQty: 0 },
     ],
     totalAmount: 24 * 1200 + 18 * 1900,
     notes: 'Para el primer turno del día siguiente',
@@ -462,8 +467,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-2',
     requestedDeliveryDate: daysFromNow(3),
     items: [
-      { productId: 'p-marraqueta', productName: 'Marraqueta', unit: 'unidad', qty: 80, unitPrice: 320, fulfilledQty: 0 },
-      { productId: 'p-hallulla', productName: 'Hallulla', unit: 'unidad', qty: 60, unitPrice: 280, fulfilledQty: 0 },
+      { productId: 'p-marraqueta', productName: 'Pain de campagne', unit: 'unidad', qty: 80, unitPrice: 320, fulfilledQty: 0 },
+      { productId: 'p-hallulla', productName: 'Sourdough boule', unit: 'unidad', qty: 60, unitPrice: 280, fulfilledQty: 0 },
     ],
     totalAmount: 80 * 320 + 60 * 280,
     createdAt: hoursAgo(3),
@@ -477,8 +482,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-3',
     requestedDeliveryDate: daysFromNow(1),
     items: [
-      { productId: 'p-empanada', productName: 'Empanada queso', unit: 'unidad', qty: 30, unitPrice: 1700, fulfilledQty: 20 },
-      { productId: 'p-brownie', productName: 'Brownie chocolate', unit: 'unidad', qty: 20, unitPrice: 2200, fulfilledQty: 20 },
+      { productId: 'p-empanada', productName: 'Focaccia rústica', unit: 'unidad', qty: 30, unitPrice: 1700, fulfilledQty: 20 },
+      { productId: 'p-brownie', productName: 'Brownie chocolate 70%', unit: 'unidad', qty: 20, unitPrice: 2200, fulfilledQty: 20 },
     ],
     totalAmount: 30 * 1700 + 20 * 2200,
     createdAt: hoursAgo(5),
@@ -497,8 +502,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-3',
     requestedDeliveryDate: daysFromNow(5),
     items: [
-      { productId: 'p-pie', productName: 'Pie de limón', unit: 'unidad', qty: 6, unitPrice: 18000, fulfilledQty: 4 },
-      { productId: 'p-galleta', productName: 'Galleta avena pasas', unit: 'unidad', qty: 100, unitPrice: 600, fulfilledQty: 100 },
+      { productId: 'p-pie', productName: 'Tarta de limón meringue', unit: 'unidad', qty: 6, unitPrice: 18000, fulfilledQty: 4 },
+      { productId: 'p-galleta', productName: 'Macaron surtido', unit: 'unidad', qty: 100, unitPrice: 600, fulfilledQty: 100 },
     ],
     totalAmount: 6 * 18000 + 100 * 600,
     notes: 'Esperando reposición de huevos y leche',
@@ -518,7 +523,7 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     id: 'ord-5', code: 'ORD-005', purpose: 'Reposición principal',
     status: 'completed',
     items: [
-      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 40, unitPrice: 1200, fulfilledQty: 40 },
+      { productId: 'p-baguette', productName: 'Baguette de masa madre', unit: 'unidad', qty: 40, unitPrice: 1200, fulfilledQty: 40 },
     ],
     totalAmount: 40 * 1200,
     createdAt: hoursAgo(20),
@@ -536,7 +541,7 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     id: 'ord-6', code: 'ORD-006', purpose: 'Lote viernes',
     status: 'completed',
     items: [
-      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 50, unitPrice: 1900, fulfilledQty: 50 },
+      { productId: 'p-croissant', productName: 'Croissant au beurre', unit: 'unidad', qty: 50, unitPrice: 1900, fulfilledQty: 50 },
     ],
     totalAmount: 50 * 1900,
     createdAt: daysAgo(1),
@@ -555,8 +560,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-2',
     requestedDeliveryDate: daysFromNow(2),
     items: [
-      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 12, unitPrice: 1900, fulfilledQty: 0 },
-      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 10, unitPrice: 1200, fulfilledQty: 0 },
+      { productId: 'p-croissant', productName: 'Croissant au beurre', unit: 'unidad', qty: 12, unitPrice: 1900, fulfilledQty: 0 },
+      { productId: 'p-baguette', productName: 'Baguette de masa madre', unit: 'unidad', qty: 10, unitPrice: 1200, fulfilledQty: 0 },
     ],
     totalAmount: 12 * 1900 + 10 * 1200,
     notes: 'Mismo día que ORD-001: produce todo junto',
@@ -572,8 +577,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-1',
     requestedDeliveryDate: daysAgo(0),
     items: [
-      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 20, unitPrice: 1200, fulfilledQty: 20 },
-      { productId: 'p-empanada', productName: 'Empanada queso', unit: 'unidad', qty: 15, unitPrice: 1700, fulfilledQty: 15 },
+      { productId: 'p-baguette', productName: 'Baguette de masa madre', unit: 'unidad', qty: 20, unitPrice: 1200, fulfilledQty: 20 },
+      { productId: 'p-empanada', productName: 'Focaccia rústica', unit: 'unidad', qty: 15, unitPrice: 1700, fulfilledQty: 15 },
     ],
     totalAmount: 20 * 1200 + 15 * 1700,
     createdAt: daysAgo(2),
@@ -593,8 +598,8 @@ export const MOCK_ORDERS: CustomerOrder[] = [
     customerId: 'cust-1',
     requestedDeliveryDate: daysAgo(3),
     items: [
-      { productId: 'p-croissant', productName: 'Croissant mantequilla', unit: 'unidad', qty: 24, unitPrice: 1900, fulfilledQty: 24, receivedQty: 20 },
-      { productId: 'p-baguette', productName: 'Baguette tradicional', unit: 'unidad', qty: 15, unitPrice: 1200, fulfilledQty: 15, receivedQty: 15 },
+      { productId: 'p-croissant', productName: 'Croissant au beurre', unit: 'unidad', qty: 24, unitPrice: 1900, fulfilledQty: 24, receivedQty: 20 },
+      { productId: 'p-baguette', productName: 'Baguette de masa madre', unit: 'unidad', qty: 15, unitPrice: 1200, fulfilledQty: 15, receivedQty: 15 },
     ],
     totalAmount: 24 * 1900 + 15 * 1200,
     finalAmount: 20 * 1900 + 15 * 1200,
@@ -663,12 +668,88 @@ export const MOCK_CUSTOMERS: Customer[] = [
   },
 ];
 
+// Proveedores estructurados con sus ventanas de pedido/entrega.
+export const MOCK_SUPPLIERS: Supplier[] = [
+  {
+    id: 'sup-1',
+    name: 'Molinos del Sur',
+    contactPerson: 'Carlos Méndez',
+    email: 'ventas@molinosdelsur.cr',
+    phone: '+506 2222-4400',
+    leadTimeDays: 3,
+    orderDays: [1, 3],          // lunes y miércoles
+    deliveryDays: [3, 5],       // miércoles y viernes
+    paymentTerms: '30 días',
+    suppliedItems: [
+      { kind: 'supply', itemId: 's-harina' },
+    ],
+    notes: 'Pedido mínimo 50kg. Descuento por volumen sobre 200kg.',
+    active: true,
+    createdAt: daysAgo(120),
+  },
+  {
+    id: 'sup-2',
+    name: 'IANSA',
+    contactPerson: 'Ana Vargas',
+    email: 'pedidos@iansa.cr',
+    phone: '+506 2255-8800',
+    leadTimeDays: 2,
+    orderDays: [2, 4],          // martes y jueves
+    deliveryDays: [4, 6],       // jueves y sábado
+    paymentTerms: 'Contado',
+    suppliedItems: [
+      { kind: 'supply', itemId: 's-azucar' },
+    ],
+    active: true,
+    createdAt: daysAgo(80),
+  },
+  {
+    id: 'sup-3',
+    name: 'Soprole',
+    contactPerson: 'Roberto Cruz',
+    email: 'cuentas@soprole.cr',
+    phone: '+506 4000-1212',
+    leadTimeDays: 1,
+    orderDays: [1, 2, 3, 4, 5],
+    deliveryDays: [1, 2, 3, 4, 5, 6],
+    paymentTerms: '15 días',
+    suppliedItems: [
+      { kind: 'supply', itemId: 's-mantequilla' },
+      { kind: 'supply', itemId: 's-leche' },
+      { kind: 'supply', itemId: 's-queso' },
+    ],
+    notes: 'Entrega temprana antes de 8am.',
+    active: true,
+    createdAt: daysAgo(60),
+  },
+  {
+    id: 'sup-4',
+    name: 'Costa Chocolates',
+    contactPerson: 'Diego Soto',
+    email: 'wholesale@costa.cr',
+    phone: '+506 2233-9900',
+    leadTimeDays: 5,
+    orderDays: [1],             // solo lunes
+    deliveryDays: [5],          // entrega viernes
+    paymentTerms: '30 días',
+    suppliedItems: [
+      { kind: 'supply', itemId: 's-choco' },
+      { kind: 'supply', itemId: 's-cacao' },
+      { kind: 'product', itemId: 'p-cafe' },        // café de reventa
+      { kind: 'product', itemId: 'p-mermelada-rev' }, // mermelada de reventa
+    ],
+    notes: 'Productos premium. Almacenar bajo 18°C.',
+    active: true,
+    createdAt: daysAgo(45),
+  },
+];
+
 // Lotes devueltos pendientes de revisar en la pantalla de Mermas.
 export const MOCK_RETURNED_LOTS: ReturnedLot[] = [
   {
     id: 'lot-ord9-croissant',
     productId: 'p-croissant',
-    productName: 'Croissant mantequilla',
+    productName: 'Croissant au beurre',
     unit: 'unidad',
     qty: 4,
     mermaQty: 0,

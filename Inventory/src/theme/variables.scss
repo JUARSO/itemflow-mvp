@@ -1,41 +1,43 @@
 /* =========================================================
-   ItemFlow — Tokens de diseño (Paper × paleta ItemFlow)
+   NOBLE Bakery & Pastry — Tokens de diseño
+   Inspirado en noble.cr: monocromático cálido, oliva oscuro,
+   cremas tipo papel, acentos ámbar. Calma · sofisticación.
    ========================================================= */
 
 :root {
-  /* --- Marca (desaturada, "tinta") --- */
-  --ui-primary: #3f7872;        /* teal apagado tipo sage */
-  --ui-primary-tint: #5a9189;
-  --ui-primary-shade: #2f5e59;
+  /* --- Marca (oliva oscuro tipo "tinta" europea) --- */
+  --ui-primary: #292E26;        /* dark olive / charcoal NOBLE */
+  --ui-primary-tint: #3d433a;
+  --ui-primary-shade: #1e2219;
   --ui-primary-contrast: #ffffff;
-  --ui-secondary: #6f5e8c;      /* slate-violet desaturado */
+  --ui-secondary: #5c5448;      /* warm taupe */
 
-  /* --- Estados semánticos (paleta editorial, baja saturación) --- */
-  --ui-success: #5f8466;        /* sage green */
-  --ui-success-tint: #eef3ef;
-  --ui-warning: #a87b41;        /* amber/oro apagado */
-  --ui-warning-tint: #f5efe5;
-  --ui-danger: #9c5454;         /* rojo ladrillo */
-  --ui-danger-tint: #f4ebeb;
-  --ui-excess: #6f5e8c;         /* slate-violet (= secondary) */
-  --ui-excess-tint: #efedf3;
-  --ui-transit: #3f7872;        /* = primary */
-  --ui-transit-tint: #eaf0ee;
+  /* --- Estados semánticos (tonos cálidos coherentes) --- */
+  --ui-success: #5f7d4f;        /* olive green */
+  --ui-success-tint: #eef2ea;
+  --ui-warning: #b45309;        /* amber NOBLE */
+  --ui-warning-tint: #f6ecdc;
+  --ui-danger: #9c4a40;         /* rojo ladrillo oscuro */
+  --ui-danger-tint: #f3e9e6;
+  --ui-excess: #735b3a;         /* tabaco/caramelo */
+  --ui-excess-tint: #f0ebe1;
+  --ui-transit: #6a705f;        /* sage gris (entre primary y muted) */
+  --ui-transit-tint: #ecede8;
 
-  /* --- Superficie (blancos cálidos tipo papel) --- */
+  /* --- Superficie (cremas tipo papel NOBLE) --- */
   --ui-surface: #ffffff;        /* papel base */
-  --ui-surface-2: #fafaf8;      /* papel marfil sutil */
-  --ui-surface-3: #f3f3f0;      /* hover / fila alterna */
+  --ui-surface-2: #F7F6F4;      /* crema NOBLE */
+  --ui-surface-3: #eceae5;      /* hover / sección alterna NOBLE */
 
-  /* --- Texto (4 niveles en escala de grises) --- */
-  --ui-text: #1f1f1f;           /* tinta principal */
-  --ui-text-strong: #0a0a0a;    /* títulos y números clave */
-  --ui-text-muted: #6e6e6e;     /* secundario, metadatos */
-  --ui-text-subtle: #9a9a9a;    /* placeholders, labels muy chicos */
+  /* --- Texto (escala olivácea oscura) --- */
+  --ui-text: #1e2219;           /* tinta principal NOBLE */
+  --ui-text-strong: #14170f;    /* títulos y números clave */
+  --ui-text-muted: #6b6a64;     /* secundario, metadatos */
+  --ui-text-subtle: #a09e96;    /* placeholders, labels muy chicos */
 
-  /* --- Bordes (grises neutros, ritmo claro) --- */
-  --ui-border: #e8e8e4;         /* divisor sutil */
-  --ui-border-strong: #c7c7c2;  /* inputs, botones outline */
+  /* --- Bordes (cremas oscuros, sutiles) --- */
+  --ui-border: #e0ddd6;         /* divisor sutil */
+  --ui-border-strong: #c4c0b6;  /* inputs, botones outline */
 
   /* --- Sombras blandas (núcleo paper design) --- */
   --ui-shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
@@ -52,10 +54,10 @@
   --ui-radius-lg: 8px;
   --ui-radius-pill: 9999px;
 
-  /* --- Tipografía --- */
-  --ui-font-sans: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --ui-font-display: 'Montserrat', 'Roboto', sans-serif;
-  --ui-font-mono: 'PT Mono', 'SF Mono', Menlo, monospace;
+  /* --- Tipografía (NOBLE: Outfit/DM Sans display, Inter body) --- */
+  --ui-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui-font-display: 'Outfit', 'DM Sans', 'Inter', sans-serif;
+  --ui-font-mono: 'IBM Plex Mono', 'PT Mono', 'SF Mono', Menlo, monospace;
 
   /* Escala paper: 14 / 16 / 18 / 24 / 32 / 40 */
   --ui-fs-xs: 14px;
@@ -96,39 +98,39 @@
   --ion-font-family: var(--ui-font-sans);
 
   --ion-color-primary: var(--ui-primary);
-  --ion-color-primary-rgb: 63, 120, 114;
+  --ion-color-primary-rgb: 41, 46, 38;
   --ion-color-primary-contrast: #ffffff;
   --ion-color-primary-contrast-rgb: 255, 255, 255;
   --ion-color-primary-shade: var(--ui-primary-shade);
   --ion-color-primary-tint: var(--ui-primary-tint);
 
   --ion-color-secondary: var(--ui-secondary);
-  --ion-color-secondary-rgb: 111, 94, 140;
+  --ion-color-secondary-rgb: 92, 84, 72;
   --ion-color-secondary-contrast: #ffffff;
   --ion-color-secondary-contrast-rgb: 255, 255, 255;
-  --ion-color-secondary-shade: #5b4d73;
-  --ion-color-secondary-tint: #87779f;
+  --ion-color-secondary-shade: #4a4438;
+  --ion-color-secondary-tint: #7a7064;
 
   --ion-color-success: var(--ui-success);
-  --ion-color-success-rgb: 95, 132, 102;
+  --ion-color-success-rgb: 95, 125, 79;
   --ion-color-success-contrast: #ffffff;
   --ion-color-success-contrast-rgb: 255, 255, 255;
-  --ion-color-success-shade: #4d6c54;
-  --ion-color-success-tint: #79997f;
+  --ion-color-success-shade: #4d6840;
+  --ion-color-success-tint: #7c9370;
 
   --ion-color-warning: var(--ui-warning);
-  --ion-color-warning-rgb: 168, 123, 65;
+  --ion-color-warning-rgb: 180, 83, 9;
   --ion-color-warning-contrast: #ffffff;
   --ion-color-warning-contrast-rgb: 255, 255, 255;
-  --ion-color-warning-shade: #8a6635;
-  --ion-color-warning-tint: #b58e5e;
+  --ion-color-warning-shade: #944307;
+  --ion-color-warning-tint: #c46420;
 
   --ion-color-danger: var(--ui-danger);
-  --ion-color-danger-rgb: 156, 84, 84;
+  --ion-color-danger-rgb: 156, 74, 64;
   --ion-color-danger-contrast: #ffffff;
   --ion-color-danger-contrast-rgb: 255, 255, 255;
-  --ion-color-danger-shade: #80464a;
-  --ion-color-danger-tint: #ad6c6c;
+  --ion-color-danger-shade: #803c34;
+  --ion-color-danger-tint: #ad625a;
 
   --ion-color-medium: var(--ui-text-muted);
   --ion-color-medium-rgb: 110, 110, 110;

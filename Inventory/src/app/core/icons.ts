@@ -49,6 +49,7 @@ import {
   calendarOutline,
   archiveOutline,
   arrowUndoOutline,
+  chatboxEllipsesOutline,
 } from 'ionicons/icons';
 
 /**
@@ -109,5 +110,6 @@ export function registerAppIcons(): void {
     'calendar-outline': calendarOutline,
     'archive-outline': archiveOutline,
     'arrow-undo-outline': arrowUndoOutline,
+    'chatbox-ellipses-outline': chatboxEllipsesOutline,
   });
 }

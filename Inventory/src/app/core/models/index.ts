@@ -8,13 +8,18 @@ export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
 export type AlertPriority = 'high' | 'medium' | 'low';
 /**
  * Roles del sistema:
- *  - admin: gestión completa (todas las pantallas + análisis + miembros + branding)
- *  - production: encargado de producción — órdenes de fabricación, cola, catálogo,
- *    insumos, recetas, inventario, ajustes, órdenes de compra, alertas, boosts
- *  - operator: operario de fabricación — ve recetas (lectura) y cola de
- *    producción; puede iniciar y completar órdenes pero NO cancelarlas.
+ *  - admin (administrativos): acceso total — todas las pantallas + análisis +
+ *    paneles administrativos + miembros + branding + PDFs contables.
+ *  - production (encargado de producción): clientes, pedidos de clientes,
+ *    creación de pedidos, planificación, historial de pedidos y gestión de
+ *    recetas. NO toca inventario ni proveedores.
+ *  - inventory (encargado de inventario): catálogo, insumos, inventario,
+ *    ajustes, mermas, proveedores, órdenes de compra, ingresos y alertas.
+ *    NO toca pedidos de clientes ni paneles administrativos.
+ *  - operator (operario de producción): solo cola de pedidos, planificación
+ *    y recetas en lectura. Ejecuta producción, no toma decisiones.
  */
-export type UserRole = 'admin' | 'production' | 'operator';
+export type UserRole = 'admin' | 'production' | 'inventory' | 'operator';
 export type POStatus = 'pending' | 'received' | 'cancelled';
 
 export interface Member {
@@ -70,8 +75,57 @@ export interface Supply {
   maxStock: number;
   reorderPoint: number;
   leadTime: number;
+  /** Texto libre (legacy) o id del proveedor (`Supplier.id`) si está vinculado. */
   supplier?: string;
+  /** Vínculo opcional a un proveedor estructurado. */
+  supplierId?: string;
   active: boolean;
+}
+
+/**
+ * Item que entrega un proveedor. Puede ser un insumo crudo o un producto
+ * terminado de reventa (productos sin receta). Los productos con receta no
+ * se compran a proveedores: se fabrican internamente.
+ */
+export interface SupplierItem {
+  kind: 'supply' | 'product';
+  itemId: string;
+}
+
+/**
+ * Proveedor estructurado con datos de contacto, lead time y ventanas
+ * semanales de pedido/entrega. Se usa en la pantalla de Proveedores para
+ * planificar reposiciones y en /ingresos para registrar la mercadería que
+ * llega.
+ */
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  /** Días promedio entre que se hace el pedido y se recibe el insumo. */
+  leadTimeDays: number;
+  /**
+   * Días de la semana (0=domingo..6=sábado) en que conviene hacer pedidos a
+   * este proveedor. Si está vacío, cualquier día.
+   */
+  orderDays: number[];
+  /**
+   * Días de la semana en que el proveedor entrega. Si está vacío, cualquier
+   * día.
+   */
+  deliveryDays: number[];
+  /** Términos de pago (texto libre: contado, 30 días, etc.). */
+  paymentTerms?: string;
+  /**
+   * Items (insumos + productos sin receta) que este proveedor entrega.
+   * Se usa para filtrar el selector en /ingresos al elegir un proveedor.
+   */
+  suppliedItems: SupplierItem[];
+  notes?: string;
+  active: boolean;
+  createdAt: Date;
 }
 
 /**

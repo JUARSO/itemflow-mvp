@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DatePipe, DecimalPipe } from '@angular/common';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonButton, IonSegment, IonSegmentButton, IonLabel, IonBadge,
+  IonButton, IonSegment, IonSegmentButton, IonLabel, IonBadge, IonIcon,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
@@ -12,6 +12,7 @@ import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.comp
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { OcFormModalComponent } from './oc-form-modal.component';
+import { NotificarProveedorModalComponent } from './notificar-proveedor-modal.component';
 import { PurchaseOrder, POStatus } from '../../core/models';
 
 type Filter = 'todas' | POStatus;
@@ -24,8 +25,9 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
   imports: [
     DatePipe, DecimalPipe,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-    IonButton, IonSegment, IonSegmentButton, IonLabel, IonBadge,
+    IonButton, IonSegment, IonSegmentButton, IonLabel, IonBadge, IonIcon,
     PageHeaderComponent, KpiCardComponent, ConfirmDialogComponent, OcFormModalComponent,
+    NotificarProveedorModalComponent,
   ],
   template: `
     <ion-header>
@@ -110,6 +112,10 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
               @if (tenant.canManagePurchaseOrders()) {
                 <div class="po__actions">
                   @if (po.status === 'pending') {
+                    <ion-button size="small" color="primary" fill="outline" (click)="notificar(po)">
+                      <ion-icon name="mail-open-outline" slot="start"></ion-icon>
+                      Notificar proveedor
+                    </ion-button>
                     <ion-button size="small" (click)="pedirAccion(po, 'receive')">Marcar recibida</ion-button>
                     <ion-button size="small" fill="clear" class="ghost" (click)="pedirAccion(po, 'cancel')">Cancelar</ion-button>
                   }
@@ -136,6 +142,12 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
         (confirmed)="ejecutarAccion()"
         (cancelled)="confirmOpen.set(false)">
       </app-confirm-dialog>
+
+      <app-notificar-proveedor-modal
+        [isOpen]="notifOpen()"
+        [po]="poNotif()"
+        (closed)="notifOpen.set(false)">
+      </app-notificar-proveedor-modal>
     </ion-content>
   `,
   styles: [`
@@ -239,6 +251,9 @@ export class OrdenesCompraPage {
   readonly poAccion = signal<PurchaseOrder | null>(null);
   readonly accion = signal<ConfirmAction>('receive');
 
+  readonly notifOpen = signal(false);
+  readonly poNotif = signal<PurchaseOrder | null>(null);
+
   readonly visibles = computed(() => {
     const f = this.filter();
     const all = [...this.data.purchaseOrders()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -284,6 +299,11 @@ export class OrdenesCompraPage {
     this.poAccion.set(po);
     this.accion.set(accion);
     this.confirmOpen.set(true);
+  }
+
+  notificar(po: PurchaseOrder) {
+    this.poNotif.set(po);
+    this.notifOpen.set(true);
   }
 
   async ejecutarAccion() {

@@ -6,8 +6,22 @@ import {
 // Combos de roles reutilizables
 const adminOnly = requireRoles('admin');
 const adminOrProduction = requireRoles('admin', 'production');
-/** Cola/recetas accesibles por admin/production/operator */
+/**
+ * Acceso a inventario/compras/proveedores/alertas.
+ * Admin tiene todo, inventory es su dominio principal, y production lo
+ * incluimos porque "ve todo menos panel administrativo".
+ */
+const inventoryAccess = requireRoles('admin', 'production', 'inventory');
+/** Análisis (predicciones, burn-down): admin + production + inventory. */
+const analyticsAccess = requireRoles('admin', 'production', 'inventory');
+/** Catálogo: admin + production + operator (lectura). Inventory NO accede. */
+const catalogAccess = requireRoles('admin', 'production', 'operator');
+/** Cola y planificación: admin, production y operator (operario). */
 const productionOrOperator = requireRoles('admin', 'production', 'operator');
+/** Recetas: admin, production y operator (lectura). Inventory NO accede. */
+const recipesAccess = requireRoles('admin', 'production', 'operator');
+/** Clientes e historial: admin, production y operator (lectura). */
+const customersReadAccess = requireRoles('admin', 'production', 'operator');
 
 export const routes: Routes = [
   // ===== Portal externo del cliente (sin shell, sin auth interna) =====
@@ -31,10 +45,10 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', canActivate: [roleHomeRedirect], children: [] },
 
-      // Clientes (portal management)
+      // Clientes (portal management) — operator entra en lectura
       {
         path: 'clientes',
-        canActivate: [adminOrProduction],
+        canActivate: [customersReadAccess],
         loadComponent: () => import('./features/clientes/clientes.page').then(m => m.ClientesPage),
       },
 
@@ -56,49 +70,61 @@ export const routes: Routes = [
       },
       {
         path: 'historial-pedidos',
-        canActivate: [adminOrProduction],
+        canActivate: [customersReadAccess],
         loadComponent: () => import('./features/historial-pedidos/historial-pedidos.page').then(m => m.HistorialPedidosPage),
       },
 
-      // Inventario y catálogo
+      // Catálogo + recetas (admin + production + operator lectura; inventory NO)
       {
         path: 'catalogo',
-        canActivate: [adminOrProduction],
+        canActivate: [catalogAccess],
         loadComponent: () => import('./features/catalogo/catalogo.page').then(m => m.CatalogoPage),
       },
       {
+        path: 'recetas',
+        canActivate: [recipesAccess],
+        loadComponent: () => import('./features/recetas/recetas.page').then(m => m.RecetasPage),
+      },
+
+      // Inventario (encargado de inventario + admin)
+      {
         path: 'inventario',
-        canActivate: [adminOrProduction],
+        canActivate: [inventoryAccess],
         loadComponent: () => import('./features/inventario/inventario.page').then(m => m.InventarioPage),
       },
       {
         path: 'insumos',
-        canActivate: [adminOrProduction],
+        canActivate: [inventoryAccess],
         loadComponent: () => import('./features/insumos/insumos.page').then(m => m.InsumosPage),
       },
       {
-        path: 'recetas',
-        canActivate: [productionOrOperator],
-        loadComponent: () => import('./features/recetas/recetas.page').then(m => m.RecetasPage),
-      },
-      {
         path: 'ajustes',
-        canActivate: [adminOrProduction],
+        canActivate: [inventoryAccess],
         loadComponent: () => import('./features/ajustes/ajustes.page').then(m => m.AjustesPage),
       },
       {
         path: 'mermas',
-        canActivate: [adminOrProduction],
+        canActivate: [inventoryAccess],
         loadComponent: () => import('./features/mermas/mermas.page').then(m => m.MermasPage),
       },
       {
         path: 'ordenes-compra',
-        canActivate: [adminOrProduction],
+        canActivate: [inventoryAccess],
         loadComponent: () => import('./features/ordenes-compra/ordenes-compra.page').then(m => m.OrdenesCompraPage),
       },
       {
+        path: 'proveedores',
+        canActivate: [inventoryAccess],
+        loadComponent: () => import('./features/proveedores/proveedores.page').then(m => m.ProveedoresPage),
+      },
+      {
+        path: 'ingresos',
+        canActivate: [inventoryAccess],
+        loadComponent: () => import('./features/ingresos/ingresos.page').then(m => m.IngresosPage),
+      },
+      {
         path: 'alertas',
-        canActivate: [adminOrProduction],
+        canActivate: [inventoryAccess],
         loadComponent: () => import('./features/alertas/alertas.page').then(m => m.AlertasPage),
       },
 
@@ -120,12 +146,12 @@ export const routes: Routes = [
       },
       {
         path: 'predicciones',
-        canActivate: [adminOnly],
+        canActivate: [analyticsAccess],
         loadComponent: () => import('./features/predicciones/predicciones.page').then(m => m.PrediccionesPage),
       },
       {
         path: 'burn-down',
-        canActivate: [adminOnly],
+        canActivate: [analyticsAccess],
         loadComponent: () => import('./features/burn-down/burn-down.page').then(m => m.BurnDownPage),
       },
 

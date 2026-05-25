@@ -6,8 +6,9 @@ const STORAGE_KEY = 'itemflow_session_v1';
 
 /** Landing route por defecto para cada rol. */
 const DEFAULT_ROUTE: Record<UserRole, string> = {
-  admin: '/produccion',
+  admin: '/panel-pedidos',
   production: '/produccion',
+  inventory: '/inventario',
   operator: '/produccion',
 };
 
@@ -21,6 +22,7 @@ export class AuthService {
 
   readonly isAdmin = computed(() => this.role() === 'admin');
   readonly isProduction = computed(() => this.role() === 'production');
+  readonly isInventory = computed(() => this.role() === 'inventory');
   readonly isOperator = computed(() => this.role() === 'operator');
 
   constructor() {
