@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DatePipe, DecimalPipe } from '@angular/common';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonButton, IonIcon,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
@@ -11,7 +10,6 @@ import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.comp
 import { CustomerOrder, PurchaseOrder } from '../../core/models';
 
 type RangePreset = 'today' | '7d' | '30d' | '90d' | 'mtd' | 'last_month' | 'custom';
-type PrintMode = 'summary' | 'full';
 
 /**
  * Panel administrativo — Contabilidad.
@@ -26,11 +24,10 @@ type PrintMode = 'summary' | 'full';
   imports: [
     DatePipe, DecimalPipe,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-    IonButton, IonIcon,
     PageHeaderComponent, KpiCardComponent,
   ],
   template: `
-    <ion-header class="no-print">
+    <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
         <ion-title>Panel — Contabilidad</ion-title>
@@ -38,28 +35,14 @@ type PrintMode = 'summary' | 'full';
     </ion-header>
 
     <ion-content>
-      <div class="page" [attr.data-print-mode]="printMode()">
-        <div class="no-print">
-          <app-page-header
-            title="Panel contable"
-            subtitle="Estado de resultados, gastos y ganancias del negocio. Exportable a PDF con un clic.">
-          </app-page-header>
-        </div>
-
-        <!-- Encabezado de impresión -->
-        <div class="print-only print-header">
-          <div>
-            <h1>{{ company().name }}</h1>
-            <div class="print-header__sub">{{ printTitleLabel() }}</div>
-          </div>
-          <div class="print-header__meta mono">
-            <div>Período: {{ fromDate() | date:'dd-MM-yyyy' }} → {{ toDate() | date:'dd-MM-yyyy' }}</div>
-            <div>Generado: {{ now() | date:'dd-MM-yyyy HH:mm' }}</div>
-          </div>
-        </div>
+      <div class="page">
+        <app-page-header
+          title="Panel contable"
+          subtitle="Estado de resultados, gastos y ganancias del negocio.">
+        </app-page-header>
 
         <!-- Filtros -->
-        <div class="filters no-print">
+        <div class="filters">
           <div class="presets">
             @for (p of presets; track p.value) {
               <button class="chip"
@@ -76,16 +59,6 @@ type PrintMode = 'summary' | 'full';
               <label>Hasta</label>
               <input type="date" [value]="toIso()" (change)="setToIso($any($event.target).value)" />
             </div>
-          </div>
-          <div class="exports">
-            <ion-button fill="outline" size="small" (click)="exportPdf('summary')">
-              <ion-icon name="document-text-outline" slot="start"></ion-icon>
-              PDF resumen
-            </ion-button>
-            <ion-button fill="outline" size="small" (click)="exportPdf('full')">
-              <ion-icon name="document-text-outline" slot="start"></ion-icon>
-              PDF contable completo
-            </ion-button>
           </div>
         </div>
 
@@ -173,7 +146,7 @@ type PrintMode = 'summary' | 'full';
         </section>
 
         <!-- Detalle de pedidos (full PDF) -->
-        <section class="block detail-only">
+        <section class="block">
           <h2 class="block__title">Detalle de pedidos confirmados</h2>
           @if (confirmedInRange().length === 0) {
             <p class="empty">Sin pedidos en el período.</p>
@@ -223,7 +196,7 @@ type PrintMode = 'summary' | 'full';
         </section>
 
         <!-- Detalle de mermas (full PDF) -->
-        <section class="block detail-only">
+        <section class="block">
           <h2 class="block__title">Detalle de mermas procesadas</h2>
           @if (mermaLotsInRange().length === 0) {
             <p class="empty">Sin mermas en el período.</p>
@@ -264,7 +237,7 @@ type PrintMode = 'summary' | 'full';
         </section>
 
         <!-- Detalle de gastos en compras (full PDF) -->
-        <section class="block detail-only">
+        <section class="block">
           <h2 class="block__title">Detalle de gastos en compras (OCs recibidas)</h2>
           @if (receivedPOs().length === 0) {
             <p class="empty">Sin órdenes de compra recibidas en el período.</p>
@@ -337,8 +310,6 @@ type PrintMode = 'summary' | 'full';
       font-family: var(--ui-font-sans);
       font-size: var(--ui-fs-xs);
     }
-    .exports { display: flex; gap: 6px; margin-left: auto; }
-
     .kpis {
       display: grid; grid-template-columns: repeat(4, 1fr);
       gap: var(--ui-sp-3); padding: 0 0 var(--ui-sp-3);
@@ -392,57 +363,11 @@ type PrintMode = 'summary' | 'full';
     }
     .acc tr.separator td { padding: 0; border: none; height: 8px; background: transparent; }
     .acc--detail th, .acc--detail td { font-size: var(--ui-fs-xs); padding: 6px 8px; }
-
-    /* === IMPRESIÓN === */
-    .print-only { display: none; }
-    .print-header {
-      padding: 0 0 var(--ui-sp-3);
-      border-bottom: 2px solid var(--ui-text);
-      margin-bottom: var(--ui-sp-3);
-    }
-    .print-header h1 {
-      margin: 0; font-family: var(--ui-font-display);
-      font-weight: var(--ui-fw-black); font-size: 22pt;
-    }
-    .print-header__sub { font-size: 12pt; color: var(--ui-text-muted); margin-top: 2px; }
-    .print-header__meta { font-size: 10pt; color: var(--ui-text-muted); text-align: right; }
-
-    .page[data-print-mode="summary"] .detail-only { display: none; }
-
-    @media print {
-      :host { background: #fff; }
-      .no-print { display: none !important; }
-      .print-only { display: block !important; }
-      .print-header {
-        display: flex !important;
-        justify-content: space-between;
-        align-items: flex-start;
-      }
-      ion-content { --background: #fff; }
-      ion-content::part(background) { background: #fff; }
-      .page { padding: 0; background: #fff; }
-      .block {
-        box-shadow: none;
-        border: 1px solid #333;
-        page-break-inside: avoid;
-        margin-bottom: 12pt;
-      }
-      .kpis { grid-template-columns: repeat(4, 1fr) !important; gap: 8pt; }
-      .acc th {
-        background: #000 !important; color: #fff !important;
-        -webkit-print-color-adjust: exact; print-color-adjust: exact;
-      }
-      .acc .pos { color: #006400 !important; }
-      .acc .neg { color: #8B0000 !important; }
-    }
   `],
 })
 export class PanelContablePage {
   protected readonly data = inject(DataService);
   protected readonly tenant = inject(TenantContextService);
-
-  readonly company = computed(() => this.tenant.company());
-  readonly now = signal(new Date());
 
   readonly presets: { value: RangePreset; label: string }[] = [
     { value: 'today', label: 'Hoy' },
@@ -458,11 +383,6 @@ export class PanelContablePage {
   readonly toDate = signal<Date>(this.endOfToday());
   readonly fromIso = computed(() => this.dateToIso(this.fromDate()));
   readonly toIso = computed(() => this.dateToIso(this.toDate()));
-
-  readonly printMode = signal<PrintMode>('summary');
-  readonly printTitleLabel = computed(() =>
-    this.printMode() === 'summary' ? 'Resumen contable' : 'Reporte contable completo'
-  );
 
   readonly ordersInRange = computed(() => {
     const from = this.fromDate().getTime();
@@ -550,12 +470,6 @@ export class PanelContablePage {
     if (Math.abs(v) >= 1_000_000) return '₡' + (v / 1_000_000).toFixed(1) + 'M';
     if (Math.abs(v) >= 10_000) return '₡' + (v / 1000).toFixed(1) + 'K';
     return '₡' + new Intl.NumberFormat('es-CR', { maximumFractionDigits: 0 }).format(v);
-  }
-
-  exportPdf(mode: PrintMode) {
-    this.printMode.set(mode);
-    this.now.set(new Date());
-    setTimeout(() => window.print(), 100);
   }
 
   setPreset(p: RangePreset) {

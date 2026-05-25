@@ -97,7 +97,7 @@ import { BrandingService } from '../../core/services/branding.service';
             </a>
             <a routerLink="/panel-contable" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="cash-outline"></ion-icon>
-              <span class="menu-item__label">Contabilidad y PDFs</span>
+              <span class="menu-item__label">Contabilidad</span>
             </a>
           }
 
