@@ -46,7 +46,7 @@ const REASON_OPTIONS: { value: ProductionMermaReason; label: string }[] = [
           </ion-toolbar>
         </ion-header>
         <ion-content>
-          <form class="form" (ngSubmit)="save()">
+          <div class="form">
             <div class="hint">
               Registra unidades que se descartaron durante la fabricación.
               Los insumos consumidos se restarán del inventario automáticamente.
@@ -58,14 +58,14 @@ const REASON_OPTIONS: { value: ProductionMermaReason; label: string }[] = [
               <select [value]="productId()" (change)="productId.set($any($event.target).value)" required>
                 <option value="">— Selecciona producto —</option>
                 @for (p of productos(); track p.id) {
-                  <option [value]="p.id">{{ p.name }} ({{ p.unit }})</option>
+                  <option [value]="p.id">{{ p.name }}</option>
                 }
               </select>
             </div>
 
             <div class="row">
               <div class="field">
-                <label>Cantidad mermada</label>
+                <label>Cantidad (unidades)</label>
                 <input type="number" min="1" step="1"
                   [value]="qty()"
                   (input)="setQty($any($event.target).value)"
@@ -129,11 +129,11 @@ const REASON_OPTIONS: { value: ProductionMermaReason; label: string }[] = [
 
             <div class="actions">
               <ion-button fill="outline" (click)="closed.emit()">Cancelar</ion-button>
-              <ion-button type="submit" color="danger" [disabled]="!canSave()">
+              <ion-button color="danger" [disabled]="!canSave()" (click)="save()">
                 Registrar merma
               </ion-button>
             </div>
-          </form>
+          </div>
         </ion-content>
       </ng-template>
     </ion-modal>

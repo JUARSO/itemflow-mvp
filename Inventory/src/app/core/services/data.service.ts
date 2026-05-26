@@ -1669,7 +1669,9 @@ export class DataService {
           kind: 'customer_return',
           productId: it.productId,
           productName: it.productName,
-          unit: it.unit,
+          // Las mermas se manejan siempre en unidades, independientemente de
+          // la unidad de medida del producto.
+          unit: 'unidad',
           qty: diff,
           mermaQty: 0,
           sourceOrderId: order.id,
@@ -1861,7 +1863,9 @@ export class DataService {
       kind: 'production',
       productId: input.productId,
       productName: product.name,
-      unit: product.unit,
+      // Las mermas se manejan siempre en unidades, independientemente de
+      // la unidad de medida del producto.
+      unit: 'unidad',
       qty: input.qty,
       mermaQty: input.qty,
       productionReason: input.reason,

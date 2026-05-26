@@ -100,7 +100,7 @@ const PROD_REASON_LABELS: Record<ProductionMermaReason, string> = {
                     <div class="card__product">{{ lot.productName }}</div>
                     <div class="card__source mono">{{ lot.sourceOrderCode }}</div>
                   </div>
-                  <ion-badge color="warning">{{ lot.qty }} {{ lot.unit }}</ion-badge>
+                  <ion-badge color="warning">{{ lot.qty }} {{ unidLabel(lot.qty) }}</ion-badge>
                 </header>
 
                 <div class="card__meta">
@@ -128,7 +128,7 @@ const PROD_REASON_LABELS: Record<ProductionMermaReason, string> = {
                       <div class="cost-banner__value mono">
                         ₡{{ lotCost(lot) | number:'1.0-0' }}
                         <span class="cost-banner__unit">
-                          ({{ unitCost(lot.productId) | number:'1.0-2' }} / {{ lot.unit }})
+                          ({{ unitCost(lot.productId) | number:'1.0-2' }} / unidad)
                         </span>
                       </div>
                     </div>
@@ -216,20 +216,20 @@ const PROD_REASON_LABELS: Record<ProductionMermaReason, string> = {
                   <div class="hist-card__breakdown">
                     <div class="hist-card__chunk hist-card__chunk--total">
                       <span class="muted">{{ lot.kind === 'production' ? 'Fabricado' : 'Devuelto' }}</span>
-                      <span class="mono">{{ lot.qty }} {{ lot.unit }}</span>
+                      <span class="mono">{{ lot.qty }} {{ unidLabel(lot.qty) }}</span>
                       <span class="mono sub">₡{{ lotCost(lot) | number:'1.0-0' }}</span>
                     </div>
                     @if (lot.mermaQty > 0) {
                       <div class="hist-card__chunk hist-card__chunk--merma">
                         <span class="muted">Merma ({{ pctOf(lot.mermaQty, lot.qty) }}%)</span>
-                        <span class="mono">−{{ lot.mermaQty }} {{ lot.unit }}</span>
+                        <span class="mono">−{{ lot.mermaQty }} {{ unidLabel(lot.mermaQty) }}</span>
                         <span class="mono sub">−₡{{ mermaCost(lot) | number:'1.0-0' }}</span>
                       </div>
                     }
                     @if (usableQty(lot) > 0) {
                       <div class="hist-card__chunk hist-card__chunk--ok">
                         <span class="muted">Reintegrado ({{ 100 - pctOf(lot.mermaQty, lot.qty) }}%)</span>
-                        <span class="mono">+{{ usableQty(lot) }} {{ lot.unit }}</span>
+                        <span class="mono">+{{ usableQty(lot) }} {{ unidLabel(usableQty(lot)) }}</span>
                         <span class="mono sub">+₡{{ usableCost(lot) | number:'1.0-0' }}</span>
                       </div>
                     }
@@ -260,7 +260,7 @@ const PROD_REASON_LABELS: Record<ProductionMermaReason, string> = {
       <app-merma-produccion-modal
         [isOpen]="prodModalOpen()"
         (closed)="prodModalOpen.set(false)"
-        (saved)="prodModalOpen.set(false)">
+        (saved)="onProdMermaSaved()">
       </app-merma-produccion-modal>
     </ion-content>
   `,
@@ -610,6 +610,21 @@ export class MermasPage {
   pctOf(part: number, total: number): number {
     if (total <= 0) return 0;
     return Math.round((part / total) * 100);
+  }
+
+  /**
+   * Al guardar una merma de producción cerramos el modal y saltamos al
+   * tab "Histórico" — la merma de producción se crea ya en `reviewed`
+   * (todo es pérdida), así que vive ahí, no en "Pendientes".
+   */
+  onProdMermaSaved() {
+    this.prodModalOpen.set(false);
+    this.tab.set('history');
+  }
+
+  /** Pluraliza la palabra "unidad" según la cantidad. */
+  unidLabel(qty: number): string {
+    return qty === 1 ? 'unidad' : 'unidades';
   }
 
   prodReasonLabel(lot: ReturnedLot): string {
