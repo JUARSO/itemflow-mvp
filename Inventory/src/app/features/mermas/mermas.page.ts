@@ -2,16 +2,26 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DatePipe, DecimalPipe } from '@angular/common';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonIcon, IonBadge, IonSegment, IonSegmentButton, IonLabel,
+  IonIcon, IonBadge, IonSegment, IonSegmentButton, IonLabel, IonButton,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
-import { ReturnedLot } from '../../core/models';
+import { MermaProduccionModalComponent } from './merma-produccion-modal.component';
+import { ReturnedLot, ProductionMermaReason } from '../../core/models';
 
 type Tab = 'pending' | 'history';
+
+const PROD_REASON_LABELS: Record<ProductionMermaReason, string> = {
+  damaged: 'Dañado',
+  underbaked: 'Crudo',
+  overbaked: 'Quemado',
+  wrong_shape: 'Mal formado',
+  contaminated: 'Contaminado',
+  other: 'Otro',
+};
 
 /**
  * Pantalla de Mermas: bandeja de productos devueltos por clientes
@@ -31,8 +41,8 @@ type Tab = 'pending' | 'history';
   imports: [
     DatePipe, DecimalPipe,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-    IonIcon, IonBadge, IonSegment, IonSegmentButton, IonLabel,
-    PageHeaderComponent, KpiCardComponent,
+    IonIcon, IonBadge, IonSegment, IonSegmentButton, IonLabel, IonButton,
+    PageHeaderComponent, KpiCardComponent, MermaProduccionModalComponent,
   ],
   template: `
     <ion-header>
@@ -45,7 +55,11 @@ type Tab = 'pending' | 'history';
     <ion-content>
       <app-page-header
         title="Mermas y devoluciones"
-        subtitle="Productos que los clientes devolvieron. Decide cuántas unidades descartar y cuántas reintegrar al inventario.">
+        subtitle="Devoluciones de clientes (decide cuánto descartar) y mermas de producción (productos que fallaron al fabricarse).">
+        <ion-button color="danger" (click)="prodModalOpen.set(true)">
+          <ion-icon name="add-outline" slot="start"></ion-icon>
+          Merma de producción
+        </ion-button>
       </app-page-header>
 
       <div class="kpis">
@@ -182,15 +196,26 @@ type Tab = 'pending' | 'history';
                 [class.hist-card--reused]="lot.mermaQty === 0">
                 <div class="hist-card__main">
                   <div>
-                    <div class="hist-card__product">{{ lot.productName }}</div>
+                    <div class="hist-card__product">
+                      {{ lot.productName }}
+                      @if (lot.kind === 'production') {
+                        <ion-badge color="danger" class="kind-badge">Producción</ion-badge>
+                      } @else {
+                        <ion-badge color="medium" class="kind-badge">Cliente</ion-badge>
+                      }
+                    </div>
                     <div class="hist-card__source">
-                      <span class="mono">{{ lot.sourceOrderCode }}</span>
-                      @if (lot.customerName) { · {{ lot.customerName }} }
+                      @if (lot.kind === 'production') {
+                        <span>{{ prodReasonLabel(lot) }}</span>
+                      } @else {
+                        <span class="mono">{{ lot.sourceOrderCode }}</span>
+                        @if (lot.customerName) { · {{ lot.customerName }} }
+                      }
                     </div>
                   </div>
                   <div class="hist-card__breakdown">
                     <div class="hist-card__chunk hist-card__chunk--total">
-                      <span class="muted">Devuelto</span>
+                      <span class="muted">{{ lot.kind === 'production' ? 'Fabricado' : 'Devuelto' }}</span>
                       <span class="mono">{{ lot.qty }} {{ lot.unit }}</span>
                       <span class="mono sub">₡{{ lotCost(lot) | number:'1.0-0' }}</span>
                     </div>
@@ -231,6 +256,12 @@ type Tab = 'pending' | 'history';
           </div>
         }
       }
+
+      <app-merma-produccion-modal
+        [isOpen]="prodModalOpen()"
+        (closed)="prodModalOpen.set(false)"
+        (saved)="prodModalOpen.set(false)">
+      </app-merma-produccion-modal>
     </ion-content>
   `,
   styles: [`
@@ -446,7 +477,10 @@ type Tab = 'pending' | 'history';
     .hist-card__product {
       font-weight: var(--ui-fw-black);
       font-size: var(--ui-fs-md);
+      display: flex; align-items: center; gap: 6px;
+      flex-wrap: wrap;
     }
+    .kind-badge { font-size: 9px; letter-spacing: 0.5px; }
     .hist-card__source {
       font-size: var(--ui-fs-xs);
       color: var(--ui-text-muted);
@@ -501,6 +535,7 @@ export class MermasPage {
   private readonly toast = inject(ToastService);
 
   readonly tab = signal<Tab>('pending');
+  readonly prodModalOpen = signal(false);
 
   /** Borrador local de merma por lote: lotId → cantidad. */
   readonly mermaDrafts = signal<Record<string, number>>({});
@@ -575,6 +610,14 @@ export class MermasPage {
   pctOf(part: number, total: number): number {
     if (total <= 0) return 0;
     return Math.round((part / total) * 100);
+  }
+
+  prodReasonLabel(lot: ReturnedLot): string {
+    if (lot.kind !== 'production' || !lot.productionReason) return '';
+    const base = PROD_REASON_LABELS[lot.productionReason];
+    return lot.productionReason === 'other' && lot.productionReasonText
+      ? `${base}: ${lot.productionReasonText}`
+      : base;
   }
 
   reviewNote(lotId: string): string {

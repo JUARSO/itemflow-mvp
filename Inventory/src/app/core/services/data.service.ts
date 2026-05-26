@@ -1,7 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import {
   Alert, Customer, CustomerOrder, DemandPrediction, KardexEntry, Member,
-  OrderItem, OrderReservation, OrderShortfall, Product,
+  OrderItem, OrderReservation, OrderShortfall, Product, ProductionMermaReason,
   PurchaseOrder, Recipe, ReturnedLot, SaleRecord, StockItem,
   Supplier, Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
 } from '../models';
@@ -1666,6 +1666,7 @@ export class DataService {
       if (diff > 0) {
         const lot: ReturnedLot = {
           id: `lot-${Date.now()}-${it.productId}-${Math.random().toString(36).slice(2, 7)}`,
+          kind: 'customer_return',
           productId: it.productId,
           productName: it.productName,
           unit: it.unit,
@@ -1770,6 +1771,110 @@ export class DataService {
     this._returnedLots.update(list => list.map(l => l.id === lotId ? reviewed : l));
     this.regenerateRestockAlerts();
     return reviewed;
+  }
+
+  /**
+   * Registra una merma de producción: X unidades de un producto fallaron
+   * durante la fabricación y no se pueden vender. NO toca el stock del
+   * producto (las unidades nunca entraron a inventario), pero sí descuenta
+   * del stock de insumos lo que se gastó produciéndolas (vía `explodeBom`)
+   * y registra esas salidas en el kardex con reason `lost`. El lote se
+   * crea ya en estado `reviewed` (toda la qty es merma).
+   */
+  registerProductionMerma(input: {
+    productId: string;
+    qty: number;
+    reason: ProductionMermaReason;
+    reasonText?: string;
+    reviewNote?: string;
+    userId: string;
+    userName: string;
+  }): ReturnedLot {
+    const product = this.productById(input.productId);
+    if (!product) throw new Error('Producto no encontrado.');
+    if (input.qty <= 0) throw new Error('La cantidad debe ser mayor a cero.');
+
+    const now = new Date();
+    const noteFragments = [
+      `Merma producción — ${product.name}`,
+      input.reasonText ? `Detalle: ${input.reasonText}` : '',
+      input.reviewNote ? `Nota: ${input.reviewNote}` : '',
+    ].filter(Boolean);
+    const kardexNote = noteFragments.join(' · ');
+
+    // Descontar insumos consumidos en la fabricación fallida (solo si tiene receta)
+    if (product.hasRecipe) {
+      const exploded = this.explodeBom(input.productId, input.qty);
+      for (const need of exploded.supplyNeeds) {
+        const stock = this.supplyStockFor(need.supplyId);
+        const supply = this.supplyById(need.supplyId);
+        if (!stock || !supply) continue;
+        const newQty = Math.max(0, stock.quantity - need.qty);
+        const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
+        this._supplyStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${need.supplyId}-merma-${Math.random().toString(36).slice(2, 6)}`,
+          supplyId: need.supplyId,
+          itemName: need.itemName,
+          type: 'out',
+          qty: need.qty,
+          balance: newQty,
+          cost: supply.cost,
+          reason: 'lost',
+          note: kardexNote,
+          userId: input.userId,
+          userName: input.userName,
+          at: now,
+        });
+      }
+      // Subproductos (reventa interna usada en receta)
+      for (const need of exploded.reventaNeeds) {
+        const stock = this.productStockFor(need.productId);
+        const subProd = this.productById(need.productId);
+        if (!stock || !subProd) continue;
+        const newQty = Math.max(0, stock.quantity - need.qty);
+        const newStatus = this.computeProductStatus(newQty, subProd.reorderPoint, subProd.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.id === stock.id ? { ...s, quantity: newQty, status: newStatus } : s
+        ));
+        this.registerKardexEntry({
+          id: `k-${Date.now()}-${need.productId}-merma-${Math.random().toString(36).slice(2, 6)}`,
+          productId: need.productId,
+          itemName: need.itemName,
+          type: 'out',
+          qty: need.qty,
+          balance: newQty,
+          cost: subProd.buyPrice,
+          reason: 'lost',
+          note: kardexNote,
+          userId: input.userId,
+          userName: input.userName,
+          at: now,
+        });
+      }
+    }
+
+    const lot: ReturnedLot = {
+      id: `lot-${Date.now()}-${input.productId}-prod-${Math.random().toString(36).slice(2, 6)}`,
+      kind: 'production',
+      productId: input.productId,
+      productName: product.name,
+      unit: product.unit,
+      qty: input.qty,
+      mermaQty: input.qty,
+      productionReason: input.reason,
+      productionReasonText: input.reasonText?.trim() || undefined,
+      reviewNote: input.reviewNote?.trim() || undefined,
+      createdAt: now,
+      status: 'reviewed',
+      reviewedAt: now,
+      reviewedBy: input.userName,
+    };
+    this._returnedLots.update(list => [lot, ...list]);
+    this.regenerateRestockAlerts();
+    return lot;
   }
 
   // ============================================================

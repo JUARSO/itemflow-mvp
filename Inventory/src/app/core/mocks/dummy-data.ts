@@ -748,6 +748,7 @@ export const MOCK_SUPPLIERS: Supplier[] = [
 export const MOCK_RETURNED_LOTS: ReturnedLot[] = [
   {
     id: 'lot-ord9-croissant',
+    kind: 'customer_return',
     productId: 'p-croissant',
     productName: 'Croissant au beurre',
     unit: 'unidad',
@@ -760,5 +761,22 @@ export const MOCK_RETURNED_LOTS: ReturnedLot[] = [
     customerNote: '4 croissants llegaron quebrados, los devolvimos',
     createdAt: daysAgo(2),
     status: 'pending',
+  },
+  // Ejemplo de merma de producción: 3 baguettes que se quemaron al hornear
+  {
+    id: 'lot-prod-baguette-1',
+    kind: 'production',
+    productId: 'p-baguette',
+    productName: 'Baguette de masa madre',
+    unit: 'unidad',
+    qty: 3,
+    mermaQty: 3,
+    productionReason: 'overbaked',
+    productionReasonText: undefined,
+    reviewNote: 'Horno quedó 15 min de más, corteza muy oscura',
+    createdAt: daysAgo(1),
+    status: 'reviewed',
+    reviewedAt: daysAgo(1),
+    reviewedBy: 'Sofía Rojas',
   },
 ];

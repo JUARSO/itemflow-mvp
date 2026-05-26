@@ -186,39 +186,63 @@ export interface KardexEntry {
 }
 
 /**
- * Lote devuelto por un cliente, pendiente de decidir cuánto es merma
- * (descarte) y cuánto vuelve al inventario como producto utilizable.
+ * Origen del lote de merma:
+ *  - `customer_return`: cliente devolvió unidades al recibir.
+ *  - `production`: fallaron durante la fabricación antes de salir a entrega.
+ */
+export type MermaKind = 'customer_return' | 'production';
+
+/** Motivo común de una merma de producción (panadería). */
+export type ProductionMermaReason =
+  | 'damaged'        // dañado/quebrado al manipular
+  | 'underbaked'     // crudo / poco cocido
+  | 'overbaked'      // quemado / sobrecocido
+  | 'wrong_shape'    // mal formado / con defecto visual
+  | 'contaminated'   // contaminado
+  | 'other';
+
+/**
+ * Lote de merma. Dos orígenes según `kind`:
  *
- * Flujo:
- *  - Cliente confirma recepción con `receivedQty < fulfilledQty`. La diferencia
- *    NO se añade al stock inmediatamente — se crea un lote `pending`.
- *  - En la pantalla de Mermas el admin revisa el lote y procesa:
- *      mermaQty = cuántas unidades descartar (0..qty)
- *      usableQty = qty - mermaQty  → se agregan al stock como producto
- *      utilizable (kardex `in` con reason `return_from_customer`).
- *    El lote queda `reviewed`.
+ * 1. `customer_return`: cliente confirmó recepción con `receivedQty < fulfilledQty`.
+ *    La diferencia NO se añade al stock inmediatamente — se crea un lote `pending`.
+ *    En /mermas el admin decide cuánto descartar y cuánto reintegrar al stock.
+ *
+ * 2. `production`: durante la fabricación X unidades fallaron y no pueden
+ *    venderse. Se registra directo en estado `reviewed` (mermaQty = qty,
+ *    todo es pérdida). Los insumos consumidos en esas unidades se descuentan
+ *    del stock vía kardex `out` reason `lost`. El stock del producto NO se
+ *    toca (las unidades nunca entraron al inventario).
  */
 export interface ReturnedLot {
   id: string;
+  kind: MermaKind;
   productId: string;
   productName: string;
   unit: Unit;
-  /** Unidades devueltas (igual a fulfilledQty - receivedQty del pedido). */
+  /** Unidades afectadas (devueltas por cliente o producidas y descartadas). */
   qty: number;
-  /** Unidades marcadas como merma al procesar el lote. */
+  /** Unidades marcadas como merma. */
   mermaQty: number;
-  sourceOrderId: string;
-  sourceOrderCode: string;
-  customerId?: string;
-  customerName?: string;
-  /** Nota que dejó el cliente al confirmar la recepción. */
-  customerNote?: string;
   createdAt: Date;
   status: 'pending' | 'reviewed';
   reviewedAt?: Date;
   reviewedBy?: string;
-  /** Nota interna que dejó el admin al procesar la merma. */
+  /** Nota interna del revisor. */
   reviewNote?: string;
+
+  // ----- Solo para `kind === 'customer_return'` -----
+  sourceOrderId?: string;
+  sourceOrderCode?: string;
+  customerId?: string;
+  customerName?: string;
+  /** Nota del cliente al confirmar la recepción. */
+  customerNote?: string;
+
+  // ----- Solo para `kind === 'production'` -----
+  productionReason?: ProductionMermaReason;
+  /** Texto libre cuando productionReason === 'other'. */
+  productionReasonText?: string;
 }
 
 export interface SaleRecord {
