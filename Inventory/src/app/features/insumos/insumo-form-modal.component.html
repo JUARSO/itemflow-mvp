@@ -1,0 +1,174 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      [title]="editing() ? 'Editar insumo' : 'Nuevo insumo'"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <app-form-field label="SKU" [required]="true">
+          <input type="text" formControlName="sku" class="mono" />
+        </app-form-field>
+
+        <app-form-field label="Nombre" [required]="true">
+          <input type="text" formControlName="name" />
+        </app-form-field>
+
+        <app-form-field label="Categoría">
+          <input type="text" formControlName="category" placeholder="Ej. Cereales" />
+        </app-form-field>
+
+        <!-- Presentación comercial: cómo se compra/maneja en la práctica -->
+        <app-form-field
+          label="Presentación de compra"
+          hint="Cómo viene empaquetado el insumo del proveedor. Ej: 'saco' de 25 kg.">
+          <div class="presentation-row">
+            <div class="presentation-row__qty">
+              <label class="presentation-row__sublabel">Tamaño</label>
+              <input type="number" min="0" step="0.001"
+                formControlName="presentationSize"
+                placeholder="25" />
+            </div>
+            <div class="presentation-row__base">
+              <label class="presentation-row__sublabel">Unidad base</label>
+              <select formControlName="unit">
+                @for (g of unitGroups; track g) {
+                  <optgroup [label]="g">
+                    @for (u of unitsGrouped[g]; track u.value) {
+                      <option [value]="u.value">{{ u.label }}</option>
+                    }
+                  </optgroup>
+                }
+              </select>
+            </div>
+            <div class="presentation-row__label">
+              <label class="presentation-row__sublabel">Etiqueta</label>
+              <input type="text"
+                formControlName="presentationLabel"
+                placeholder="saco / caja / bolsa…" />
+            </div>
+          </div>
+          @if (presentation(); as p) {
+            <small class="presentation-preview">
+              1 <strong>{{ p.label }}</strong> = {{ p.size }} {{ currentUnit() }}
+            </small>
+          } @else {
+            <small class="muted">Si no usás presentación, los stocks se manejan en la unidad base ({{ currentUnit() }}).</small>
+          }
+        </app-form-field>
+
+        <app-form-field
+          label="Proveedores"
+          [required]="true"
+          hint="Un insumo debe tener al menos un proveedor. Podés asignarle un precio distinto a cada uno.">
+          @if (data.activeSuppliers().length === 0) {
+            <small class="muted error">
+              No hay proveedores registrados. Creá uno en la sección Proveedores antes de continuar.
+            </small>
+          } @else {
+            <div class="suppliers"
+              [class.suppliers--invalid]="selectedEntries().length === 0">
+              @for (s of data.activeSuppliers(); track s.id) {
+                <button type="button"
+                  class="supplier-chip"
+                  [class.supplier-chip--on]="isSelected(s.id)"
+                  (click)="toggleSupplier(s.id)">
+                  {{ s.name }}
+                </button>
+              }
+            </div>
+            @if (selectedEntries().length === 0) {
+              <small class="muted error">
+                Seleccioná al menos un proveedor — es obligatorio.
+              </small>
+            }
+
+            @if (selectedEntries().length > 0) {
+              <div class="prices">
+                <div class="prices__head">
+                  <span>Precio unitario por proveedor</span>
+                  <small>se usa al generar OC; vacío = usa el costo global</small>
+                </div>
+                @for (e of selectedEntries(); track e.supplierId) {
+                  <div class="prices__row">
+                    <span class="prices__name">{{ supplierName(e.supplierId) }}</span>
+                    <div class="prices__input">
+                      <span class="prices__currency">₡</span>
+                      <input type="number" min="0" step="0.01"
+                        [value]="e.unitCost ?? ''"
+                        placeholder="Costo global"
+                        (input)="setPrice(e.supplierId, $any($event.target).value)" />
+                    </div>
+                  </div>
+                }
+                @if (avgPrice() != null) {
+                  <div class="prices__avg">
+                    <span>Promedio de {{ pricedCount() }} proveedor(es)</span>
+                    <strong class="mono">₡{{ avgPrice() | number:'1.0-2' }}</strong>
+                  </div>
+                  <small class="muted">
+                    Este promedio se usará como costo unitario del insumo (sobrescribe el valor manual).
+                  </small>
+                }
+              </div>
+            }
+          }
+        </app-form-field>
+
+        <app-form-field
+          label="Costo unitario"
+          [hint]="costHint()">
+          <input type="number"
+            [value]="effectiveCost()"
+            readonly
+            class="cost-readonly mono" />
+        </app-form-field>
+
+        <!-- Stock min/max/reorden en presentaciones cuando aplica -->
+        <div class="row">
+          <app-form-field
+            [label]="minStockLabel()"
+            [required]="true"
+            hint="Bajo esto = crítico">
+            <input type="number" formControlName="minStock" min="0" [step]="stockStepValue()" />
+            @if (minStockEq(); as eq) {
+              <small class="muted">= {{ eq }}</small>
+            }
+          </app-form-field>
+          <app-form-field
+            [label]="maxStockLabel()"
+            [required]="true"
+            hint="Sobre esto = exceso">
+            <input type="number" formControlName="maxStock" min="0" [step]="stockStepValue()" />
+            @if (maxStockEq(); as eq) {
+              <small class="muted">= {{ eq }}</small>
+            }
+          </app-form-field>
+        </div>
+
+        <app-form-field
+          [label]="reorderPointLabel()"
+          [required]="true">
+          <input type="number" formControlName="reorderPoint" min="0" [step]="stockStepValue()" />
+          @if (reorderPointEq(); as eq) {
+            <small class="muted">= {{ eq }}</small>
+          }
+        </app-form-field>
+
+        @if (stocksError(); as err) {
+          <div class="stocks-error">
+            <ion-icon name="warning-outline"></ion-icon>
+            <span>{{ err }}</span>
+          </div>
+        }
+
+        <app-form-field label="Descripción">
+          <textarea formControlName="description" rows="2"></textarea>
+        </app-form-field>
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid || selectedEntries().length === 0 || stocksError() !== null">
+          {{ editing() ? 'Guardar cambios' : 'Crear insumo' }}
+        </ion-button>
+      </div>
+    </app-form-modal>

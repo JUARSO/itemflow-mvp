@@ -2,7 +2,7 @@ import {
   Member, Company, Product, Supply, Supplier, Recipe,
   StockItem, SupplyStockItem, KardexEntry, SaleRecord,
   Alert, DemandPrediction, PurchaseOrder, CustomerOrder, Customer,
-  ReturnedLot,
+  ReturnedLot, Urna, UrnaLote,
 } from '../models';
 
 export const MOCK_COMPANY: Company = {
@@ -15,27 +15,26 @@ export const MOCK_COMPANY: Company = {
 
 export const MOCK_MEMBERS: Member[] = [
   { uid: 'u-admin', email: 'admin@noble.cr', displayName: 'María González', role: 'admin', active: true },
-  { uid: 'u-produccion', email: 'produccion@noble.cr', displayName: 'Sofía Rojas', role: 'production', active: true },
-  { uid: 'u-inventario', email: 'inventario@noble.cr', displayName: 'Diego Soto', role: 'inventory', active: true },
-  { uid: 'u-operario', email: 'operario@noble.cr', displayName: 'Carlos Mora', role: 'operator', active: true },
+  { uid: 'u-produccion', email: 'produccion@noble.cr', displayName: 'Diego Soto', role: 'produccion', active: true },
+  { uid: 'u-ventas', email: 'ventas@noble.cr', displayName: 'Sofía Rojas', role: 'ventas', active: true },
 ];
 
 export const MOCK_SUPPLIES: Supply[] = [
-  { id: 's-harina', sku: 'INS-HARINA-001', name: 'Harina de trigo', category: 'Cereales', unit: 'kg', cost: 850, minStock: 20, maxStock: 200, reorderPoint: 50, leadTime: 3, supplier: 'Molinos del Sur', active: true },
-  { id: 's-azucar', sku: 'INS-AZUCAR-001', name: 'Azúcar granulada', category: 'Endulzantes', unit: 'kg', cost: 950, minStock: 10, maxStock: 100, reorderPoint: 25, leadTime: 2, supplier: 'IANSA', active: true },
-  { id: 's-sal', sku: 'INS-SAL-001', name: 'Sal de mesa', category: 'Sazonadores', unit: 'kg', cost: 600, minStock: 3, maxStock: 30, reorderPoint: 8, leadTime: 2, supplier: 'Lobos', active: true },
-  { id: 's-levadura', sku: 'INS-LEVADURA-001', name: 'Levadura fresca', category: 'Leudantes', unit: 'kg', cost: 4200, minStock: 2, maxStock: 15, reorderPoint: 5, leadTime: 1, supplier: 'Lefersa', active: true },
-  { id: 's-mantequilla', sku: 'INS-MANTEQ-001', name: 'Mantequilla sin sal', category: 'Lácteos', unit: 'kg', cost: 7500, minStock: 5, maxStock: 40, reorderPoint: 12, leadTime: 2, supplier: 'Soprole', active: true },
-  { id: 's-huevos', sku: 'INS-HUEVO-001', name: 'Huevos', category: 'Lácteos', unit: 'unidad', cost: 220, minStock: 60, maxStock: 600, reorderPoint: 180, leadTime: 1, supplier: 'Coliumo', active: true },
-  { id: 's-leche', sku: 'INS-LECHE-001', name: 'Leche entera', category: 'Lácteos', unit: 'L', cost: 1100, minStock: 10, maxStock: 80, reorderPoint: 25, leadTime: 1, supplier: 'Soprole', active: true },
-  { id: 's-aceite', sku: 'INS-ACEITE-001', name: 'Aceite vegetal', category: 'Aceites', unit: 'L', cost: 2800, minStock: 5, maxStock: 30, reorderPoint: 10, leadTime: 3, supplier: 'Natura', active: true },
-  { id: 's-choco', sku: 'INS-CHOCO-001', name: 'Chocolate cobertura', category: 'Especiales', unit: 'kg', cost: 9800, minStock: 3, maxStock: 25, reorderPoint: 8, leadTime: 5, supplier: 'Costa', active: true },
-  { id: 's-cacao', sku: 'INS-CACAO-001', name: 'Cacao en polvo', category: 'Especiales', unit: 'kg', cost: 6500, minStock: 2, maxStock: 15, reorderPoint: 5, leadTime: 4, supplier: 'Costa', active: true },
-  { id: 's-canela', sku: 'INS-CANELA-001', name: 'Canela molida', category: 'Especias', unit: 'kg', cost: 12000, minStock: 1, maxStock: 8, reorderPoint: 2, leadTime: 5, supplier: 'McCormick', active: true },
-  { id: 's-bicarb', sku: 'INS-BICARB-001', name: 'Bicarbonato de sodio', category: 'Leudantes', unit: 'kg', cost: 1800, minStock: 1, maxStock: 10, reorderPoint: 3, leadTime: 2, supplier: 'Diquimica', active: true },
-  { id: 's-vainilla', sku: 'INS-VAINILLA-001', name: 'Esencia de vainilla', category: 'Aromas', unit: 'L', cost: 8500, minStock: 0.5, maxStock: 5, reorderPoint: 1.5, leadTime: 3, supplier: 'Gourmet', active: true },
-  { id: 's-mermelada', sku: 'INS-MERM-001', name: 'Mermelada de frutilla', category: 'Rellenos', unit: 'kg', cost: 3200, minStock: 4, maxStock: 30, reorderPoint: 10, leadTime: 4, supplier: 'Watts', active: true },
-  { id: 's-queso', sku: 'INS-QUESO-001', name: 'Queso crema', category: 'Lácteos', unit: 'kg', cost: 5400, minStock: 3, maxStock: 25, reorderPoint: 8, leadTime: 2, supplier: 'Soprole', active: true },
+  { id: 's-harina', sku: 'INS-HARINA-001', name: 'Harina de trigo', category: 'Cereales', unit: 'kg', cost: 21250, minStock: 50, maxStock: 500, reorderPoint: 125, supplier: 'Molinos del Sur', presentation: { size: 25, label: 'saco' }, active: true },
+  { id: 's-azucar', sku: 'INS-AZUCAR-001', name: 'Azúcar granulada', category: 'Endulzantes', unit: 'kg', cost: 47500, minStock: 50, maxStock: 500, reorderPoint: 125, supplier: 'IANSA', presentation: { size: 50, label: 'saco' }, active: true },
+  { id: 's-sal', sku: 'INS-SAL-001', name: 'Sal de mesa', category: 'Sazonadores', unit: 'kg', cost: 600, minStock: 3, maxStock: 30, reorderPoint: 8, supplier: 'Lobos', active: true },
+  { id: 's-levadura', sku: 'INS-LEVADURA-001', name: 'Levadura fresca', category: 'Leudantes', unit: 'kg', cost: 4200, minStock: 2, maxStock: 15, reorderPoint: 5, supplier: 'Lefersa', active: true },
+  { id: 's-mantequilla', sku: 'INS-MANTEQ-001', name: 'Mantequilla sin sal', category: 'Lácteos', unit: 'kg', cost: 18750, minStock: 5, maxStock: 50, reorderPoint: 12.5, supplier: 'Soprole', presentation: { size: 2.5, label: 'bloque' }, active: true },
+  { id: 's-huevos', sku: 'INS-HUEVO-001', name: 'Huevos', category: 'Lácteos', unit: 'unidad', cost: 6600, minStock: 60, maxStock: 600, reorderPoint: 180, supplier: 'Coliumo', presentation: { size: 30, label: 'cubeta' }, active: true },
+  { id: 's-leche', sku: 'INS-LECHE-001', name: 'Leche entera', category: 'Lácteos', unit: 'L', cost: 1100, minStock: 10, maxStock: 80, reorderPoint: 25, supplier: 'Soprole', presentation: { size: 1, label: 'litro' }, active: true },
+  { id: 's-aceite', sku: 'INS-ACEITE-001', name: 'Aceite vegetal', category: 'Aceites', unit: 'L', cost: 2800, minStock: 5, maxStock: 30, reorderPoint: 10, supplier: 'Natura', active: true },
+  { id: 's-choco', sku: 'INS-CHOCO-001', name: 'Chocolate cobertura', category: 'Especiales', unit: 'kg', cost: 49000, minStock: 5, maxStock: 25, reorderPoint: 10, supplier: 'Costa', presentation: { size: 5, label: 'caja' }, active: true },
+  { id: 's-cacao', sku: 'INS-CACAO-001', name: 'Cacao en polvo', category: 'Especiales', unit: 'kg', cost: 6500, minStock: 2, maxStock: 15, reorderPoint: 5, supplier: 'Costa', active: true },
+  { id: 's-canela', sku: 'INS-CANELA-001', name: 'Canela molida', category: 'Especias', unit: 'kg', cost: 12000, minStock: 1, maxStock: 8, reorderPoint: 2, supplier: 'McCormick', active: true },
+  { id: 's-bicarb', sku: 'INS-BICARB-001', name: 'Bicarbonato de sodio', category: 'Leudantes', unit: 'kg', cost: 1800, minStock: 1, maxStock: 10, reorderPoint: 3, supplier: 'Diquimica', active: true },
+  { id: 's-vainilla', sku: 'INS-VAINILLA-001', name: 'Esencia de vainilla', category: 'Aromas', unit: 'L', cost: 8500, minStock: 0.5, maxStock: 5, reorderPoint: 1.5, supplier: 'Gourmet', active: true },
+  { id: 's-mermelada', sku: 'INS-MERM-001', name: 'Mermelada de frutilla', category: 'Rellenos', unit: 'kg', cost: 3200, minStock: 4, maxStock: 30, reorderPoint: 10, supplier: 'Watts', active: true },
+  { id: 's-queso', sku: 'INS-QUESO-001', name: 'Queso crema', category: 'Lácteos', unit: 'kg', cost: 5400, minStock: 3, maxStock: 25, reorderPoint: 8, supplier: 'Soprole', active: true },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
@@ -323,10 +322,11 @@ export const MOCK_SALES: SaleRecord[] = (() => {
 })();
 
 /**
- * Alertas mock para tipos que NO genera automáticamente regenerateRestockAlerts:
- * stockout_risk, excess y restock histórico (resolved). Las alertas activas de
- * tipo `restock` se derivan en runtime desde supplyStock/productStock al iniciar
- * el servicio, evitando duplicación con los ids `auto-restock-*`.
+ * Alertas mock MANUALES — ejemplos de alertas creadas a mano que conviven con
+ * las auto-generadas. `regenerateAutoAlerts` deriva en runtime las de stock
+ * (restock/stockout_risk/order_now/excess), pedidos (delivery/parcial) y día
+ * de pedido; estos ids sin prefijo `auto-` se preservan y la auto-generación
+ * NO los duplica (dedup por tipo+item). Incluye una histórica (resolved).
  */
 export const MOCK_ALERTS: Alert[] = [
   {
@@ -416,7 +416,8 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
     status: 'pending',
     items: [{ supplyId: 's-levadura', itemName: 'Levadura fresca', qty: 10, unitCost: 4200 }],
     totalCost: 42000,
-    expectedDate: daysAgo(-1), createdAt: hoursAgo(6),
+    // Entrega esperada HOY → dispara alerta delivery_today.
+    expectedDate: daysFromNow(0), createdAt: hoursAgo(6),
   },
   {
     id: 'po-4', code: 'OC-2025-141', supplier: 'IANSA',
@@ -439,7 +440,24 @@ export const MOCK_PURCHASE_ORDERS: PurchaseOrder[] = [
     totalCost: 105000,
     expectedDate: daysAgo(-5), createdAt: hoursAgo(2),
   },
+  {
+    // Entrega vencida hace 2 días y aún pendiente → alerta delivery_overdue.
+    id: 'po-7', code: 'OC-2025-146', supplier: 'Costa',
+    status: 'pending',
+    items: [{ supplyId: 's-cacao', itemName: 'Cacao en polvo', qty: 12, unitCost: 6500 }],
+    totalCost: 78000,
+    expectedDate: daysFromNow(-2), createdAt: daysAgo(6),
+  },
+  {
+    // Recepción parcial: llegaron 55 de 80 → alerta partial_reception.
+    id: 'po-8', code: 'OC-2025-139', supplier: 'IANSA',
+    status: 'received',
+    items: [{ supplyId: 's-azucar', itemName: 'Azúcar granulada', qty: 80, unitCost: 950, receivedQty: 55 }],
+    totalCost: 76000,
+    expectedDate: daysAgo(3), receivedAt: daysAgo(3), createdAt: daysAgo(7),
+  },
 ];
+
 
 // Órdenes de producción de muestra cubriendo todos los estados.
 // El "purpose" es el motivo/destino interno del lote — no representa un
@@ -778,5 +796,56 @@ export const MOCK_RETURNED_LOTS: ReturnedLot[] = [
     status: 'reviewed',
     reviewedAt: daysAgo(1),
     reviewedBy: 'Sofía Rojas',
+  },
+];
+
+// =========================================================
+//  Urnas (vitrinas / puntos de venta — lado Ventas)
+// =========================================================
+// Un solo Almacén de Ventas (modelo de almacén único; reusa la entidad Urna).
+export const MOCK_URNAS: Urna[] = [
+  {
+    id: 'almacen-ventas', name: 'Almacén de Ventas',
+    location: 'Local principal', responsible: 'Sofía Rojas',
+    active: true, createdAt: daysAgo(30),
+  },
+];
+
+/**
+ * Catálogo de Ventas: precio FINAL al consumidor por producto (productId → precio).
+ * El "costo" de Ventas es el precio base de producción (Product.sellPrice). Si un
+ * producto no está acá, el precio final cae al precio base.
+ */
+export const MOCK_CONSUMER_PRICES: Record<string, number> = {
+  'p-baguette': 2900,
+  'p-croissant': 2700,
+  'p-brownie': 3200,
+  'p-galleta': 1400,
+  'p-empanada': 4300,
+};
+
+// Stock del almacén por LOTES (tandas). El consumo es FIFO: primero el más antiguo.
+export const MOCK_URNA_LOTES: UrnaLote[] = [
+  // Dos lotes de baguette (para demostrar FIFO) + croissant + brownie/galleta.
+  {
+    id: 'lote-a', urnaId: 'almacen-ventas', code: 'OC-LOTE-0021',
+    receivedAt: daysAgo(2), orderCode: 'OC-LOTE-0021',
+    lines: [{ productId: 'p-baguette', productName: 'Baguette de masa madre', qty: 5 }],
+  },
+  {
+    id: 'lote-b', urnaId: 'almacen-ventas', code: 'OC-LOTE-0024',
+    receivedAt: daysAgo(1), orderCode: 'OC-LOTE-0024',
+    lines: [
+      { productId: 'p-baguette', productName: 'Baguette de masa madre', qty: 7 },
+      { productId: 'p-croissant', productName: 'Croissant au beurre', qty: 8 },
+    ],
+  },
+  {
+    id: 'lote-c', urnaId: 'almacen-ventas', code: 'OC-LOTE-0023',
+    receivedAt: daysAgo(1), orderCode: 'OC-LOTE-0023',
+    lines: [
+      { productId: 'p-brownie', productName: 'Brownie de chocolate', qty: 6 },
+      { productId: 'p-galleta', productName: 'Galleta de avena', qty: 15 },
+    ],
   },
 ];

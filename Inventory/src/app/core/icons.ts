@@ -22,6 +22,11 @@ import {
   cubeOutline as cubeInventory,
   createOutline,
   documentTextOutline,
+  clipboardOutline,
+  thumbsUpOutline,
+  thumbsDownOutline,
+  paperPlaneOutline,
+  ellipsisVerticalOutline,
   // Alertas / boosts
   notificationsOutline,
   flashOutline,
@@ -38,6 +43,9 @@ import {
   arrowForwardOutline,
   addOutline,
   closeOutline,
+  removeOutline,
+  storefrontOutline,
+  pricetagsOutline,
   // Clientes / acciones de card
   trashOutline,
   copyOutline,
@@ -83,6 +91,11 @@ export function registerAppIcons(): void {
     'cube-inventory': cubeInventory,
     'create-outline': createOutline,
     'document-text-outline': documentTextOutline,
+    'clipboard-outline': clipboardOutline,
+    'thumbs-up-outline': thumbsUpOutline,
+    'thumbs-down-outline': thumbsDownOutline,
+    'paper-plane-outline': paperPlaneOutline,
+    'ellipsis-vertical-outline': ellipsisVerticalOutline,
     // alertas / boosts
     'notifications-outline': notificationsOutline,
     'flash-outline': flashOutline,
@@ -99,6 +112,9 @@ export function registerAppIcons(): void {
     'arrow-forward-outline': arrowForwardOutline,
     'add-outline': addOutline,
     'close-outline': closeOutline,
+    'remove-outline': removeOutline,
+    'storefront-outline': storefrontOutline,
+    'pricetags-outline': pricetagsOutline,
     // Clientes / acciones
     'trash-outline': trashOutline,
     'copy-outline': copyOutline,

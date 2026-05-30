@@ -1,0 +1,28 @@
+    <div class="kpi" [attr.data-tone]="tone()">
+      @if (period()) {
+        <div class="kpi__period">{{ period() }}</div>
+      }
+      <div class="kpi__label">{{ label() }}</div>
+      <div class="kpi__value mono">{{ value() }}</div>
+
+      @if (series() && series()!.length > 0) {
+        <div class="kpi__chart">
+          <app-line-chart [points]="series()!" [color]="sparkColor()" [mini]="true"></app-line-chart>
+        </div>
+      } @else if (hint()) {
+        <div class="kpi__hint">{{ hint() }}</div>
+      }
+
+      @if (footer() || delta() !== undefined) {
+        <div class="kpi__foot">
+          @if (footer()) {
+            <span class="kpi__source">{{ footer() }}</span>
+          }
+          @if (delta() !== undefined) {
+            <span class="kpi__delta" [attr.data-pos]="(delta() ?? 0) >= 0">
+              {{ (delta() ?? 0) >= 0 ? '▲' : '▼' }} {{ absDelta() }}%
+            </span>
+          }
+        </div>
+      }
+    </div>

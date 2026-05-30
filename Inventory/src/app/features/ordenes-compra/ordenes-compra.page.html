@@ -1,0 +1,148 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Órdenes de Compra</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Órdenes de Compra"
+        subtitle="Cuando una OC se recibe, genera entradas de kardex automáticamente.">
+        @if (tenant.canManagePurchaseOrders()) {
+          <ion-button (click)="modalOpen.set(true)">+ Nueva OC</ion-button>
+        }
+      </app-page-header>
+
+      <div class="kpis">
+        <app-kpi-card label="Pendientes" [value]="data.inTransitOrders()" tone="transit"
+          [hint]="data.inTransitUnits() + ' unidades en tránsito'"></app-kpi-card>
+        <app-kpi-card label="Recibidas" [value]="recibidas().length" tone="success"></app-kpi-card>
+        <app-kpi-card label="Canceladas" [value]="canceladas().length" tone="danger"></app-kpi-card>
+        <app-kpi-card label="Total OCs" [value]="data.purchaseOrders().length" tone="primary"></app-kpi-card>
+      </div>
+
+      <div class="tabs">
+        <ion-segment [value]="filter()" (ionChange)="filter.set($any($event.detail.value))">
+          <ion-segment-button value="todas"><ion-label>Todas</ion-label></ion-segment-button>
+          <ion-segment-button value="pending"><ion-label>Pendientes</ion-label></ion-segment-button>
+          <ion-segment-button value="received"><ion-label>Recibidas</ion-label></ion-segment-button>
+          <ion-segment-button value="cancelled"><ion-label>Canceladas</ion-label></ion-segment-button>
+        </ion-segment>
+      </div>
+
+      <div class="datefilter">
+        <div class="datefilter__field">
+          <label class="datefilter__label" for="oc-desde">Creada desde</label>
+          <input id="oc-desde" type="date" class="datefilter__input"
+            [value]="dateFrom()" [max]="dateTo() || null"
+            (change)="dateFrom.set($any($event.target).value)">
+        </div>
+        <div class="datefilter__field">
+          <label class="datefilter__label" for="oc-hasta">Hasta</label>
+          <input id="oc-hasta" type="date" class="datefilter__input"
+            [value]="dateTo()" [min]="dateFrom() || null"
+            (change)="dateTo.set($any($event.target).value)">
+        </div>
+        @if (dateFrom() || dateTo()) {
+          <ion-button size="small" fill="clear" class="ghost" (click)="limpiarFechas()">
+            <ion-icon name="close-outline" slot="start"></ion-icon>
+            Limpiar fechas
+          </ion-button>
+          <span class="datefilter__count mono">{{ visibles().length }} OC(s)</span>
+        }
+      </div>
+
+      <div class="list">
+        @if (visibles().length === 0) {
+          <app-empty-state
+            icon="📋"
+            title="Sin órdenes en este rango"
+            body="No hay órdenes de compra que coincidan con el estado y el rango de fechas seleccionados.">
+          </app-empty-state>
+        }
+        @for (po of visibles(); track po.id) {
+          <article class="po">
+            <header class="po__head" [attr.data-status]="po.status">
+              <div>
+                <div class="po__code mono">{{ po.code }}</div>
+                <h3 class="po__supplier">{{ po.supplier }}</h3>
+                <div class="po__meta">
+                  Creada {{ po.createdAt | date:'dd-MM-yyyy' }}
+                </div>
+              </div>
+              <div class="po__status">
+                @switch (po.status) {
+                  @case ('pending')   { <ion-badge color="transit">Pendiente</ion-badge> }
+                  @case ('received')  { <ion-badge color="success">Recibida</ion-badge> }
+                  @case ('cancelled') { <ion-badge color="danger">Cancelada</ion-badge> }
+                }
+              </div>
+            </header>
+            <div class="po__items">
+              @for (it of po.items; track it.supplyId) {
+                <div class="po-item">
+                  <span class="po-item__name">
+                    {{ it.itemName }}
+                    @if (it.productId) {
+                      <span class="po-item__kind">producto</span>
+                    }
+                  </span>
+                  <span class="po-item__qty mono">{{ it.qty }} × ₡{{ it.unitCost | number:'1.0-0' }}</span>
+                  <span class="po-item__total mono">₡{{ it.qty * it.unitCost | number:'1.0-0' }}</span>
+                </div>
+              }
+            </div>
+            <footer class="po__footer">
+              <div class="po__total">
+                <span class="muted">Total OC</span>
+                <span class="mono"><strong>₡{{ po.totalCost | number:'1.0-0' }}</strong></span>
+              </div>
+              @if (po.status === 'pending' && po.expectedDate) {
+                <div class="po__expected">
+                  Esperada: <strong class="mono">{{ po.expectedDate | date:'dd-MM-yyyy' }}</strong>
+                  @if (isOverdue(po.expectedDate)) {
+                    <ion-badge color="danger">Atrasada</ion-badge>
+                  }
+                </div>
+              }
+              @if (tenant.canManagePurchaseOrders()) {
+                <div class="po__actions">
+                  @if (po.status === 'pending') {
+                    <ion-button size="small" color="primary" fill="outline" (click)="notificar(po)">
+                      <ion-icon name="mail-open-outline" slot="start"></ion-icon>
+                      Notificar proveedor
+                    </ion-button>
+                    <ion-button size="small" (click)="pedirAccion(po, 'receive')">Marcar recibida</ion-button>
+                    <ion-button size="small" fill="clear" class="ghost" (click)="pedirAccion(po, 'cancel')">Cancelar</ion-button>
+                  }
+                  <ion-button size="small" color="danger" (click)="pedirAccion(po, 'delete')">Eliminar</ion-button>
+                </div>
+              }
+            </footer>
+          </article>
+        }
+      </div>
+
+      <app-oc-form-modal
+        [isOpen]="modalOpen()"
+        (closed)="modalOpen.set(false)"
+        (saved)="modalOpen.set(false)">
+      </app-oc-form-modal>
+
+      <app-confirm-dialog
+        [isOpen]="confirmOpen()"
+        [title]="confirmTitle()"
+        [message]="confirmMessage()"
+        [tone]="confirmTone()"
+        [confirmLabel]="confirmCta()"
+        (confirmed)="ejecutarAccion()"
+        (cancelled)="confirmOpen.set(false)">
+      </app-confirm-dialog>
+
+      <app-notificar-proveedor-modal
+        [isOpen]="notifOpen()"
+        [po]="poNotif()"
+        (closed)="notifOpen.set(false)">
+      </app-notificar-proveedor-modal>
+    </ion-content>

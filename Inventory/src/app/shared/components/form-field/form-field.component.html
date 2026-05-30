@@ -1,0 +1,9 @@
+    <label class="ff">
+      <span class="ff__label">
+        {{ label() }}
+        @if (required()) { <span class="ff__req">*</span> }
+      </span>
+      <ng-content></ng-content>
+      @if (hint()) { <span class="ff__hint">{{ hint() }}</span> }
+      @if (error()) { <span class="ff__error">{{ error() }}</span> }
+    </label>

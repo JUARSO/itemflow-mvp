@@ -1,0 +1,142 @@
+    ion-menu {
+      --width: 280px;
+      --background: var(--ui-surface);
+    }
+    ion-menu::part(container) {
+      border-right: var(--ui-border-w-md) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-md);
+    }
+    ion-menu ion-content {
+      --background: var(--ui-surface);
+      --padding-bottom: 80px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: var(--ui-sp-3);
+      padding: var(--ui-sp-4);
+      border-bottom: var(--ui-border-w-md) solid var(--ui-border);
+      background: var(--ui-primary);
+      color: var(--ui-primary-contrast);
+    }
+    .brand__logo {
+      font-size: 32px;
+      line-height: 1;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--ui-surface);
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      overflow: hidden;
+      padding: 4px;
+      flex-shrink: 0;
+    }
+    .brand__logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      /* Si el header tiene fondo oscuro, mantenemos el logo original sobre
+         su contenedor blanco (no aplicamos invert). Si en algún momento
+         se quiere logo blanco directo sobre el header, usar:
+         filter: brightness(0) invert(1); */
+    }
+    .brand__logo-icon {
+      font-size: 28px;
+      color: var(--ui-text);
+    }
+    .brand__text { min-width: 0; }
+    .brand__name {
+      font-family: var(--ui-font-display);
+      font-weight: var(--ui-fw-black);
+      font-size: var(--ui-fs-lg);
+      line-height: 1.1;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .brand__company {
+      font-size: var(--ui-fs-xs);
+      opacity: 0.9;
+    }
+
+    .menu-section {
+      padding: var(--ui-sp-4) var(--ui-sp-4) var(--ui-sp-1);
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-black);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--ui-text-muted);
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: var(--ui-sp-3);
+      padding: var(--ui-sp-3) var(--ui-sp-4);
+      color: var(--ui-text);
+      text-decoration: none;
+      font-weight: var(--ui-fw-medium);
+      font-size: var(--ui-fs-md);
+      border-left: 4px solid transparent;
+      transition: background 80ms;
+    }
+    .menu-item:hover { background: var(--ui-surface-3); }
+    .menu-item.active {
+      background: var(--ui-surface-2);
+      border-left-color: var(--ui-primary);
+      font-weight: var(--ui-fw-bold);
+    }
+    .menu-item__icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      font-size: 22px;
+      color: var(--ui-text-muted);
+    }
+    .menu-item.active .menu-item__icon { color: var(--ui-primary); }
+    .menu-item__label { flex: 1; }
+    .menu-item__badge { margin-left: auto; }
+    .menu-item__hint {
+      font-size: 9px;
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: auto;
+    }
+
+    .user-block {
+      margin: var(--ui-sp-4);
+      padding: var(--ui-sp-3);
+      background: var(--ui-surface-2);
+      border: var(--ui-border-w-md) solid var(--ui-border);
+    }
+    .user-block__name {
+      font-weight: var(--ui-fw-bold);
+      font-size: var(--ui-fs-md);
+      color: var(--ui-text);
+    }
+    .user-block__role {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--ui-sp-2);
+    }
+    .user-block__logout {
+      width: 100%;
+      padding: 10px;
+      background: var(--ui-danger);
+      color: #fff;
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-sm);
+      font-weight: var(--ui-fw-bold);
+      cursor: pointer;
+      font-size: var(--ui-fs-sm);
+    }
+    .user-block__logout:active {
+      box-shadow: none;
+      transform: translate(2px, 2px);
+    }

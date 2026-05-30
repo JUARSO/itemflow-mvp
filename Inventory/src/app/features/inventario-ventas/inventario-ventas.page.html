@@ -1,0 +1,123 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Inventario</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Inventario de Ventas"
+    subtitle="Stock de productos en el almacén. Pide reposición a producción cuando lo necesites.">
+    @if (tenant.canManageUrnas()) {
+      <ion-button [routerLink]="['/pedir-produccion']">
+        <ion-icon name="receipt-outline" slot="start"></ion-icon>
+        Pedir a producción
+      </ion-button>
+    }
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Productos" [value]="totalProductos()" tone="primary"></app-kpi-card>
+    <app-kpi-card label="Unidades en almacén" [value]="unidadesEnAlmacen()" tone="success"></app-kpi-card>
+    <app-kpi-card label="Por recibir" [value]="recepciones().length" tone="transit"></app-kpi-card>
+    <app-kpi-card label="Agotados" [value]="agotados()" tone="danger"></app-kpi-card>
+  </div>
+
+  <!-- Recepciones por validar (lo que Producción terminó) -->
+  @if (recepciones().length > 0) {
+    <div class="section-title">Recepciones por validar</div>
+    <div class="recepciones">
+      @for (o of recepciones(); track o.id) {
+        <article class="rec">
+          <div class="rec__info">
+            <div class="rec__code mono">{{ o.code }} <span class="muted">· {{ o.urnaName }}</span></div>
+            <div class="rec__items">
+              @for (d of itemsRecibidos(o); track d.name) {
+                <span class="rec__chip mono">{{ d.name }}: {{ d.qty }}</span>
+              }
+            </div>
+            <div class="rec__meta muted">
+              @if (o.requestedDeliveryDate) { Para {{ o.requestedDeliveryDate | date:'dd-MM-yyyy' }} }
+            </div>
+          </div>
+          @if (tenant.canManageUrnas()) {
+            <ion-button size="small" (click)="validar(o)">
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Validar entrega
+            </ion-button>
+          }
+        </article>
+      }
+    </div>
+  }
+
+  <div class="search">
+    <ion-searchbar
+      placeholder="Buscar producto…"
+      [value]="query()"
+      (ionInput)="query.set($any($event.target).value ?? '')"
+      [debounce]="150">
+    </ion-searchbar>
+  </div>
+
+  <div class="list">
+    @if (visibles().length === 0) {
+      <app-empty-state icon="📦" title="Sin productos"
+        body="No hay productos en el catálogo o no coinciden con la búsqueda."></app-empty-state>
+    }
+    @for (v of visibles(); track v.product.id) {
+      <article class="row" [attr.data-status]="v.status">
+        <div class="row__main">
+          <div class="row__name">{{ v.product.name }}</div>
+          <div class="row__sub mono">₡{{ data.consumerPrice(v.product.id) | number:'1.0-0' }} c/u</div>
+        </div>
+
+        <div class="row__stock">
+          <div class="row__qty mono">{{ v.qty }} <span class="unit">{{ v.product.unit }}</span></div>
+          <app-status-badge [status]="v.status"></app-status-badge>
+        </div>
+
+        @if (v.incoming > 0) {
+          <button type="button" class="row__incoming" (click)="toggleIncoming(v.product.id)"
+            [attr.aria-expanded]="isIncomingOpen(v.product.id)">
+            <ion-icon name="arrow-down-circle-outline"></ion-icon>
+            {{ v.incoming }} en camino
+            <ion-icon class="row__incoming-caret"
+              [name]="isIncomingOpen(v.product.id) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+          </button>
+        }
+
+        @if (tenant.canManageUrnas()) {
+          <div class="row__actions">
+            <ion-button size="small" fill="outline" [routerLink]="['/pedir-produccion']">
+              Pedir
+            </ion-button>
+          </div>
+        }
+
+        @if (v.incoming > 0 && isIncomingOpen(v.product.id)) {
+          <div class="incoming-detail">
+            <div class="incoming-detail__head">
+              <span>Pedido</span>
+              <span class="num">Cantidad</span>
+              <span>Estado</span>
+              <span>Para cuándo</span>
+            </div>
+            @for (d of incomingDetail(v.product.id); track d.orderCode) {
+              <div class="incoming-detail__row">
+                <span class="mono">{{ d.orderCode }}</span>
+                <span class="num mono strong">{{ d.qty }}</span>
+                <span>{{ d.estado }}</span>
+                <span class="mono">
+                  @if (d.deliveryDate) { {{ d.deliveryDate | date:'EEE dd-MM-yyyy' }} }
+                  @else { sin fecha }
+                </span>
+              </div>
+            }
+          </div>
+        }
+      </article>
+    }
+  </div>
+</ion-content>

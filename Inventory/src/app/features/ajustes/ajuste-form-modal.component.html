@@ -1,0 +1,95 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      title="Nuevo movimiento manual"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <app-form-field label="Tipo de movimiento" [required]="true">
+          <div class="seg">
+            <label class="seg__opt" [class.seg__opt--active]="kind() === 'entry'">
+              <input type="radio" formControlName="kind" value="entry" (change)="onKindChange('entry')" />
+              <span>↑ Entrada</span>
+              <small>Devolución, donación, carga</small>
+            </label>
+            <label class="seg__opt" [class.seg__opt--active]="kind() === 'exit'">
+              <input type="radio" formControlName="kind" value="exit" (change)="onKindChange('exit')" />
+              <span>↓ Salida (merma)</span>
+              <small>Dañado, vencido, pérdida</small>
+            </label>
+            <label class="seg__opt" [class.seg__opt--active]="kind() === 'adjustment'">
+              <input type="radio" formControlName="kind" value="adjustment" (change)="onKindChange('adjustment')" />
+              <span>⚙ Ajuste de conteo</span>
+              <small>Diferencia conteo físico</small>
+            </label>
+          </div>
+        </app-form-field>
+
+        <app-form-field label="Tipo de item" [required]="true">
+          <div class="seg seg--row">
+            <label class="seg__opt" [class.seg__opt--active]="itemKind() === 'supply'">
+              <input type="radio" formControlName="itemKind" value="supply" (change)="onItemKindChange('supply')" />
+              <span>Insumo</span>
+            </label>
+            <label class="seg__opt" [class.seg__opt--active]="itemKind() === 'product'">
+              <input type="radio" formControlName="itemKind" value="product" (change)="onItemKindChange('product')" />
+              <span>Producto de reventa</span>
+            </label>
+          </div>
+        </app-form-field>
+
+        <app-form-field [label]="itemKind() === 'supply' ? 'Insumo' : 'Producto'" [required]="true">
+          <select formControlName="itemId" (change)="onItemChange()">
+            <option value="">— Selecciona —</option>
+            @for (it of items(); track it.id) {
+              <option [value]="it.id">{{ it.name }} ({{ it.unit }})</option>
+            }
+          </select>
+        </app-form-field>
+
+        @if (kind() !== 'adjustment') {
+          <app-form-field label="Cantidad" [required]="true" [hint]="unitHint()">
+            <input type="number" formControlName="qty" min="0.001" step="0.001" />
+          </app-form-field>
+        } @else {
+          <app-form-field label="Stock contado físicamente" [required]="true" [hint]="adjustHint()">
+            <input type="number" formControlName="newQty" min="0" step="0.001" />
+          </app-form-field>
+        }
+
+        <app-form-field label="Motivo" [required]="true">
+          <select formControlName="reason">
+            <option value="">— Selecciona motivo —</option>
+            @for (r of reasonOptions(); track r.value) {
+              <option [value]="r.value">{{ r.label }}</option>
+            }
+          </select>
+        </app-form-field>
+
+        <app-form-field label="Nota" hint="Opcional — referencia, contexto del movimiento">
+          <textarea formControlName="note" rows="2" placeholder="Ej. Devolución factura #1023"></textarea>
+        </app-form-field>
+
+        <div class="summary">
+          <div>
+            <div class="summary__label">Stock actual</div>
+            <div class="summary__value mono">
+              {{ (currentStock() | number:'1.0-3') ?? '0' }} {{ unitLabel() }}
+            </div>
+          </div>
+          <div class="summary__arrow">→</div>
+          <div>
+            <div class="summary__label">Nuevo stock</div>
+            <div class="summary__value mono" [class.success]="delta() > 0" [class.danger]="delta() < 0">
+              {{ projectedStock() | number:'1.0-3' }} {{ unitLabel() }}
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
+          Registrar movimiento
+        </ion-button>
+      </div>
+    </app-form-modal>

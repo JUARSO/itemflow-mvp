@@ -1,0 +1,30 @@
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--ui-sp-3);
+    }
+    @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: var(--ui-sp-2);
+      cursor: pointer;
+      padding: var(--ui-sp-2) 0;
+    }
+    .check input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+    .info-box {
+      padding: var(--ui-sp-3);
+      background: var(--ui-surface-2);
+      border-left: 3px solid var(--ui-primary);
+      font-size: var(--ui-fs-sm);
+      color: var(--ui-text-muted);
+      margin-bottom: var(--ui-sp-3);
+    }
+    /* Input readonly que muestra valor calculado: se ve grisáceo con label especial. */
+    .input--computed {
+      background: var(--ui-surface-2) !important;
+      color: var(--ui-text-muted) !important;
+      cursor: not-allowed;
+      font-family: var(--ui-font-mono);
+      font-weight: var(--ui-fw-bold);
+    }

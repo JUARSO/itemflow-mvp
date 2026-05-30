@@ -1,0 +1,83 @@
+    .kpi {
+      display: flex;
+      flex-direction: column;
+      background: var(--ui-surface);
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-md);
+      padding: var(--ui-sp-3) var(--ui-sp-4);
+      min-height: 170px;
+      position: relative;
+    }
+    .kpi__period {
+      font-size: 9px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-bold);
+      margin-bottom: 2px;
+    }
+    .kpi__label {
+      font-size: var(--ui-fs-sm);
+      font-weight: var(--ui-fw-bold);
+      color: var(--ui-text-muted);
+      text-align: center;
+      margin-bottom: var(--ui-sp-2);
+    }
+    .kpi__value {
+      /* Tamaño fluido: cabe hasta ₡9,999,999,999 cómodamente.
+         clamp(min, preferred, max) — escala según ancho disponible. */
+      font-size: clamp(18px, 2.2vw, 26px);
+      font-weight: var(--ui-fw-black);
+      text-align: center;
+      line-height: 1.05;
+      color: var(--ui-text);
+      letter-spacing: -0.3px;
+      margin-bottom: var(--ui-sp-2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .kpi[data-tone="success"]  .kpi__value { color: var(--ui-success); }
+    .kpi[data-tone="danger"]   .kpi__value { color: var(--ui-danger); }
+    .kpi[data-tone="warning"]  .kpi__value { color: var(--ui-warning); }
+    .kpi[data-tone="primary"]  .kpi__value { color: var(--ui-primary); }
+    .kpi[data-tone="excess"]   .kpi__value { color: var(--ui-excess); }
+    .kpi[data-tone="transit"]  .kpi__value { color: var(--ui-transit); }
+    .kpi[data-tone="neutral"]  .kpi__value { color: var(--ui-text); }
+
+    .kpi__chart {
+      flex: 1;
+      min-height: 64px;
+      display: flex;
+      align-items: flex-end;
+    }
+    .kpi__hint {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      text-align: center;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .kpi__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--ui-sp-2);
+      margin-top: var(--ui-sp-2);
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+      font-size: var(--ui-fs-xs);
+    }
+    .kpi__source {
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-medium);
+    }
+    .kpi__delta {
+      font-weight: var(--ui-fw-black);
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+    .kpi__delta[data-pos="true"]  { color: var(--ui-success); }
+    .kpi__delta[data-pos="false"] { color: var(--ui-danger); }

@@ -1,0 +1,120 @@
+    <ion-modal [isOpen]="isOpen" (didDismiss)="closed.emit()">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Notificar al proveedor</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="closed.emit()">
+                <ion-icon name="close-outline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+
+        <ion-content>
+          @if (_po(); as po) {
+            <div class="container">
+              <!-- Resumen del destinatario -->
+              <section class="recipient">
+                <div class="recipient__title">
+                  <ion-icon name="person-outline"></ion-icon>
+                  <strong>{{ po.supplier }}</strong>
+                </div>
+                @if (supplier(); as s) {
+                  <div class="recipient__row">
+                    <span class="label">Contacto:</span>
+                    <span>{{ s.contactPerson || '—' }}</span>
+                  </div>
+                  <div class="recipient__row">
+                    <span class="label">Email:</span>
+                    @if (s.email) {
+                      <a [href]="'mailto:' + s.email" class="mono">{{ s.email }}</a>
+                    } @else {
+                      <span class="muted">no registrado</span>
+                    }
+                  </div>
+                  <div class="recipient__row">
+                    <span class="label">Teléfono:</span>
+                    @if (s.phone) {
+                      <span class="mono">{{ s.phone }}</span>
+                    } @else {
+                      <span class="muted">no registrado</span>
+                    }
+                  </div>
+                } @else {
+                  <div class="warn">
+                    <ion-icon name="warning-outline"></ion-icon>
+                    No se encontró el proveedor "{{ po.supplier }}" en la base.
+                    Podés copiar el mensaje y enviarlo manualmente.
+                    <a routerLink="/proveedores" class="link">Crear proveedor</a>
+                  </div>
+                }
+              </section>
+
+              <!-- Asunto -->
+              <div class="field">
+                <label>Asunto</label>
+                <input type="text"
+                  [value]="subject()"
+                  (input)="subject.set($any($event.target).value)" />
+              </div>
+
+              <!-- Cuerpo editable -->
+              <div class="field">
+                <label>Mensaje</label>
+                <textarea rows="14"
+                  [value]="body()"
+                  (input)="body.set($any($event.target).value)"></textarea>
+              </div>
+
+              <!-- Canales -->
+              <div class="channels">
+                <a class="channel channel--email"
+                  [href]="mailtoUrl()"
+                  [class.channel--disabled]="!supplier()?.email"
+                  (click)="onSend('email', $event)">
+                  <ion-icon name="mail-open-outline"></ion-icon>
+                  <div>
+                    <strong>Enviar por email</strong>
+                    <small>
+                      @if (supplier()?.email) {
+                        {{ supplier()?.email }}
+                      } @else {
+                        sin email registrado
+                      }
+                    </small>
+                  </div>
+                </a>
+
+                <a class="channel channel--wa"
+                  [href]="waUrl()"
+                  target="_blank"
+                  rel="noopener"
+                  [class.channel--disabled]="!supplier()?.phone"
+                  (click)="onSend('wa', $event)">
+                  <ion-icon name="chatbox-ellipses-outline"></ion-icon>
+                  <div>
+                    <strong>Enviar por WhatsApp</strong>
+                    <small>
+                      @if (supplier()?.phone) {
+                        {{ supplier()?.phone }}
+                      } @else {
+                        sin teléfono registrado
+                      }
+                    </small>
+                  </div>
+                </a>
+
+                <button class="channel channel--copy" type="button" (click)="copyToClipboard()">
+                  <ion-icon name="copy-outline"></ion-icon>
+                  <div>
+                    <strong>Copiar mensaje</strong>
+                    <small>pegalo donde necesites</small>
+                  </div>
+                </button>
+              </div>
+            </div>
+          }
+        </ion-content>
+      </ng-template>
+    </ion-modal>

@@ -1,0 +1,10 @@
+    <div class="card" [attr.data-tone]="tone()">
+      <div class="card__stripe"></div>
+      <div class="card__body">
+        <div class="card__label">{{ label() }}</div>
+        <div class="card__value mono">{{ value() }}</div>
+        @if (hint()) {
+          <div class="card__hint">{{ hint() }}</div>
+        }
+      </div>
+    </div>

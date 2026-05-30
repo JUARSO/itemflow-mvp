@@ -1,0 +1,105 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-3);
+}
+@media (max-width: 600px) { .kpis { grid-template-columns: 1fr; } }
+
+.tabs { padding: 0 var(--ui-sp-4) var(--ui-sp-3); }
+
+.list {
+  padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+  display: grid;
+  gap: var(--ui-sp-3);
+}
+.ped {
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  border-left: 4px solid var(--ui-warning);
+  padding: var(--ui-sp-3) var(--ui-sp-4);
+}
+.ped--done { border-left-color: var(--ui-success); }
+.ped__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ui-sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--ui-sp-2);
+}
+.ped__code { font-family: var(--ui-font-display); font-weight: var(--ui-fw-black); color: var(--ui-text); margin-right: var(--ui-sp-2); }
+.ped__cliente { font-weight: var(--ui-fw-bold); }
+.ped__when { font-size: var(--ui-fs-sm); }
+.ped__hist { display: flex; align-items: center; gap: var(--ui-sp-2); }
+
+/* Tabla editable de facturación */
+.grid__head, .grid__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.1fr 0.9fr;
+  gap: var(--ui-sp-2);
+  align-items: center;
+}
+.grid__head {
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ui-text-muted);
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--ui-border);
+}
+.grid__row {
+  padding: var(--ui-sp-2) 0;
+  border-bottom: 1px dashed var(--ui-border);
+  font-size: var(--ui-fs-sm);
+}
+.grid__row:last-of-type { border-bottom: none; }
+.grid__row.has-merma { background: var(--ui-danger-tint); }
+.num { text-align: right; }
+.grid__name { min-width: 0; }
+.merma { color: var(--ui-danger); }
+.qty {
+  width: 64px;
+  text-align: right;
+  padding: 4px 6px;
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.ped__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--ui-sp-3);
+  padding-top: var(--ui-sp-2);
+  border-top: var(--ui-border-w-sm) solid var(--ui-border);
+}
+.ped__totals { display: flex; align-items: center; gap: var(--ui-sp-3); flex-wrap: wrap; font-size: var(--ui-fs-sm); }
+.merma-tag {
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-danger);
+  background: var(--ui-danger-tint);
+  padding: 2px 8px;
+  border-radius: var(--ui-radius-pill, 9999px);
+}
+.ped__final { font-size: var(--ui-fs-md); }
+
+/* Historial */
+.hist-items { display: grid; gap: 2px; }
+.hist-item {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr auto;
+  gap: var(--ui-sp-3);
+  align-items: center;
+  font-size: var(--ui-fs-sm);
+  padding: 3px 0;
+}
+.hist-item__sub { text-align: right; font-weight: var(--ui-fw-bold); }
+.muted { color: var(--ui-text-muted); }

@@ -1,0 +1,98 @@
+    .alert {
+      display: flex;
+      background: var(--ui-surface-2);
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-sm);
+      margin-bottom: var(--ui-sp-3);
+    }
+    .alert[data-priority="high"]   { box-shadow: var(--ui-shadow-lg); }
+    .alert[data-priority="medium"] { box-shadow: var(--ui-shadow-md); }
+    .alert[data-priority="low"]    { box-shadow: var(--ui-shadow-sm); }
+
+    .alert__stripe {
+      width: 12px;
+      flex-shrink: 0;
+    }
+    .alert[data-type="restock"]           .alert__stripe { background: var(--ui-warning); }
+    .alert[data-type="stockout_risk"]     .alert__stripe { background: var(--ui-danger); }
+    .alert[data-type="order_now"]         .alert__stripe { background: var(--ui-danger); }
+    .alert[data-type="excess"]            .alert__stripe { background: var(--ui-excess); }
+    .alert[data-type="delivery_today"]    .alert__stripe { background: var(--ui-transit); }
+    .alert[data-type="delivery_overdue"]  .alert__stripe { background: var(--ui-danger); }
+    .alert[data-type="partial_reception"] .alert__stripe { background: var(--ui-warning); }
+    .alert[data-type="order_day"]         .alert__stripe { background: var(--ui-transit); }
+
+    .alert__body {
+      padding: var(--ui-sp-3) var(--ui-sp-4);
+      flex: 1;
+      min-width: 0;
+    }
+    .alert__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--ui-sp-2);
+      margin-bottom: var(--ui-sp-1);
+    }
+    .alert__type {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-black);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: var(--ui-border-w-sm) solid var(--ui-border);
+    }
+    .alert[data-type="restock"]           .alert__type { background: var(--ui-warning-tint); color: var(--ui-warning); }
+    .alert[data-type="stockout_risk"]     .alert__type { background: var(--ui-danger-tint); color: var(--ui-danger); }
+    .alert[data-type="order_now"]         .alert__type { background: var(--ui-danger-tint); color: var(--ui-danger); }
+    .alert[data-type="excess"]            .alert__type { background: var(--ui-excess-tint); color: var(--ui-excess); }
+    .alert[data-type="delivery_today"]    .alert__type { background: var(--ui-transit-tint); color: var(--ui-transit); }
+    .alert[data-type="delivery_overdue"]  .alert__type { background: var(--ui-danger-tint); color: var(--ui-danger); }
+    .alert[data-type="partial_reception"] .alert__type { background: var(--ui-warning-tint); color: var(--ui-warning); }
+    .alert[data-type="order_day"]         .alert__type { background: var(--ui-transit-tint); color: var(--ui-transit); }
+    .alert__priority {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+    }
+    .alert__title {
+      font-family: var(--ui-font-display);
+      font-weight: var(--ui-fw-black);
+      font-size: var(--ui-fs-lg);
+      line-height: var(--ui-lh-tight);
+      margin: 0;
+      color: var(--ui-text);
+    }
+    .alert__sub {
+      font-size: var(--ui-fs-sm);
+      color: var(--ui-text-muted);
+      margin-bottom: var(--ui-sp-2);
+    }
+    .alert__message {
+      font-size: var(--ui-fs-md);
+      color: var(--ui-text);
+      margin: 0 0 var(--ui-sp-2) 0;
+    }
+    .alert__meta {
+      font-size: var(--ui-fs-sm);
+      color: var(--ui-text);
+      padding: 6px 0;
+    }
+    .alert__actions {
+      display: flex;
+      gap: var(--ui-sp-2);
+      flex-wrap: wrap;
+      margin-top: var(--ui-sp-3);
+    }
+    @media (max-width: 768px) {
+      .alert__body { padding: var(--ui-sp-3); }
+      .alert__title { font-size: var(--ui-fs-md); }
+      .alert__message { font-size: var(--ui-fs-sm); }
+      .alert__header { flex-wrap: wrap; }
+      .alert__actions ion-button {
+        flex: 1 1 auto;
+        min-width: 120px;
+      }
+    }

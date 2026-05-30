@@ -1,0 +1,70 @@
+.tabs { padding: 0 var(--ui-sp-4) var(--ui-sp-3); }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+}
+@media (max-width: 600px) { .kpis { grid-template-columns: 1fr; } }
+
+.form-card {
+  margin: 0 var(--ui-sp-4) var(--ui-sp-5);
+  padding: var(--ui-sp-4);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-md);
+}
+.form-card__title {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-black);
+  margin-bottom: var(--ui-sp-3);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--ui-sp-3);
+}
+@media (max-width: 520px) { .form-row { grid-template-columns: 1fr; } }
+.form-card__actions { display: flex; justify-content: flex-end; margin-top: var(--ui-sp-3); }
+
+.section-title {
+  padding: var(--ui-sp-2) var(--ui-sp-4);
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-black);
+  font-size: var(--ui-fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ui-text-muted);
+}
+
+.list {
+  padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+  display: grid;
+  gap: var(--ui-sp-2);
+}
+.lot {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-sp-3);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  padding: var(--ui-sp-3) var(--ui-sp-4);
+}
+.lot__info { flex: 1 1 auto; min-width: 0; }
+.lot__name { font-family: var(--ui-font-display); font-weight: var(--ui-fw-bold); color: var(--ui-text); }
+.lot__sub { font-size: var(--ui-fs-sm); }
+.muted { color: var(--ui-text-muted); }
+
+.lot[data-kind="delivery"] { border-left: 4px solid var(--ui-warning); }
+.lot__tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-warning);
+  background: var(--ui-warning-tint);
+  border-radius: var(--ui-radius-pill, 9999px);
+}

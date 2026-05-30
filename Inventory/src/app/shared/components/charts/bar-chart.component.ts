@@ -18,27 +18,8 @@ export interface BarItem {
   selector: 'app-bar-chart',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (items().length === 0) {
-      <div class="empty">Sin datos.</div>
-    } @else {
-      <div class="chart__canvas" [style.height.px]="chartHeight()">
-        <canvas #canvas></canvas>
-      </div>
-    }
-  `,
-  styles: [`
-    .chart__canvas { position: relative; width: 100%; }
-    canvas { width: 100% !important; }
-    .empty {
-      padding: var(--ui-sp-4);
-      text-align: center;
-      color: var(--ui-text-muted);
-      font-size: var(--ui-fs-sm);
-      background: var(--ui-surface-2);
-      border-radius: 4px;
-    }
-  `],
+  templateUrl: './bar-chart.component.html',
+  styleUrls: ['./bar-chart.component.scss'],
 })
 export class BarChartComponent implements AfterViewInit, OnDestroy {
   readonly items = input.required<BarItem[]>();

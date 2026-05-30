@@ -1,0 +1,89 @@
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--ui-sp-3);
+      padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+    }
+    @media (max-width: 900px) { .kpis { grid-template-columns: 1fr; } }
+
+    .filters {
+      padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--ui-sp-3);
+    }
+    ion-searchbar { --background: var(--ui-surface); padding: 0; }
+
+    .table {
+      margin: 0 var(--ui-sp-4) var(--ui-sp-8);
+      border: var(--ui-border-w-sm) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-md);
+      background: var(--ui-surface);
+      border-radius: var(--ui-radius);
+      overflow: hidden;
+    }
+    .table__head, .table__row {
+      display: grid;
+      grid-template-columns: 110px 1.5fr 130px 100px 100px 1.4fr 1fr;
+      gap: var(--ui-sp-3);
+      padding: var(--ui-sp-3) var(--ui-sp-4);
+      align-items: center;
+    }
+    .table__head {
+      background: var(--ui-text-strong);
+      color: #fff;
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .table__row {
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+      font-size: var(--ui-fs-sm);
+    }
+    .table__row:hover { background: var(--ui-surface-3); }
+    .num { text-align: right; }
+    .cell__name { font-weight: var(--ui-fw-semibold); color: var(--ui-text-strong); }
+    .cell__reason { color: var(--ui-text); }
+    .cell__note {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      margin-top: 2px;
+      font-style: italic;
+    }
+    .cell__user { color: var(--ui-text-muted); font-size: var(--ui-fs-xs); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--ui-radius-pill);
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-medium);
+    }
+    .table__row[data-type="in"] .badge {
+      background: var(--ui-success-tint);
+      color: var(--ui-success);
+    }
+    .table__row[data-type="out"] .badge {
+      background: var(--ui-danger-tint);
+      color: var(--ui-danger);
+    }
+    .table__row[data-type="adjustment"] .badge {
+      background: var(--ui-warning-tint);
+      color: var(--ui-warning);
+    }
+
+    @media (max-width: 900px) {
+      .table__head { display: none; }
+      .table__row {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px var(--ui-sp-2);
+        padding: var(--ui-sp-3);
+      }
+      .cell__name { grid-column: 1 / -1; font-size: var(--ui-fs-md); }
+      .num { text-align: left; font-size: var(--ui-fs-sm); }
+      .cell__reason { grid-column: 1 / -1; }
+      .cell__user { grid-column: 1 / -1; }
+    }

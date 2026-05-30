@@ -1,0 +1,152 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Proveedores</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Gestión de proveedores"
+        subtitle="Datos de contacto, lead time y ventanas de pedido/entrega para planificar reposiciones.">
+        <ion-button (click)="abrirNuevo()">+ Nuevo proveedor</ion-button>
+      </app-page-header>
+
+      <div class="kpis">
+        <app-kpi-card label="Proveedores activos"
+          [value]="data.activeSuppliers().length" tone="success"></app-kpi-card>
+        <app-kpi-card label="Total registrados"
+          [value]="data.suppliers().length" tone="primary"></app-kpi-card>
+        <app-kpi-card label="Pueden recibir pedidos hoy"
+          [value]="canOrderTodayCount()" tone="warning"
+          [hint]="todayLabel()"></app-kpi-card>
+      </div>
+
+      @if (data.suppliers().length === 0) {
+        <div class="empty">
+          <h3>No hay proveedores registrados</h3>
+          <p>Crea el primer proveedor para enlazar tus insumos y planificar reposiciones.</p>
+          <ion-button (click)="abrirNuevo()">+ Crear proveedor</ion-button>
+        </div>
+      }
+
+      <div class="cards">
+        @for (s of data.suppliers(); track s.id) {
+          <article class="card" [class.card--inactive]="!s.active">
+            <header class="card__head">
+              <div>
+                <h3 class="card__name">{{ s.name }}</h3>
+                @if (s.contactPerson) {
+                  <div class="card__contact">{{ s.contactPerson }}</div>
+                }
+              </div>
+              <ion-badge [color]="s.active ? 'success' : 'medium'">
+                {{ s.active ? 'Activo' : 'Inactivo' }}
+              </ion-badge>
+            </header>
+
+            @if (s.email || s.phone) {
+              <div class="card__info">
+                @if (s.email) { <span><ion-icon name="mail-open-outline"></ion-icon> {{ s.email }}</span> }
+                @if (s.phone) { <span class="mono">{{ s.phone }}</span> }
+              </div>
+            }
+
+            <div class="meta-row">
+              <div class="meta">
+                <div class="meta__label">Lead time hoy</div>
+                @if (dynLt(s.id); as lt) {
+                  <div class="meta__value mono">{{ lt.leadTimeDays }} día(s)</div>
+                  @if (lt.fromCalendar) {
+                    <div class="meta__hint">
+                      pedido {{ lt.nextOrderDate | date:'EEE dd/MM' }} ·
+                      entrega {{ lt.nextDeliveryDate | date:'EEE dd/MM' }}
+                    </div>
+                  } @else {
+                    <div class="meta__hint">sin calendario · usa LT fijo</div>
+                  }
+                }
+              </div>
+              <div class="meta">
+                <div class="meta__label">Pago</div>
+                <div class="meta__value">{{ s.paymentTerms || '—' }}</div>
+              </div>
+              <div class="meta">
+                <div class="meta__label">Estado hoy</div>
+                <div class="meta__value">
+                  @if (data.canOrderToSupplierToday(s.id)) {
+                    <span class="pill pill--ok">Hoy podés pedir</span>
+                  } @else {
+                    <span class="pill pill--off">No es día de pedido</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="windows">
+              <div class="window">
+                <div class="window__label">Días para pedir</div>
+                <div class="window__days">
+                  @for (d of weekDays; track d) {
+                    <span class="dot" [class.dot--on]="s.orderDays.includes(d)">{{ dayLabel(d) }}</span>
+                  }
+                </div>
+              </div>
+              <div class="window">
+                <div class="window__label">Días de entrega</div>
+                <div class="window__days">
+                  @for (d of weekDays; track d) {
+                    <span class="dot" [class.dot--on]="s.deliveryDays.includes(d)">{{ dayLabel(d) }}</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="supplies-block">
+              <div class="supplies-block__head">
+                <ion-icon name="leaf-outline"></ion-icon>
+                <strong>{{ s.suppliedItems.length }} item(s) registrado(s)</strong>
+              </div>
+              @if (s.suppliedItems.length === 0) {
+                <small class="supplies-block__empty">
+                  Sin insumos asignados. Edita el proveedor para vincular qué entrega.
+                </small>
+              } @else {
+                <div class="supplies-list">
+                  @for (it of s.suppliedItems; track it.kind + it.itemId) {
+                    <span class="supply-tag" [attr.data-kind]="it.kind">
+                      {{ itemName(it.kind, it.itemId) }}
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+
+            @if (s.notes) {
+              <p class="card__notes">{{ s.notes }}</p>
+            }
+
+            <footer class="card__foot">
+              <span class="card__since">Desde {{ s.createdAt | date:'dd-MM-yyyy' }}</span>
+              <div class="card__actions">
+                <ion-button size="small" fill="outline" (click)="abrirEditar(s)">
+                  <ion-icon name="create-outline" slot="start"></ion-icon>
+                  Editar
+                </ion-button>
+                <ion-button size="small" color="danger" fill="clear" (click)="eliminar(s)">
+                  <ion-icon name="trash-outline" slot="start"></ion-icon>
+                  Eliminar
+                </ion-button>
+              </div>
+            </footer>
+          </article>
+        }
+      </div>
+
+      <app-proveedor-form-modal
+        [isOpen]="modalOpen()"
+        [editing]="editing()"
+        (closed)="cerrarModal()"
+        (saved)="cerrarModal()">
+      </app-proveedor-form-modal>
+    </ion-content>

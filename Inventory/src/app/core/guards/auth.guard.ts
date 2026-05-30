@@ -30,7 +30,7 @@ export const adminGuard: CanActivateFn = () => {
  * Si el usuario no tiene rol permitido, lo redirige a su ruta por defecto.
  *
  * Uso en rutas:
- *   canActivate: [authGuard, requireRoles('admin', 'sales')]
+ *   canActivate: [authGuard, requireRoles('admin', 'ventas')]
  */
 export const requireRoles = (...roles: UserRole[]): CanActivateFn => () => {
   const auth = inject(AuthService);

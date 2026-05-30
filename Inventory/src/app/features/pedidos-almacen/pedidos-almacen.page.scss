@@ -1,0 +1,67 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+}
+@media (max-width: 760px) { .kpis { grid-template-columns: 1fr; } }
+
+.list {
+  padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+  display: grid;
+  gap: var(--ui-sp-3);
+}
+.req {
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  padding: var(--ui-sp-3) var(--ui-sp-4);
+}
+.req[data-status="pending"]       { border-left: 4px solid var(--ui-warning); }
+.req[data-status="in_production"] { border-left: 4px solid var(--ui-primary); }
+.req[data-status="completed"]     { border-left: 4px solid var(--ui-transit); }
+
+.req__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-sp-2);
+}
+.req[data-tipo="cliente"] { border-left-width: 6px; }
+.req__id { display: flex; align-items: baseline; gap: var(--ui-sp-2); flex-wrap: wrap; }
+.req__code { font-family: var(--ui-font-display); font-weight: var(--ui-fw-black); color: var(--ui-text); }
+.req__dest {
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  padding: 1px 8px;
+  border-radius: var(--ui-radius-pill, 9999px);
+  background: var(--ui-surface-2);
+  color: var(--ui-text-muted);
+}
+.req__dest--cliente { background: var(--ui-primary-tint); color: var(--ui-primary); }
+.req__meta { font-size: var(--ui-fs-sm); margin: 4px 0 var(--ui-sp-2); }
+
+.req__items {
+  display: grid;
+  gap: 2px;
+  padding: var(--ui-sp-2) 0;
+  border-top: 1px dashed var(--ui-border);
+  border-bottom: 1px dashed var(--ui-border);
+}
+.item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--ui-sp-3);
+  font-size: var(--ui-fs-sm);
+}
+.item__name { min-width: 0; }
+.item__qty { font-weight: var(--ui-fw-bold); }
+
+.req__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-sp-2);
+  flex-wrap: wrap;
+  margin-top: var(--ui-sp-3);
+}
+.muted { color: var(--ui-text-muted); font-size: var(--ui-fs-sm); }

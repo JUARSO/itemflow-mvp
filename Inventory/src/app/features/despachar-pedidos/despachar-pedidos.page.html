@@ -1,0 +1,58 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Despachar pedidos</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Despachar pedidos"
+    subtitle="Pedidos de clientes ya producidos, listos para entregar. Al despachar, el stock sale al cliente.">
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Por despachar" [value]="pedidos().length" tone="transit"></app-kpi-card>
+    <app-kpi-card label="Unidades" [value]="totalUnidades()" tone="primary"></app-kpi-card>
+  </div>
+
+  <div class="list">
+    @if (pedidos().length === 0) {
+      <app-empty-state icon="🚚" title="Sin pedidos por despachar"
+        body="Cuando Producción termine un pedido de cliente, aparecerá aquí para despacharlo."></app-empty-state>
+    }
+    @for (o of pedidos(); track o.id) {
+      <article class="ped">
+        <header class="ped__head">
+          <div>
+            <span class="ped__code mono">{{ o.code }}</span>
+            <span class="ped__cliente">{{ clienteNombre(o) }}</span>
+          </div>
+          <div class="ped__when muted">
+            @if (o.requestedDeliveryDate) { Para {{ o.requestedDeliveryDate | date:'EEE dd-MM-yyyy' }} }
+          </div>
+        </header>
+
+        <div class="ped__items">
+          @for (d of itemsListos(o); track d.name) {
+            <div class="item">
+              <span class="item__name">{{ d.name }}</span>
+              <span class="item__qty mono" [class.short]="d.qty < d.pedido">
+                {{ d.qty }}@if (d.qty < d.pedido) { <span class="muted">/ {{ d.pedido }} pedidas</span> }
+              </span>
+            </div>
+          }
+        </div>
+
+        @if (tenant.canCreateOrder()) {
+          <footer class="ped__actions">
+            <ion-button size="small" (click)="despachar(o)">
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Despachar al cliente
+            </ion-button>
+          </footer>
+        }
+      </article>
+    }
+  </div>
+</ion-content>

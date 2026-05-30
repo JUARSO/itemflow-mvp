@@ -1,0 +1,99 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      title="Nueva orden de compra"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <div class="row">
+          <app-form-field label="Proveedor" [required]="true">
+            <select formControlName="supplierId" (change)="onSupplierChange()">
+              <option value="">— Selecciona proveedor —</option>
+              @for (s of data.activeSuppliers(); track s.id) {
+                <option [value]="s.id">{{ s.name }}</option>
+              }
+              <option value="__other__">Otro (escribir nombre)</option>
+            </select>
+          </app-form-field>
+          <app-form-field label="Fecha esperada de entrega">
+            <input type="date" formControlName="expectedDate" />
+          </app-form-field>
+        </div>
+
+        @if (form.controls.supplierId.value === '__other__') {
+          <app-form-field label="Nombre del proveedor (manual)" [required]="true">
+            <input type="text" formControlName="supplierName" placeholder="Ej. Molinos del Sur" />
+          </app-form-field>
+        } @else if (selectedSupplier(); as s) {
+          <div class="supplier-meta">
+            <span>
+              <strong>Lead time:</strong> {{ s.leadTimeDays }} día(s)
+              · <strong>Pago:</strong> {{ s.paymentTerms || '—' }}
+            </span>
+            @if (s.suppliedItems.length > 0) {
+              <small>{{ s.suppliedItems.length }} item(s) registrados → aparecen primero abajo.</small>
+            } @else {
+              <small class="warn">
+                Este proveedor no tiene insumos vinculados.
+                Podés editarlo en Proveedores para verlos prioritarios.
+              </small>
+            }
+          </div>
+        }
+
+        <div class="items">
+          <div class="items__head">
+            <h3>Insumos a comprar</h3>
+            <ion-button size="small" fill="clear" class="ghost" (click)="addLine()">+ Agregar línea</ion-button>
+          </div>
+
+          @if (lines.controls.length === 0) {
+            <div class="items__empty">Agrega al menos una línea con insumo y cantidad.</div>
+          }
+
+          <div formArrayName="items" class="lines">
+            @for (ctrl of lines.controls; track $index) {
+              <div [formGroupName]="$index" class="line">
+                <select formControlName="itemRef" class="line__supply">
+                  <option value="">— Selecciona insumo o producto —</option>
+                  @if (supplierItemRefs().length > 0) {
+                    <optgroup [label]="'Asignados a ' + (selectedSupplier()?.name ?? '')">
+                      @for (s of supplierSupplies(); track s.id) {
+                        <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit }})</option>
+                      }
+                      @for (p of supplierProducts(); track p.id) {
+                        <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit }}) · reventa</option>
+                      }
+                    </optgroup>
+                  }
+                  <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros insumos' : 'Insumos'">
+                    @for (s of nonSupplierSupplies(); track s.id) {
+                      <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit }})</option>
+                    }
+                  </optgroup>
+                  <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros productos de reventa' : 'Productos de reventa'">
+                    @for (p of nonSupplierProducts(); track p.id) {
+                      <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit }})</option>
+                    }
+                  </optgroup>
+                </select>
+                <input type="number" formControlName="qty" placeholder="Cant." min="0.001" step="0.001" class="line__qty mono" />
+                <input type="number" formControlName="unitCost" placeholder="C/U" min="0" step="0.01" class="line__cost mono" />
+                <button type="button" class="line__remove" (click)="removeLine($index)" aria-label="Eliminar">×</button>
+              </div>
+            }
+          </div>
+
+          <div class="total">
+            <span>Total OC</span>
+            <strong class="mono">₡{{ total() | number:'1.0-0' }}</strong>
+          </div>
+        </div>
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid || lines.length === 0">
+          Crear OC
+        </ion-button>
+      </div>
+    </app-form-modal>

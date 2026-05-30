@@ -3,13 +3,17 @@ import {
   Alert, Customer, CustomerOrder, DemandPrediction, KardexEntry, Member,
   OrderItem, OrderReservation, OrderShortfall, Product, ProductionMermaReason,
   PurchaseOrder, Recipe, ReturnedLot, SaleRecord, StockItem,
+  SuggestedPrePurchase, SuggestedPrePurchaseItem, SuggestedReason,
   Supplier, Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
+  Urna, UrnaLote, UrnaLoteLine, PosSale, PosSaleLine, RecurringOrder, RecurringOrderItem,
 } from '../models';
 import {
   MOCK_ALERTS, MOCK_CUSTOMERS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
   MOCK_PRODUCTS, MOCK_PRODUCT_STOCK, MOCK_PURCHASE_ORDERS, MOCK_RECIPES,
   MOCK_RETURNED_LOTS, MOCK_SALES, MOCK_SUPPLIERS, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
+  MOCK_URNAS, MOCK_URNA_LOTES, MOCK_CONSUMER_PRICES,
 } from '../mocks/dummy-data';
+import { computeSupplierLeadTime, LeadTimeResult } from '../lead-time';
 
 /**
  * Servicio único in-memory para el MVP.
@@ -33,10 +37,24 @@ export class DataService {
   private readonly _customers = signal<Customer[]>([...MOCK_CUSTOMERS]);
   private readonly _returnedLots = signal<ReturnedLot[]>([...MOCK_RETURNED_LOTS]);
   private readonly _suppliers = signal<Supplier[]>([...MOCK_SUPPLIERS]);
+  private readonly _urnas = signal<Urna[]>([...MOCK_URNAS]);
+  private readonly _urnaLotes = signal<UrnaLote[]>([...MOCK_URNA_LOTES]);
+  private readonly _posSales = signal<PosSale[]>([]);
+  private readonly _recurringOrders = signal<RecurringOrder[]>([]);
+  /** Precio FINAL al consumidor por producto (catálogo de Ventas). */
+  private readonly _consumerPrices = signal<Record<string, number>>({ ...MOCK_CONSUMER_PRICES });
+  /**
+   * Adiciones MANUALES al carrito de pre-compra por proveedor. Es estado
+   * efímero (en-memoria) que se limpia al aprobar la pre-compra de ese
+   * proveedor. Estructura: { [supplierId]: [{ supplyId, qty }] }.
+   * No se persiste — la pre-compra sigue siendo "dinámica", esto es sólo
+   * una capa de overlay para que el usuario pueda agregar items.
+   */
+  private readonly _manualAdditions = signal<Record<string, { supplyId: string; qty: number }[]>>({});
 
   constructor() {
     // Sembrar alertas auto-derivadas a partir del stock inicial.
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
   }
 
 
@@ -68,20 +86,229 @@ export class DataService {
   );
   readonly suppliers = this._suppliers.asReadonly();
   readonly activeSuppliers = computed(() => this._suppliers().filter(s => s.active));
+  readonly urnas = this._urnas.asReadonly();
+  readonly activeUrnas = computed(() => this._urnas().filter(u => u.active));
+  readonly urnaLotes = this._urnaLotes.asReadonly();
+  readonly posSales = this._posSales.asReadonly();
+  readonly consumerPrices = this._consumerPrices.asReadonly();
+
+  /** Modelo de almacén único: el Almacén de Ventas es la primera urna activa. */
+  readonly almacen = computed(() => this.activeUrnas()[0] ?? null);
+
+  /** Pedidos de reposición listos para recibir en el almacén (completados, sin recibir). */
+  readonly almacenRecepcionesPendientes = computed(() => {
+    const id = this.activeUrnas()[0]?.id;
+    if (!id) return 0;
+    return this._orders().filter(o => o.urnaId === id && o.status === 'completed' && !o.deliveredToUrnaAt).length;
+  });
+
+  // ----- Catálogo de Ventas (precios al consumidor) -----
+
+  /** Precio base de producción (lo que "vende" producción) — es el COSTO de Ventas. */
+  baseSalePrice(productId: string): number {
+    return this.productById(productId)?.sellPrice ?? 0;
+  }
+
+  /** Precio final al consumidor. Si no está configurado, cae al precio base. */
+  consumerPrice(productId: string): number {
+    const c = this._consumerPrices()[productId];
+    return c != null ? c : this.baseSalePrice(productId);
+  }
+
+  /** Configura el precio final al consumidor de un producto. */
+  setConsumerPrice(productId: string, price: number): void {
+    const p = Math.max(0, Math.round(price || 0));
+    this._consumerPrices.update(map => ({ ...map, [productId]: p }));
+  }
+
+  // ----- Inventario del almacén de Ventas -----
+
+  /** Estado binario del producto en el almacén: disponible si hay stock, agotado si no. */
+  almacenProductStatus(productId: string): StockStatus {
+    return this.urnaProductQty(this.almacenId(), productId) > 0 ? 'available' : 'out';
+  }
+
+  /**
+   * Unidades EN CAMINO al almacén para un producto: solicitudes de reposición
+   * (con urnaId) aún no recibidas. Para las completadas usa lo producido
+   * (fulfilledQty); para las demás, lo solicitado (qty).
+   */
+  almacenIncomingForProduct(productId: string): number {
+    let total = 0;
+    for (const o of this._orders()) {
+      if (!o.urnaId || o.status === 'cancelled' || o.deliveredToUrnaAt) continue;
+      for (const it of o.items) {
+        if (it.productId !== productId) continue;
+        total += o.status === 'completed' ? it.fulfilledQty : it.qty;
+      }
+    }
+    return total;
+  }
+
+  /**
+   * Detalle de lo que viene en camino de un producto: cada solicitud de
+   * reposición pendiente con su cantidad, estado y fecha en que se necesita.
+   * Ordenado por fecha (lo más próximo primero).
+   */
+  almacenIncomingDetail(productId: string): Array<{
+    orderCode: string; qty: number; estado: string; deliveryDate?: Date;
+  }> {
+    const out: Array<{ orderCode: string; qty: number; estado: string; deliveryDate?: Date }> = [];
+    for (const o of this._orders()) {
+      if (!o.urnaId || o.status === 'cancelled' || o.deliveredToUrnaAt) continue;
+      const it = o.items.find(i => i.productId === productId);
+      if (!it) continue;
+      const qty = o.status === 'completed' ? it.fulfilledQty : it.qty;
+      if (qty <= 0) continue;
+      const estado = o.status === 'pending' ? 'En cola'
+        : o.status === 'in_production' ? 'En fabricación'
+        : 'Listo para recibir';
+      out.push({ orderCode: o.code, qty, estado, deliveryDate: o.requestedDeliveryDate });
+    }
+    out.sort((a, b) => (a.deliveryDate?.getTime() ?? Infinity) - (b.deliveryDate?.getTime() ?? Infinity));
+    return out;
+  }
 
   /** Órdenes que aún están abiertas en el flujo (no completadas ni canceladas). */
+  // Colas de PEDIDOS DE CLIENTES EXTERNOS (lado Ventas): excluyen las
+  // solicitudes de reposición de almacén (esas tienen urnaId y van a Producción).
   readonly openOrders = computed(() =>
-    this._orders().filter(o => o.status === 'pending' || o.status === 'in_production')
+    this._orders().filter(o => !o.urnaId && (o.status === 'pending' || o.status === 'in_production'))
   );
   readonly pendingOrders = computed(() =>
-    this._orders().filter(o => o.status === 'pending')
+    this._orders().filter(o => !o.urnaId && o.status === 'pending')
   );
   readonly inProductionOrders = computed(() =>
-    this._orders().filter(o => o.status === 'in_production')
+    this._orders().filter(o => !o.urnaId && o.status === 'in_production')
   );
   readonly completedOrders = computed(() =>
-    this._orders().filter(o => o.status === 'completed')
+    this._orders().filter(o => !o.urnaId && o.status === 'completed')
   );
+
+  // Solicitudes de REPOSICIÓN DE ALMACÉN (pedidos con urnaId) — lado Producción.
+  readonly almacenRequests = computed(() =>
+    this._orders()
+      .filter(o => o.urnaId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  );
+  /** Solicitudes de almacén pendientes de producir (badge de Producción). */
+  readonly almacenRequestsPorProducir = computed(() =>
+    this._orders().filter(o => o.urnaId && o.status === 'pending').length
+  );
+
+  // ----- Flujo de pedidos de CLIENTE (simétrico al de almacén) -----
+
+  /** Pedidos de cliente RECIBIDOS, esperando que Ventas los corrobore. */
+  readonly pedidosRecibidos = computed(() =>
+    this._orders()
+      .filter(o => o.customerId && o.status === 'pending' && !o.acceptedBySalesAt)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  );
+
+  /** Cola UNIFICADA de producción: pedidos de almacén + pedidos de cliente corroborados. */
+  readonly produccionQueue = computed(() =>
+    this._orders()
+      .filter(o =>
+        o.status !== 'cancelled' && !o.deliveredToUrnaAt && !o.dispatchedAt &&
+        (o.status === 'pending' || o.status === 'in_production' || o.status === 'completed') &&
+        (!!o.urnaId || !!o.acceptedBySalesAt),
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  );
+
+  /** Pedidos de cliente ya producidos, esperando DESPACHO al cliente. */
+  readonly pedidosPorDespachar = computed(() =>
+    this._orders()
+      .filter(o => o.customerId && o.status === 'completed' && !o.dispatchedAt)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  );
+
+  /** Pedidos despachados, esperando FACTURACIÓN. */
+  readonly pedidosPorFacturar = computed(() =>
+    this._orders()
+      .filter(o => o.customerId && !!o.dispatchedAt && !o.invoicedAt)
+      .sort((a, b) => (b.dispatchedAt?.getTime() ?? 0) - (a.dispatchedAt?.getTime() ?? 0))
+  );
+
+  /** Pedidos FACTURADOS (historial). */
+  readonly pedidosFacturados = computed(() =>
+    this._orders()
+      .filter(o => o.customerId && !!o.invoicedAt)
+      .sort((a, b) => (b.invoicedAt?.getTime() ?? 0) - (a.invoicedAt?.getTime() ?? 0))
+  );
+
+  /** Conteos para badges del menú. */
+  readonly pedidosRecibidosCount = computed(() => this.pedidosRecibidos().length);
+  readonly produccionPorProducir = computed(() => this.produccionQueue().filter(o => o.status === 'pending').length);
+  readonly pedidosPorDespacharCount = computed(() => this.pedidosPorDespachar().length);
+  readonly pedidosPorFacturarCount = computed(() => this.pedidosPorFacturar().length);
+
+  // ----- Pedidos recurrentes (plantillas por cliente) -----
+
+  readonly recurringOrders = this._recurringOrders.asReadonly();
+
+  recurringOrdersFor(customerId: string): RecurringOrder[] {
+    return this._recurringOrders()
+      .filter(r => r.customerId === customerId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  createRecurringOrder(input: {
+    customerId: string; label?: string; weekdays: number[]; items: RecurringOrderItem[];
+  }): RecurringOrder {
+    const items = input.items.filter(i => i.qty > 0);
+    if (items.length === 0) throw new Error('Agrega al menos un producto.');
+    if (input.weekdays.length === 0) throw new Error('Elige al menos un día de la semana.');
+    const ro: RecurringOrder = {
+      id: `rec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      customerId: input.customerId,
+      label: input.label?.trim() || undefined,
+      weekdays: [...input.weekdays].sort((a, b) => a - b),
+      items,
+      active: true,
+      createdAt: new Date(),
+    };
+    this._recurringOrders.update(list => [ro, ...list]);
+    return ro;
+  }
+
+  deleteRecurringOrder(id: string): void {
+    this._recurringOrders.update(list => list.filter(r => r.id !== id));
+  }
+
+  /**
+   * Genera un pedido real a partir de una plantilla recurrente. La fecha de
+   * entrega es el próximo día (desde hoy) que coincida con sus weekdays.
+   */
+  generateRecurringOrder(id: string, userId: string, userName: string): CustomerOrder {
+    const ro = this._recurringOrders().find(r => r.id === id);
+    if (!ro) throw new Error('Pedido recurrente no encontrado.');
+    const customer = this.customerById(ro.customerId);
+    const items = ro.items
+      .filter(i => i.qty > 0)
+      .map(i => ({ productId: i.productId, qty: i.qty, unitPrice: this.priceForCustomer(customer, i.productId) }));
+    if (items.length === 0) throw new Error('La plantilla no tiene productos.');
+    const order = this.createOrder({
+      customerId: ro.customerId,
+      items,
+      requestedDeliveryDate: this.nextWeekdayDate(ro.weekdays),
+      notes: ro.label ? `Recurrente: ${ro.label}` : 'Pedido recurrente',
+      userId, userName,
+    });
+    this._recurringOrders.update(list => list.map(r => r.id === id ? { ...r, lastGeneratedAt: new Date() } : r));
+    return order;
+  }
+
+  /** Próxima fecha (desde hoy, inclusive) que cae en alguno de los weekdays. */
+  private nextWeekdayDate(weekdays: number[]): Date {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    if (weekdays.length === 0) return d;
+    for (let i = 0; i < 14; i++) {
+      if (weekdays.includes(d.getDay())) return new Date(d);
+      d.setDate(d.getDate() + 1);
+    }
+    return new Date();
+  }
 
   // ----- KPIs computed -----
   readonly totalProducts = computed(() => this._products().filter(p => p.active).length);
@@ -312,7 +539,7 @@ export class DataService {
         reservedQty: 0,
         status: 'out' as StockStatus,
       }]);
-      this.regenerateRestockAlerts();
+      this.regenerateAutoAlerts();
     }
     return product;
   }
@@ -345,7 +572,7 @@ export class DataService {
           status: 'out' as StockStatus,
         })),
       ]);
-      this.regenerateRestockAlerts();
+      this.regenerateAutoAlerts();
     }
   }
 
@@ -382,7 +609,7 @@ export class DataService {
   }
 
   /** Crea N insumos + sus filas de stock inicial en cero. */
-  createSuppliesBulk(inputs: Omit<Supply, 'id'>[]) {
+  createSuppliesBulk(inputs: Omit<Supply, 'id'>[]): Supply[] {
     const base = Date.now();
     const items: Supply[] = inputs.map((input, i) => ({ ...input, id: `s-${base}-${i}` }));
     this._supplies.update(list => [...list, ...items]);
@@ -395,6 +622,7 @@ export class DataService {
         status: 'out' as StockStatus,
       })),
     ]);
+    return items;
   }
 
   // ============================================================
@@ -531,7 +759,7 @@ export class DataService {
           });
         }
       }
-      this.regenerateRestockAlerts();
+      this.regenerateAutoAlerts();
     }
 
     this._pos.update(list => list.map(p =>
@@ -548,10 +776,577 @@ export class DataService {
   }
 
   // ============================================================
+  //  Pre-compras (sugerencias automáticas — sin persistencia)
+  // ============================================================
+
+  /**
+   * Cantidad de un insumo que ya viene en camino vía OCs pending. Se usa
+   * para evitar sugerir insumos que ya están cubiertos por una OC abierta.
+   */
+  private pendingIncomingQtyForSupply(supplyId: string): number {
+    let qty = 0;
+    for (const po of this._pos()) {
+      if (po.status !== 'pending') continue;
+      for (const it of po.items) {
+        if (it.supplyId === supplyId) qty += it.qty;
+      }
+    }
+    return qty;
+  }
+
+  /**
+   * Lista de OCs pendientes que contienen un insumo dado, con la cantidad
+   * que viene y la fecha esperada de llegada (si está definida). Se usa
+   * en la UI de insumos para mostrar "en camino" por tarjeta.
+   * Ordenado por fecha esperada (más próxima primero).
+   */
+  pendingPOsForSupply(supplyId: string): Array<{
+    poId: string;
+    code: string;
+    supplier: string;
+    qty: number;
+    expectedDate?: Date;
+  }> {
+    const out: Array<{ poId: string; code: string; supplier: string; qty: number; expectedDate?: Date }> = [];
+    for (const po of this._pos()) {
+      if (po.status !== 'pending') continue;
+      const qty = po.items
+        .filter(it => it.supplyId === supplyId)
+        .reduce((s, it) => s + it.qty, 0);
+      if (qty <= 0) continue;
+      out.push({
+        poId: po.id,
+        code: po.code,
+        supplier: po.supplier,
+        qty,
+        expectedDate: po.expectedDate,
+      });
+    }
+    out.sort((a, b) => {
+      const at = a.expectedDate?.getTime() ?? Infinity;
+      const bt = b.expectedDate?.getTime() ?? Infinity;
+      return at - bt;
+    });
+    return out;
+  }
+
+  /**
+   * Pre-compras SUGERIDAS, calculadas en runtime.
+   *
+   * Algoritmo (por cada insumo activo):
+   *  1. Stock efectivo = stock actual + pendientes en OCs abiertas.
+   *  2. Demanda diaria = rolling mean(7d) del consumo en kardex.
+   *  3. LT real = `supplyLeadTime(supplyId, hoy)` — del proveedor con
+   *     entrega más temprana según su calendario semanal.
+   *  4. Stock proyectado al arribo = stock efectivo - (demanda × LT).
+   *  5. Se incluye si:
+   *       - stock efectivo ≤ reorderPoint  (ya está bajo)  → `below_rop`
+   *       - O stock al arribo ≤ minStock   (no aguanta el LT) → `wont_cover_lt`
+   *  6. Cantidad sugerida = maxStock - stockAtArrival, redondeada a
+   *     presentación entera si el insumo tiene una.
+   *
+   * Se agrupa por proveedor más rápido y se calcula totalCost / fechas.
+   * **No se guarda nada.** El resultado cambia automáticamente al cambiar
+   * stock, recibir OCs, o ajustar calendarios.
+   */
+  /**
+   * Construye el item sugerido completo (con todos los datos derivados) a
+   * partir de un insumo + supplierId + cantidad ya decidida. Se usa tanto
+   * para los items auto-detectados como para los agregados a mano.
+   */
+  private buildSuggestedItem(
+    supply: Supply,
+    supplierId: string,
+    qty: number,
+    reason: SuggestedReason,
+  ): SuggestedPrePurchaseItem {
+    const currentStock = this.supplyStockFor(supply.id)?.quantity ?? 0;
+    const pendingQty = this.pendingIncomingQtyForSupply(supply.id);
+    const dailyDemand = this.rollingMean('supply', supply.id, 7) || 0;
+    const daysUntilEmpty = dailyDemand > 0 ? currentStock / dailyDemand : Infinity;
+    const unitCost = this.supplierUnitCost(supplierId, supply.id) || supply.cost;
+    return {
+      supplyId: supply.id,
+      itemName: supply.name,
+      qty,
+      unitCost,
+      currentStock,
+      pendingQty,
+      reorderPoint: supply.reorderPoint,
+      minStock: supply.minStock,
+      dailyDemand,
+      daysUntilEmpty,
+      reason,
+      manual: reason === 'manual',
+    };
+  }
+
+  suggestedPrePurchases(today: Date = new Date()): SuggestedPrePurchase[] {
+    const bucket = new Map<string, SuggestedPrePurchaseItem[]>();
+
+    // --- 1. Items auto-detectados por el algoritmo de reposición ---
+    for (const supply of this.activeSupplies()) {
+      const lt = this.supplyLeadTime(supply.id, today);
+      if (!lt) continue; // sin proveedores → no se puede sugerir
+
+      const currentStock = this.supplyStockFor(supply.id)?.quantity ?? 0;
+      const pendingQty = this.pendingIncomingQtyForSupply(supply.id);
+      const effectiveStock = currentStock + pendingQty;
+
+      const dailyDemand = this.rollingMean('supply', supply.id, 7) || 0;
+      const consumeDuringLT = dailyDemand * lt.leadTimeDays;
+      const stockAtArrival = effectiveStock - consumeDuringLT;
+
+      let reason: SuggestedReason | null = null;
+      if (effectiveStock <= supply.reorderPoint) reason = 'below_rop';
+      else if (stockAtArrival <= supply.minStock && dailyDemand > 0) reason = 'wont_cover_lt';
+      if (!reason) continue;
+
+      const rawTarget = Math.max(0, supply.maxStock - stockAtArrival);
+      if (rawTarget <= 0) continue;
+
+      // Redondear a presentación entera si el insumo tiene una (no tiene
+      // sentido pedir 2.3 sacos: redondear hacia arriba).
+      let qty: number;
+      if (supply.presentation && supply.presentation.size > 0) {
+        const packs = Math.ceil(rawTarget / supply.presentation.size);
+        qty = packs * supply.presentation.size;
+      } else {
+        qty = Math.round(rawTarget * 100) / 100;
+      }
+
+      const item = this.buildSuggestedItem(supply, lt.supplierId, qty, reason);
+      const list = bucket.get(lt.supplierId) ?? [];
+      list.push(item);
+      bucket.set(lt.supplierId, list);
+    }
+
+    // --- 2. Adiciones MANUALES del usuario (overlay) ---
+    // Se agregan a la lista del proveedor correspondiente, evitando
+    // duplicar items que ya estén en la sugerencia automática.
+    const manual = this._manualAdditions();
+    for (const supplierId of Object.keys(manual)) {
+      const additions = manual[supplierId];
+      if (!additions || additions.length === 0) continue;
+      const list = bucket.get(supplierId) ?? [];
+      const existingIds = new Set(list.map(i => i.supplyId));
+      for (const add of additions) {
+        if (existingIds.has(add.supplyId)) continue; // ya estaba auto
+        const supply = this.supplyById(add.supplyId);
+        if (!supply || !supply.active) continue;
+        list.push(this.buildSuggestedItem(supply, supplierId, add.qty, 'manual'));
+        existingIds.add(add.supplyId);
+      }
+      bucket.set(supplierId, list);
+    }
+
+    // --- 3. Materializar al shape final ---
+    const result: SuggestedPrePurchase[] = [];
+    for (const [supplierId, items] of bucket) {
+      const sup = this.supplierById(supplierId);
+      if (!sup) continue;
+      const sLt = this.supplierLeadTime(supplierId, today);
+      if (!sLt) continue;
+      const totalCost = items.reduce((s, it) => s + it.qty * it.unitCost, 0);
+      // Items más críticos primero; los manuales al final.
+      items.sort((a, b) => {
+        if (a.manual !== b.manual) return a.manual ? 1 : -1;
+        return a.daysUntilEmpty - b.daysUntilEmpty;
+      });
+      result.push({
+        supplierId,
+        supplierName: sup.name,
+        items,
+        totalCost,
+        nextOrderDate: sLt.nextOrderDate,
+        nextDeliveryDate: sLt.nextDeliveryDate,
+        leadTimeDays: sLt.leadTimeDays,
+        fromCalendar: sLt.fromCalendar,
+      });
+    }
+    result.sort((a, b) => a.leadTimeDays - b.leadTimeDays);
+    return result;
+  }
+
+  /**
+   * Agrega manualmente un insumo al carrito de pre-compra de un proveedor.
+   * Si ya existe (sea auto o manual), no hace nada. Sólo permite items
+   * que el proveedor entrega (Supplier.suppliedItems).
+   */
+  addManualPrePurchaseItem(supplierId: string, supplyId: string, qty: number): void {
+    const sup = this.supplierById(supplierId);
+    if (!sup) throw new Error('Proveedor no encontrado.');
+    const supplies = sup.suppliedItems.some(i => i.kind === 'supply' && i.itemId === supplyId);
+    if (!supplies) throw new Error('Este proveedor no entrega ese insumo.');
+    if (qty <= 0) throw new Error('La cantidad debe ser mayor a cero.');
+    this._manualAdditions.update(map => {
+      const current = map[supplierId] ?? [];
+      if (current.some(it => it.supplyId === supplyId)) return map; // ya está
+      return { ...map, [supplierId]: [...current, { supplyId, qty }] };
+    });
+  }
+
+  /** Quita un item manual del carrito de un proveedor. */
+  removeManualPrePurchaseItem(supplierId: string, supplyId: string): void {
+    this._manualAdditions.update(map => {
+      const current = map[supplierId];
+      if (!current) return map;
+      const next = current.filter(it => it.supplyId !== supplyId);
+      if (next.length === 0) {
+        const { [supplierId]: _, ...rest } = map;
+        return rest;
+      }
+      return { ...map, [supplierId]: next };
+    });
+  }
+
+  /** Limpia todos los items manuales de un proveedor (post-aprobación). */
+  private clearManualForSupplier(supplierId: string): void {
+    this._manualAdditions.update(map => {
+      if (!map[supplierId]) return map;
+      const { [supplierId]: _, ...rest } = map;
+      return rest;
+    });
+  }
+
+  /**
+   * Materializa la pre-compra sugerida de un proveedor como una OC real.
+   * En la próxima consulta de `suggestedPrePurchases`, los insumos que
+   * acaban de entrar en OC pending dejan de aparecer (ya están cubiertos).
+   */
+  approvePrePurchaseForSupplier(supplierId: string, today: Date = new Date()): PurchaseOrder {
+    const all = this.suggestedPrePurchases(today);
+    const pre = all.find(p => p.supplierId === supplierId);
+    if (!pre) throw new Error('No hay sugerencia activa para ese proveedor.');
+    if (pre.items.length === 0) throw new Error('La sugerencia no tiene items.');
+
+    const po = this.createPurchaseOrder({
+      supplier: pre.supplierName,
+      status: 'pending',
+      items: pre.items.map(it => ({
+        supplyId: it.supplyId,
+        itemName: it.itemName,
+        qty: it.qty,
+        unitCost: it.unitCost,
+      })),
+      totalCost: pre.totalCost,
+      expectedDate: pre.nextDeliveryDate,
+    });
+    // Las adiciones manuales se materializaron en la OC: limpiamos.
+    this.clearManualForSupplier(supplierId);
+    return po;
+  }
+
+  // ============================================================
   //  Movimientos manuales de stock
   // ============================================================
   registerKardexEntry(entry: KardexEntry) {
     this._kardex.update(list => [entry, ...list]);
+  }
+
+  // ============================================================
+  //  Urnas (vitrinas / puntos de venta — lado Ventas)
+  //  La urna es una ubicación de stock SEPARADA del inventario central.
+  // ============================================================
+
+  urnaById(id: string): Urna | undefined {
+    return this._urnas().find(u => u.id === id);
+  }
+
+  /** Lotes de una urna, ordenados por recepción (más reciente primero, para mostrar). */
+  urnaLotesFor(urnaId: string): UrnaLote[] {
+    return this._urnaLotes()
+      .filter(l => l.urnaId === urnaId)
+      .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
+  }
+
+  /** Cantidad total de un producto en una urna (suma de todos sus lotes). */
+  urnaProductQty(urnaId: string, productId: string): number {
+    let total = 0;
+    for (const l of this._urnaLotes()) {
+      if (l.urnaId !== urnaId) continue;
+      for (const ln of l.lines) if (ln.productId === productId) total += ln.qty;
+    }
+    return total;
+  }
+
+  /**
+   * Totales por producto en una urna (agregando todos sus lotes), solo
+   * productos con stock > 0. Útil para la vista de "productos en vitrina".
+   */
+  urnaProductTotals(urnaId: string): { productId: string; productName: string; quantity: number }[] {
+    const map = new Map<string, { productId: string; productName: string; quantity: number }>();
+    for (const l of this._urnaLotes()) {
+      if (l.urnaId !== urnaId) continue;
+      for (const ln of l.lines) {
+        if (ln.qty <= 0) continue;
+        const cur = map.get(ln.productId);
+        if (cur) cur.quantity += ln.qty;
+        else map.set(ln.productId, { productId: ln.productId, productName: ln.productName, quantity: ln.qty });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.productName.localeCompare(b.productName));
+  }
+
+  /**
+   * Consume `qty` de un producto en una urna en modo FIFO: descuenta primero
+   * de los lotes más antiguos. El caller debe validar disponibilidad antes.
+   */
+  private consumeUrnaFifo(urnaId: string, productId: string, qty: number): void {
+    let remaining = qty;
+    const ordered = this._urnaLotes()
+      .filter(l => l.urnaId === urnaId)
+      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
+    const deductions = new Map<string, number>();
+    for (const l of ordered) {
+      if (remaining <= 0) break;
+      const line = l.lines.find(ln => ln.productId === productId && ln.qty > 0);
+      if (!line) continue;
+      const take = Math.min(line.qty, remaining);
+      deductions.set(l.id, take);
+      remaining -= take;
+    }
+    this._urnaLotes.update(list => list.map(l => {
+      const take = deductions.get(l.id);
+      if (!take) return l;
+      return { ...l, lines: l.lines.map(ln =>
+        ln.productId === productId ? { ...ln, qty: ln.qty - take } : ln) };
+    }));
+  }
+
+  /** Solicitudes de reposición (órdenes con urnaId) de una urna, recientes primero. */
+  urnaOrders(urnaId: string): CustomerOrder[] {
+    return this._orders().filter(o => o.urnaId === urnaId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  createUrna(input: { name: string; location?: string; responsible?: string; notes?: string }): Urna {
+    const urna: Urna = {
+      id: `urna-${Date.now()}`,
+      name: input.name.trim(),
+      location: input.location?.trim() || undefined,
+      responsible: input.responsible?.trim() || undefined,
+      notes: input.notes?.trim() || undefined,
+      active: true,
+      createdAt: new Date(),
+    };
+    this._urnas.update(list => [urna, ...list]);
+    return urna;
+  }
+
+  updateUrna(id: string, patch: Partial<Omit<Urna, 'id' | 'createdAt'>>): void {
+    this._urnas.update(list => list.map(u => u.id === id ? { ...u, ...patch } : u));
+  }
+
+  deleteUrna(id: string): void {
+    this._urnas.update(list => list.filter(u => u.id !== id));
+    this._urnaLotes.update(list => list.filter(l => l.urnaId !== id));
+  }
+
+  /**
+   * Ventas crea una SOLICITUD DE REPOSICIÓN para una urna: una orden interna
+   * con urnaId que entra a la cola de Producción. unitPrice = 0 (no es venta).
+   */
+  requestUrnaReplenishment(input: {
+    urnaId: string;
+    items: { productId: string; qty: number }[];
+    requestedDeliveryDate?: Date;
+    notes?: string;
+    userId: string;
+    userName: string;
+  }): CustomerOrder {
+    const urna = this.urnaById(input.urnaId);
+    if (!urna) throw new Error('Urna no encontrada.');
+    const items = input.items.filter(it => it.qty > 0);
+    if (items.length === 0) throw new Error('Agrega al menos un producto con cantidad.');
+    return this.createOrder({
+      urnaId: input.urnaId,
+      items: items.map(it => ({ productId: it.productId, qty: it.qty, unitPrice: 0 })),
+      purpose: `Reposición urna ${urna.name}`,
+      notes: input.notes,
+      requestedDeliveryDate: input.requestedDeliveryDate,
+      userId: input.userId,
+      userName: input.userName,
+    });
+  }
+
+  /**
+   * Entrega a la urna lo producido por una orden de reposición ya completada:
+   * mueve fulfilledQty del stock central a la urna creando un NUEVO LOTE con la
+   * fecha de recepción. Registra kardex `urna_in` por producto.
+   */
+  deliverOrderToUrna(orderId: string, userId: string, userName: string): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Orden no encontrada.');
+    if (!order.urnaId) throw new Error('La orden no tiene urna de destino.');
+    if (order.status !== 'completed') throw new Error('Solo se entrega a la urna una orden completada por producción.');
+    if (order.deliveredToUrnaAt) throw new Error('Esta orden ya fue entregada a la urna.');
+
+    const now = new Date();
+    const lines: UrnaLoteLine[] = [];
+    for (const it of order.items) {
+      if (it.fulfilledQty <= 0) continue;
+      const product = this.productById(it.productId);
+      // Descontar del stock central lo que se despacha a la urna (clamp a lo disponible).
+      const central = this.productStockFor(it.productId);
+      const move = Math.min(it.fulfilledQty, central?.quantity ?? 0);
+      if (central && move > 0) {
+        const afterOut = central.quantity - move;
+        const newStatus = this.computeProductStatus(afterOut, product?.reorderPoint, product?.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.productId === it.productId ? { ...s, quantity: afterOut, status: newStatus } : s));
+      }
+      lines.push({ productId: it.productId, productName: it.productName, qty: it.fulfilledQty });
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${it.productId}-uin`,
+        productId: it.productId, itemName: it.productName,
+        type: 'out', qty: it.fulfilledQty, balance: it.fulfilledQty,
+        cost: this.effectiveProductCost(it.productId),
+        reason: 'urna_in',
+        note: `Entrega a urna ${order.urnaName} — lote orden ${order.code}`,
+        userId, userName, at: now,
+      });
+    }
+    // Crear el lote en la urna con lo recibido.
+    if (lines.length > 0) {
+      const lote: UrnaLote = {
+        id: `lote-${Date.now()}`,
+        urnaId: order.urnaId,
+        code: order.code,
+        receivedAt: now,
+        orderId: order.id,
+        orderCode: order.code,
+        lines,
+      };
+      this._urnaLotes.update(list => [lote, ...list]);
+    }
+    const updated: CustomerOrder = { ...order, deliveredToUrnaAt: now };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    return updated;
+  }
+
+  /** Registra una venta de un producto desde una urna (POS). */
+  registerUrnaSale(input: { urnaId: string; productId: string; qty: number; userId: string; userName: string }): void {
+    const { urnaId, productId } = input;
+    const qty = Math.floor(input.qty);
+    if (qty <= 0) throw new Error('La cantidad debe ser mayor a cero.');
+    const available = this.urnaProductQty(urnaId, productId);
+    if (qty > available) throw new Error(`Solo hay ${available} unidad(es) en la urna.`);
+    const product = this.productById(productId);
+    this.consumeUrnaFifo(urnaId, productId, qty);
+    this.registerKardexEntry({
+      id: `k-${Date.now()}-${productId}-usale`,
+      productId, itemName: product?.name ?? productId,
+      type: 'out', qty, balance: this.urnaProductQty(urnaId, productId),
+      cost: this.effectiveProductCost(productId),
+      reason: 'urna_sale',
+      note: `Venta en urna ${this.urnaById(urnaId)?.name ?? urnaId} (FIFO)`,
+      userId: input.userId, userName: input.userName, at: new Date(),
+    });
+  }
+
+  /** Registra merma de un producto en una urna (vencido/dañado en vitrina). */
+  registerUrnaMerma(input: {
+    urnaId: string; productId: string; qty: number;
+    reason: ProductionMermaReason; reasonText?: string;
+    userId: string; userName: string;
+  }): ReturnedLot {
+    const { urnaId, productId } = input;
+    const qty = Math.floor(input.qty);
+    if (qty <= 0) throw new Error('La cantidad debe ser mayor a cero.');
+    const available = this.urnaProductQty(urnaId, productId);
+    if (qty > available) throw new Error(`Solo hay ${available} unidad(es) en la urna.`);
+    const product = this.productById(productId);
+    const urna = this.urnaById(urnaId);
+    const now = new Date();
+    this.consumeUrnaFifo(urnaId, productId, qty);
+    this.registerKardexEntry({
+      id: `k-${Date.now()}-${productId}-umerma`,
+      productId, itemName: product?.name ?? productId,
+      type: 'out', qty, balance: this.urnaProductQty(urnaId, productId),
+      cost: this.effectiveProductCost(productId),
+      reason: 'urna_merma',
+      note: `Merma en urna ${urna?.name ?? urnaId} (FIFO)`,
+      userId: input.userId, userName: input.userName, at: now,
+    });
+    const lot: ReturnedLot = {
+      id: `lot-${Date.now()}-urna`,
+      kind: 'urna',
+      productId, productName: product?.name ?? productId,
+      unit: product?.unit ?? 'unidad',
+      qty, mermaQty: qty,
+      productionReason: input.reason,
+      productionReasonText: input.reasonText?.trim() || undefined,
+      urnaId, urnaName: urna?.name,
+      createdAt: now, status: 'reviewed', reviewedAt: now, reviewedBy: input.userName,
+    };
+    this._returnedLots.update(list => [lot, ...list]);
+    return lot;
+  }
+
+  /** Id del almacén único de Ventas. */
+  almacenId(): string { return this.almacen()?.id ?? ''; }
+
+  /** Tickets del POS de un almacén, recientes primero. */
+  posSalesFor(almacenId: string): PosSale[] {
+    return this._posSales()
+      .filter(s => s.almacenId === almacenId)
+      .sort((a, b) => b.at.getTime() - a.at.getTime());
+  }
+
+  /**
+   * Registra una venta 1 a 1 (ticket con varias líneas) en el POS. Valida el
+   * stock de TODAS las líneas antes de descontar, consume FIFO de los lotes del
+   * almacén y registra kardex `urna_sale` por línea. Devuelve el ticket.
+   */
+  registerPosSale(input: {
+    almacenId: string;
+    lines: { productId: string; qty: number }[];
+    userId: string;
+    userName: string;
+  }): PosSale {
+    const almacenId = input.almacenId;
+    if (!this.urnaById(almacenId)) throw new Error('Almacén no encontrado.');
+    const clean = input.lines
+      .map(l => ({ productId: l.productId, qty: Math.floor(l.qty) }))
+      .filter(l => l.qty > 0);
+    if (clean.length === 0) throw new Error('Agrega al menos un producto al ticket.');
+    // Validar disponibilidad de todas las líneas ANTES de descontar nada.
+    for (const l of clean) {
+      const avail = this.urnaProductQty(almacenId, l.productId);
+      if (l.qty > avail) {
+        const name = this.productById(l.productId)?.name ?? l.productId;
+        throw new Error(`Stock insuficiente de ${name}: hay ${avail}, pides ${l.qty}.`);
+      }
+    }
+    const now = new Date();
+    const saleLines: PosSaleLine[] = [];
+    for (const l of clean) {
+      const product = this.productById(l.productId);
+      const unitPrice = this.consumerPrice(l.productId);
+      this.consumeUrnaFifo(almacenId, l.productId, l.qty);
+      saleLines.push({
+        productId: l.productId, productName: product?.name ?? l.productId,
+        qty: l.qty, unitPrice, lineTotal: l.qty * unitPrice,
+      });
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${l.productId}-pos`,
+        productId: l.productId, itemName: product?.name ?? l.productId,
+        type: 'out', qty: l.qty, balance: this.urnaProductQty(almacenId, l.productId),
+        cost: this.effectiveProductCost(l.productId),
+        reason: 'urna_sale',
+        note: 'Venta POS',
+        userId: input.userId, userName: input.userName, at: now,
+      });
+    }
+    const total = saleLines.reduce((s, ln) => s + ln.lineTotal, 0);
+    const sale: PosSale = {
+      id: `pos-${Date.now()}`,
+      code: `VTA-${String(this._posSales().length + 1).padStart(4, '0')}`,
+      almacenId, lines: saleLines, total, at: now, soldBy: input.userName,
+    };
+    this._posSales.update(list => [sale, ...list]);
+    return sale;
   }
 
   receiveSupply(input: { supplyId: string; qty: number; cost: number; userName: string; userId: string; note?: string; reason?: string; }) {
@@ -590,7 +1385,7 @@ export class DataService {
       userName: input.userName,
       at: new Date(),
     });
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
   }
 
   adjustSupplyStock(input: {
@@ -631,7 +1426,7 @@ export class DataService {
       userName: input.userName,
       at: new Date(),
     });
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
   }
 
   /**
@@ -760,7 +1555,7 @@ export class DataService {
         at: new Date(),
       });
     }
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
   }
 
   /**
@@ -836,12 +1631,16 @@ export class DataService {
       const s = this.supplyById(itemId);
       if (!s) return this.emptyBurnDown();
       const stockItem = this.supplyStockFor(itemId);
+      // LT dinámico: depende del calendario semanal del proveedor más
+      // rápido del insumo (próxima ventana pedido → próxima entrega).
+      // Si no hay proveedores o ninguno tiene calendario, leadTime=0.
+      const dynLt = this.supplyLeadTime(itemId, new Date());
       item = {
         stock: stockItem?.quantity ?? 0,
         reorderPoint: s.reorderPoint,
         minStock: s.minStock,
         maxStock: s.maxStock,
-        leadTime: s.leadTime,
+        leadTime: dynLt?.leadTimeDays ?? 0,
       };
     } else {
       const p = this.productById(itemId);
@@ -1079,72 +1878,234 @@ export class DataService {
   }
 
   /**
-   * Re-deriva las alertas auto-generadas de restock a partir del stock actual.
-   * Convención: ids con prefijo `auto-` son administradas por esta función; los
-   * demás (excess, stockout_risk manual, históricas) se preservan intactos.
+   * Re-deriva TODAS las alertas auto-generadas a partir del estado actual del
+   * negocio. Cubre tres familias:
    *
-   * Se llama después de toda mutación de stock (venta, recepción, ajuste, OC recibida).
+   *  **Stock** (por insumo / producto de reventa):
+   *   - `restock`       — stock ≤ punto de reorden (bajo / crítico / agotado).
+   *   - `stockout_risk` — proyectiva: se agotará en ≤7 días según consumo diario.
+   *   - `order_now`     — cruce LT + proyección: el stock no aguanta ni la
+   *                       entrega más rápida; hay que ordenar HOY o se rompe.
+   *   - `excess`        — stock por sobre el máximo (capital inmovilizado).
+   *
+   *  **Pedidos** (por OC):
+   *   - `delivery_today`    — entrega esperada hoy.
+   *   - `delivery_overdue`  — entrega vencida y no recibida.
+   *   - `partial_reception` — llegó menos de lo pedido.
+   *
+   *  **Proveedores** (por proveedor):
+   *   - `order_day` — hoy es ventana de pedido y hay insumos por reordenar.
+   *
+   * Convención: ids con prefijo `auto-` son administradas por esta función; las
+   * demás (manuales, históricas) se preservan intactas. Si ya existe una alerta
+   * MANUAL para el mismo (tipo, item), no se duplica con una auto.
+   *
+   * Se llama tras toda mutación de stock/OC y al iniciar el servicio.
    */
-  regenerateRestockAlerts() {
+  regenerateAutoAlerts(today: Date = new Date()) {
     const supplies = this._supplies();
     const products = this._products();
     const supplyStock = this._supplyStock();
     const productStock = this._productStock();
+    const pos = this._pos();
     const existing = this._alerts();
+
+    const t0 = new Date(today);
+    t0.setHours(0, 0, 0, 0);
+    const startOfToday = t0.getTime();
+    const DAY = 86_400_000;
+    const STOCKOUT_HORIZON = 7; // días de anticipación para "se va a acabar"
+    const r1 = (n: number) => Math.round(n * 10) / 10;
 
     const autoNext: Alert[] = [];
 
-    // Insumos
-    for (const stock of supplyStock) {
-      if (stock.status === 'available') continue;
-      const sup = supplies.find(s => s.id === stock.supplyId);
-      if (!sup || !sup.active) continue;
-      const priority: 'high' | 'medium' | 'low' = stock.status === 'out' || stock.status === 'critical' ? 'high' : 'medium';
-      const id = `auto-restock-supply-${stock.supplyId}`;
-      const prev = existing.find(a => a.id === id);
+    // Claves de alertas manuales existentes — para no duplicar con auto.
+    const manualKeys = new Set(
+      existing
+        .filter(a => !a.id.startsWith('auto-'))
+        .map(a => `${a.type}:${a.supplyId ?? a.productId ?? a.poId ?? a.supplierId ?? ''}`),
+    );
+
+    // Conserva el estado `acknowledged` y la fecha de creación de una alerta
+    // auto previa con el mismo id; si fue resuelta pero la condición persiste,
+    // vuelve a 'active'. Omite si ya hay una alerta manual equivalente.
+    const push = (base: Alert) => {
+      const key = `${base.type}:${base.supplyId ?? base.productId ?? base.poId ?? base.supplierId ?? ''}`;
+      if (manualKeys.has(key)) return;
+      const prev = existing.find(a => a.id === base.id);
       autoNext.push({
-        id,
-        type: 'restock',
+        ...base,
         status: prev?.status === 'acknowledged' ? 'acknowledged' : 'active',
-        priority,
-        supplyId: stock.supplyId,
-        itemName: sup.name,
-        message: `Stock ${stock.status === 'out' ? 'agotado' : stock.status === 'critical' ? 'crítico' : 'bajo punto de reorden'}: ${stock.quantity} ${sup.unit} (reorden ${sup.reorderPoint}).`,
-        currentQty: stock.quantity,
-        reorderPoint: sup.reorderPoint,
-        createdAt: prev?.createdAt ?? new Date(),
+        createdAt: prev?.createdAt ?? today,
         acknowledgedAt: prev?.acknowledgedAt,
         acknowledgedBy: prev?.acknowledgedBy,
       });
+    };
+
+    // ---------- 1. Insumos: reabastecimiento + proyección + exceso ----------
+    for (const stock of supplyStock) {
+      const sup = supplies.find(s => s.id === stock.supplyId);
+      if (!sup || !sup.active) continue;
+
+      const qty = stock.quantity;
+      const dailyDemand = this.rollingMean('supply', sup.id, 7) || 0;
+      const pendingQty = this.pendingIncomingQtyForSupply(sup.id);
+      const effectiveStock = qty + pendingQty;
+      const lt = this.supplyLeadTime(sup.id, today);
+
+      // 1a. Reabastecimiento (nivel) — stock bajo el punto de reorden.
+      if (stock.status !== 'available') {
+        const id = `auto-restock-supply-${sup.id}`;
+        push({
+          id, type: 'restock', status: 'active',
+          priority: stock.status === 'out' || stock.status === 'critical' ? 'high' : 'medium',
+          supplyId: sup.id, itemName: sup.name,
+          message: `Stock ${stock.status === 'out' ? 'agotado' : stock.status === 'critical' ? 'crítico' : 'bajo punto de reorden'}: ${qty} ${sup.unit} (reorden ${sup.reorderPoint}).`,
+          currentQty: qty, reorderPoint: sup.reorderPoint,
+          createdAt: today,
+        });
+      }
+
+      // 1b. Proyección de agotamiento — requiere consumo y stock restante.
+      if (dailyDemand > 0 && qty > 0) {
+        const daysUntilEmpty = effectiveStock / dailyDemand;
+        const ltDays = lt?.leadTimeDays ?? 0;
+        const stockoutDate = new Date(startOfToday + Math.floor(daysUntilEmpty) * DAY);
+
+        if (lt && daysUntilEmpty <= ltDays) {
+          // 1b-i. order_now: no alcanza ni ordenando hoy — la entrega más
+          // rápida llega después de que el stock se agote.
+          const id = `auto-ordernow-supply-${sup.id}`;
+          push({
+            id, type: 'order_now', status: 'active', priority: 'high',
+            supplyId: sup.id, supplierId: lt.supplierId,
+            supplierName: this.supplierById(lt.supplierId)?.name,
+            itemName: sup.name,
+            message: `Ordena hoy: el stock dura ~${Math.floor(daysUntilEmpty)} día(s) y la entrega más rápida tarda ${ltDays}. Si esperas, rompes stock.`,
+            currentQty: qty, reorderPoint: sup.reorderPoint,
+            projectedStockoutDate: stockoutDate,
+            projectedDaysUntilStockout: Math.floor(daysUntilEmpty),
+            leadTimeDays: ltDays,
+            createdAt: today,
+          });
+        } else if (daysUntilEmpty <= STOCKOUT_HORIZON) {
+          // 1b-ii. stockout_risk: aviso proyectivo con holgura para reaccionar.
+          const days = Math.floor(daysUntilEmpty);
+          const id = `auto-stockout-supply-${sup.id}`;
+          push({
+            id, type: 'stockout_risk', status: 'active',
+            priority: days <= 3 ? 'high' : 'medium',
+            supplyId: sup.id, itemName: sup.name,
+            message: `Se agotará en ~${days} día(s) al ritmo actual (${r1(dailyDemand)} ${sup.unit}/día).`,
+            currentQty: qty, reorderPoint: sup.reorderPoint,
+            projectedStockoutDate: stockoutDate,
+            projectedDaysUntilStockout: days,
+            createdAt: today,
+          });
+        }
+      }
+
+      // 1c. Exceso de inventario — capital inmovilizado.
+      if (sup.maxStock > 0 && qty > sup.maxStock) {
+        const excessUnits = qty - sup.maxStock;
+        const id = `auto-excess-supply-${sup.id}`;
+        push({
+          id, type: 'excess', status: 'active', priority: 'low',
+          supplyId: sup.id, itemName: sup.name,
+          message: `Exceso de inventario: ${qty} ${sup.unit} sobre el máximo de ${sup.maxStock}. Sobran ${r1(excessUnits)} ${sup.unit}.`,
+          currentQty: qty, excessValue: Math.round(excessUnits * sup.cost),
+          createdAt: today,
+        });
+      }
     }
 
-    // Productos de reventa
+    // ---------- 2. Productos de reventa: reabastecimiento ----------
     for (const stock of productStock) {
       if (stock.status === 'available') continue;
       const prod = products.find(p => p.id === stock.productId);
       if (!prod || !prod.active || prod.hasRecipe) continue;
       if (prod.reorderPoint == null && stock.status !== 'out') continue; // sin umbral, solo alertar si agotado
-      const priority: 'high' | 'medium' | 'low' = stock.status === 'out' || stock.status === 'critical' ? 'high' : 'medium';
       const id = `auto-restock-product-${stock.productId}`;
-      const prev = existing.find(a => a.id === id);
-      autoNext.push({
-        id,
-        type: 'restock',
-        status: prev?.status === 'acknowledged' ? 'acknowledged' : 'active',
-        priority,
-        productId: stock.productId,
-        itemName: prod.name,
+      push({
+        id, type: 'restock', status: 'active',
+        priority: stock.status === 'out' || stock.status === 'critical' ? 'high' : 'medium',
+        productId: stock.productId, itemName: prod.name,
         message: `Stock ${stock.status === 'out' ? 'agotado' : stock.status === 'critical' ? 'crítico' : 'bajo punto de reorden'}: ${stock.quantity} ${prod.unit}${prod.reorderPoint != null ? ` (reorden ${prod.reorderPoint})` : ''}. Producto de reventa — generar OC al proveedor.`,
-        currentQty: stock.quantity,
-        reorderPoint: prod.reorderPoint,
-        createdAt: prev?.createdAt ?? new Date(),
-        acknowledgedAt: prev?.acknowledgedAt,
-        acknowledgedBy: prev?.acknowledgedBy,
+        currentQty: stock.quantity, reorderPoint: prod.reorderPoint ?? undefined,
+        createdAt: today,
       });
     }
 
-    // Preservar alertas no-auto (manuales, históricas, excess, stockout_risk creadas a mano)
-    const manual = existing.filter(a => !a.id.startsWith('auto-restock-'));
+    // ---------- 3. Órdenes de compra: entrega hoy / vencida / parcial ----------
+    for (const po of pos) {
+      const ordered = po.items.reduce((s, it) => s + it.qty, 0);
+
+      // 3a + 3b: OCs pendientes con fecha esperada de entrega.
+      if (po.status === 'pending' && po.expectedDate) {
+        const due = new Date(po.expectedDate);
+        due.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((due.getTime() - startOfToday) / DAY);
+
+        if (diffDays === 0) {
+          const id = `auto-delivery-today-${po.id}`;
+          push({
+            id, type: 'delivery_today', status: 'active', priority: 'medium',
+            itemName: `${po.code} · ${po.supplier}`,
+            message: `Hoy llega tu pedido: ${ordered} unidad(es) de ${po.supplier}. Prepárate para recibir y registrar el ingreso.`,
+            poId: po.id, poCode: po.code, supplierName: po.supplier,
+            expectedDate: po.expectedDate, orderedQty: ordered,
+            createdAt: today,
+          });
+        } else if (diffDays < 0) {
+          const id = `auto-delivery-overdue-${po.id}`;
+          push({
+            id, type: 'delivery_overdue', status: 'active', priority: 'high',
+            itemName: `${po.code} · ${po.supplier}`,
+            message: `Tu pedido no ha llegado: la OC ${po.code} de ${po.supplier} venció hace ${-diffDays} día(s). Contacta al proveedor.`,
+            poId: po.id, poCode: po.code, supplierName: po.supplier,
+            expectedDate: po.expectedDate, orderedQty: ordered,
+            createdAt: today,
+          });
+        }
+      }
+
+      // 3c: recepción parcial — llegó menos de lo pedido.
+      const received = po.items.reduce((s, it) => s + (it.receivedQty ?? 0), 0);
+      const hasReception = po.items.some(it => it.receivedQty != null);
+      if (po.status !== 'cancelled' && hasReception && received < ordered) {
+        const id = `auto-partial-${po.id}`;
+        push({
+          id, type: 'partial_reception', status: 'active', priority: 'medium',
+          itemName: `${po.code} · ${po.supplier}`,
+          message: `Recepción parcial: de ${ordered} unidad(es) pedidas a ${po.supplier} llegaron ${received}. Faltan ${ordered - received}.`,
+          poId: po.id, poCode: po.code, supplierName: po.supplier,
+          orderedQty: ordered, receivedQty: received,
+          createdAt: today,
+        });
+      }
+    }
+
+    // ---------- 4. Día de pedido del proveedor ----------
+    // Si hoy es ventana de pedido de un proveedor y tiene insumos por
+    // reordenar, avisar para no perder el ciclo y esperar al próximo.
+    const weekday = t0.getDay();
+    const suggestions = this.suggestedPrePurchases(today);
+    for (const sup of this.activeSuppliers()) {
+      if (!sup.orderDays?.includes(weekday)) continue;
+      const sg = suggestions.find(s => s.supplierId === sup.id);
+      const itemCount = sg?.items.length ?? 0;
+      if (itemCount === 0) continue;
+      const id = `auto-orderday-${sup.id}`;
+      push({
+        id, type: 'order_day', status: 'active', priority: 'medium',
+        supplierId: sup.id, supplierName: sup.name, itemName: sup.name,
+        message: `Hoy es día de pedido de ${sup.name}: ${itemCount} insumo(s) por reordenar. Aprovecha la ventana para no esperar al próximo ciclo.`,
+        createdAt: today,
+      });
+    }
+
+    // ---------- 5. Preservar alertas manuales / históricas ----------
+    const manual = existing.filter(a => !a.id.startsWith('auto-'));
     this._alerts.set([...autoNext, ...manual]);
   }
   // ============================================================
@@ -1281,7 +2242,9 @@ export class DataService {
     userName: string;
     /** Cliente que originó el pedido (cuando viene del portal). */
     customerId?: string;
-    /** Fecha de entrega solicitada (solo en pedidos desde portal). */
+    /** Urna de destino cuando es una solicitud de reposición interna de Ventas. */
+    urnaId?: string;
+    /** Fecha de entrega solicitada (portal) o requerida (reposición de urna). */
     requestedDeliveryDate?: Date;
   }): CustomerOrder {
     if (input.items.length === 0) {
@@ -1301,9 +2264,13 @@ export class DataService {
     });
     const total = orderItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
     const order: CustomerOrder = {
-      id: `ord-${Date.now()}`,
+      // Sufijo aleatorio: al crear varias órdenes en el mismo milisegundo (una
+      // por día en "Pedir a producción"), Date.now() solo no garantiza un id único.
+      id: `ord-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       code,
       customerId: input.customerId,
+      urnaId: input.urnaId,
+      urnaName: input.urnaId ? this.urnaById(input.urnaId)?.name : undefined,
       purpose: input.purpose?.trim() || undefined,
       status: 'pending',
       items: orderItems,
@@ -1433,7 +2400,7 @@ export class DataService {
       }),
     };
     this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
     return updated;
   }
 
@@ -1494,7 +2461,109 @@ export class DataService {
 
     const updated: CustomerOrder = { ...order, status: 'completed', completedAt: now };
     this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
+    return updated;
+  }
+
+  /**
+   * Ventas CORROBORA un pedido de cliente recibido y lo envía a producción.
+   * No consume insumos (eso lo hace Producción al iniciar); solo lo habilita
+   * para la cola de producción.
+   */
+  corroborateOrder(orderId: string): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (!order.customerId) throw new Error('Solo se corroboran pedidos de cliente.');
+    if (order.status !== 'pending') throw new Error('Solo se corroboran pedidos recibidos (pendientes).');
+    if (order.acceptedBySalesAt) throw new Error('Este pedido ya fue enviado a producción.');
+    const updated: CustomerOrder = { ...order, acceptedBySalesAt: new Date() };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    return updated;
+  }
+
+  /**
+   * Ventas DESPACHA un pedido de cliente ya producido: descuenta del stock
+   * central lo fabricado (kardex `sale`) y marca el pedido como despachado.
+   */
+  dispatchOrder(orderId: string, userId: string, userName: string): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (!order.customerId) throw new Error('Solo se despachan pedidos de cliente.');
+    if (order.status !== 'completed') throw new Error('Solo se despacha un pedido ya producido (completado).');
+    if (order.dispatchedAt) throw new Error('Este pedido ya fue despachado.');
+
+    const now = new Date();
+    const customerName = this.customerById(order.customerId)?.name ?? 'cliente';
+    for (const it of order.items) {
+      if (it.fulfilledQty <= 0) continue;
+      const product = this.productById(it.productId);
+      const central = this.productStockFor(it.productId);
+      const move = Math.min(it.fulfilledQty, central?.quantity ?? 0);
+      if (central && move > 0) {
+        const afterOut = central.quantity - move;
+        const newStatus = this.computeProductStatus(afterOut, product?.reorderPoint, product?.minStock);
+        this._productStock.update(list => list.map(s =>
+          s.productId === it.productId ? { ...s, quantity: afterOut, status: newStatus } : s));
+      }
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${it.productId}-disp`,
+        productId: it.productId, itemName: it.productName,
+        type: 'out', qty: it.fulfilledQty, balance: this.productStockFor(it.productId)?.quantity ?? 0,
+        cost: this.effectiveProductCost(it.productId),
+        reason: 'sale',
+        note: `Pedido ${order.code} despachado a ${customerName}`,
+        userId, userName, at: now,
+      });
+    }
+    const updated: CustomerOrder = { ...order, dispatchedAt: now };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    this.regenerateAutoAlerts();
+    return updated;
+  }
+
+  /**
+   * Ventas FACTURA un pedido despachado. `lines` indica cuánto se entregó
+   * realmente de cada producto; la diferencia con lo despachado (fulfilledQty)
+   * se manda a MERMA (problema de entrega). Calcula el monto final facturado.
+   */
+  invoiceOrder(
+    orderId: string,
+    lines: Array<{ productId: string; deliveredQty: number }>,
+    _userId: string,
+    userName: string,
+  ): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (!order.dispatchedAt) throw new Error('Solo se factura un pedido ya despachado.');
+    if (order.invoicedAt) throw new Error('Este pedido ya fue facturado.');
+
+    const now = new Date();
+    const map = new Map(lines.map(l => [l.productId, Math.max(0, Math.floor(l.deliveredQty))]));
+    const customerName = order.customerId ? (this.customerById(order.customerId)?.name ?? 'cliente') : 'cliente';
+
+    let finalAmount = 0;
+    const updatedItems = order.items.map(it => {
+      const delivered = Math.min(map.get(it.productId) ?? it.fulfilledQty, it.fulfilledQty);
+      finalAmount += delivered * it.unitPrice;
+      const merma = it.fulfilledQty - delivered;
+      if (merma > 0) {
+        const lot: ReturnedLot = {
+          id: `lot-${Date.now()}-${it.productId}-fact`,
+          kind: 'delivery',
+          productId: it.productId, productName: it.productName, unit: it.unit,
+          qty: merma, mermaQty: merma,
+          sourceOrderId: order.id, sourceOrderCode: order.code,
+          customerId: order.customerId, customerName,
+          customerNote: 'Problema de entrega — no recibido (facturación)',
+          createdAt: now, status: 'reviewed', reviewedAt: now, reviewedBy: userName,
+        };
+        this._returnedLots.update(list => [lot, ...list]);
+      }
+      return { ...it, receivedQty: delivered };
+    });
+
+    const updated: CustomerOrder = { ...order, items: updatedItems, invoicedAt: now, finalAmount };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
     return updated;
   }
 
@@ -1569,7 +2638,7 @@ export class DataService {
       notes: motivo ? `${order.notes ? order.notes + ' · ' : ''}Cancelado: ${motivo}` : order.notes,
     };
     this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
     return updated;
   }
 
@@ -1694,7 +2763,7 @@ export class DataService {
       finalAmount,
     };
     this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
     return updated;
   }
 
@@ -1771,7 +2840,7 @@ export class DataService {
       reviewNote: reviewNote?.trim() || undefined,
     };
     this._returnedLots.update(list => list.map(l => l.id === lotId ? reviewed : l));
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
     return reviewed;
   }
 
@@ -1877,7 +2946,7 @@ export class DataService {
       reviewedBy: input.userName,
     };
     this._returnedLots.update(list => [lot, ...list]);
-    this.regenerateRestockAlerts();
+    this.regenerateAutoAlerts();
     return lot;
   }
 
@@ -1887,6 +2956,19 @@ export class DataService {
 
   customerById(id: string): Customer | undefined {
     return this._customers().find(c => c.id === id);
+  }
+
+  /**
+   * Precio de un producto PARA un cliente: si el cliente tiene un precio
+   * personalizado en `productPrices`, se usa ese; sino, el `sellPrice`
+   * global del producto. `customer` puede ser el id o el objeto.
+   */
+  priceForCustomer(customer: string | Customer | null | undefined, productId: string): number {
+    const product = this.productById(productId);
+    const global = product?.sellPrice ?? 0;
+    const c = typeof customer === 'string' ? this.customerById(customer) : customer;
+    const custom = c?.productPrices?.[productId];
+    return (custom != null && custom >= 0) ? custom : global;
   }
 
   /** Busca un cliente por su token público (URL /c/:token). */
@@ -2017,102 +3099,146 @@ export class DataService {
     return s.orderDays.includes(new Date().getDay());
   }
 
-  // ============================================================
-  //  Ingresos de inventario (recepciones)
-  // ============================================================
+  /**
+   * Lista de proveedores que entregan un insumo específico (N..M).
+   * La relación se modela en `Supplier.suppliedItems` — esto solo invierte
+   * la query para acceder desde la perspectiva del insumo.
+   */
+  suppliersForSupply(supplyId: string): Supplier[] {
+    return this._suppliers().filter(s =>
+      s.suppliedItems.some(i => i.kind === 'supply' && i.itemId === supplyId)
+    );
+  }
 
   /**
-   * Registra el ingreso de uno o más insumos al inventario en un solo evento
-   * (típicamente la entrega de un proveedor). Por cada línea:
-   *  - Suma la qty al stock del insumo.
-   *  - Recomputa el status (out/critical/low/available).
-   *  - Inserta una entrada de kardex `in` con reason 'purchase' (o el
-   *    pasado por el caller).
-   *
-   * Es la versión sin OC: para registrar recepciones rápidas cuando el
-   * proveedor entrega mercadería sin que haya una orden formal en sistema.
+   * Lista de proveedores que entregan un producto de reventa.
    */
-  registerInventoryReceipt(input: {
-    supplierId?: string;
-    supplierName?: string;
-    reference?: string;
-    receivedAt: Date;
-    reason?: string;
-    notes?: string;
-    /** Cada línea es insumo o producto sin receta. */
-    items: Array<{ kind: 'supply' | 'product'; itemId: string; qty: number; unitCost?: number }>;
-    userId: string;
-    userName: string;
-  }): { kardexIds: string[] } {
-    if (input.items.length === 0) {
-      throw new Error('Debe registrar al menos un item.');
+  suppliersForProduct(productId: string): Supplier[] {
+    return this._suppliers().filter(s =>
+      s.suppliedItems.some(i => i.kind === 'product' && i.itemId === productId)
+    );
+  }
+
+  /**
+   * Sincroniza qué proveedores entregan un insumo y a qué precio. Recibe la
+   * lista deseada con su `unitCost` opcional. Actualiza `suppliedItems` en
+   * cada proveedor afectado: agrega, quita o actualiza precio según el caso.
+   *
+   * Si pasás solo strings (ids sin precios), llamá la sobrecarga sin precios.
+   */
+  setSuppliersForSupply(
+    supplyId: string,
+    entries: Array<{ supplierId: string; unitCost?: number }>,
+  ): void {
+    const byId = new Map(entries.map(e => [e.supplierId, e.unitCost]));
+    this._suppliers.update(list => list.map(s => {
+      const existing = s.suppliedItems.find(i => i.kind === 'supply' && i.itemId === supplyId);
+      const shouldHave = byId.has(s.id);
+      const wantedCost = byId.get(s.id);
+
+      if (!existing && !shouldHave) return s; // nada que hacer
+      if (existing && !shouldHave) {
+        // Remover
+        return {
+          ...s,
+          suppliedItems: s.suppliedItems.filter(
+            i => !(i.kind === 'supply' && i.itemId === supplyId)
+          ),
+        };
+      }
+      if (!existing && shouldHave) {
+        // Agregar
+        return {
+          ...s,
+          suppliedItems: [...s.suppliedItems, { kind: 'supply', itemId: supplyId, unitCost: wantedCost }],
+        };
+      }
+      // Actualizar precio si cambió
+      if (existing && shouldHave && existing.unitCost !== wantedCost) {
+        return {
+          ...s,
+          suppliedItems: s.suppliedItems.map(i =>
+            i.kind === 'supply' && i.itemId === supplyId ? { ...i, unitCost: wantedCost } : i
+          ),
+        };
+      }
+      return s;
+    }));
+    // Tras cualquier cambio en proveedores/precios, refrescar el costo
+    // promedio del insumo. Si ningún proveedor tiene precio, queda el manual.
+    this.recomputeSupplyCostFromSuppliers(supplyId);
+  }
+
+  /**
+   * Devuelve el costo unitario que cobra un proveedor específico por un
+   * insumo. Cae al `Supply.cost` global si el proveedor no tiene un precio
+   * propio asignado.
+   */
+  supplierUnitCost(supplierId: string, supplyId: string): number {
+    const sup = this.supplierById(supplierId);
+    const item = sup?.suppliedItems.find(i => i.kind === 'supply' && i.itemId === supplyId);
+    if (item?.unitCost != null) return item.unitCost;
+    return this.supplyById(supplyId)?.cost ?? 0;
+  }
+
+  /**
+   * Promedio aritmético de los precios que cobran los proveedores que
+   * entregan un insumo. Solo considera entradas con `unitCost` definido.
+   * Devuelve `null` si ningún proveedor tiene precio asignado.
+   */
+  averageSupplierPrice(supplyId: string): number | null {
+    const prices: number[] = [];
+    for (const s of this._suppliers()) {
+      const item = s.suppliedItems.find(i => i.kind === 'supply' && i.itemId === supplyId);
+      if (item?.unitCost != null && item.unitCost > 0) prices.push(item.unitCost);
     }
-    const kardexIds: string[] = [];
-    const reason = input.reason ?? 'purchase';
-    const supplierLabel = input.supplierName
-      ?? (input.supplierId ? this.supplierById(input.supplierId)?.name : undefined)
-      ?? 'proveedor';
+    if (prices.length === 0) return null;
+    return prices.reduce((a, b) => a + b, 0) / prices.length;
+  }
 
-    for (const it of input.items) {
-      if (it.qty <= 0) continue;
+  /**
+   * Recalcula `Supply.cost` como el promedio de los precios de sus
+   * proveedores. Si ninguno tiene precio asignado, deja el cost sin tocar
+   * (queda el valor manual). Llamar después de modificar suppliedItems.
+   */
+  recomputeSupplyCostFromSuppliers(supplyId: string): void {
+    const avg = this.averageSupplierPrice(supplyId);
+    if (avg == null) return;
+    const rounded = Math.round(avg * 100) / 100; // 2 decimales
+    this._supplies.update(list => list.map(s =>
+      s.id === supplyId && s.cost !== rounded ? { ...s, cost: rounded } : s
+    ));
+  }
 
-      const noteText = [
-        `Recepción de ${supplierLabel}`,
-        input.reference ? `Ref ${input.reference}` : '',
-        input.notes ?? '',
-      ].filter(Boolean).join(' · ');
+  /**
+   * Lead time efectivo de un proveedor en `today`, calculado contra su
+   * calendario semanal (orderDays + deliveryDays). Si el calendario está
+   * vacío, cae al `leadTimeDays` fijo. Útil para mostrar en la UI o para
+   * planificar una OC puntual.
+   */
+  supplierLeadTime(supplierId: string, today: Date = new Date()): LeadTimeResult | null {
+    const sup = this.supplierById(supplierId);
+    if (!sup) return null;
+    return computeSupplierLeadTime(sup, today);
+  }
 
-      if (it.kind === 'supply') {
-        const supply = this.supplyById(it.itemId);
-        if (!supply) continue;
-        let stock = this.supplyStockFor(it.itemId);
-        if (!stock) {
-          stock = { id: it.itemId, supplyId: it.itemId, quantity: 0, status: 'out' };
-          this._supplyStock.update(list => [...list, stock!]);
-        }
-        const newQty = stock.quantity + it.qty;
-        const newStatus = this.computeStatus(newQty, supply.reorderPoint, supply.minStock);
-        this._supplyStock.update(list => list.map(s =>
-          s.id === stock!.id ? { ...s, quantity: newQty, status: newStatus } : s
-        ));
-
-        const kid = `k-${Date.now()}-${it.itemId}-${Math.random().toString(36).slice(2, 6)}`;
-        this.registerKardexEntry({
-          id: kid, supplyId: it.itemId, itemName: supply.name,
-          type: 'in', qty: it.qty, balance: newQty,
-          cost: it.unitCost ?? supply.cost,
-          reason, note: noteText,
-          userId: input.userId, userName: input.userName, at: input.receivedAt,
-        });
-        kardexIds.push(kid);
-      } else {
-        // Producto sin receta (reventa)
-        const product = this.productById(it.itemId);
-        if (!product) continue;
-        let stock = this.productStockFor(it.itemId);
-        if (!stock) {
-          stock = { id: it.itemId, productId: it.itemId, quantity: 0, reservedQty: 0, status: 'out' };
-          this._productStock.update(list => [...list, stock!]);
-        }
-        const newQty = stock.quantity + it.qty;
-        const newStatus = this.computeProductStatus(newQty, product.reorderPoint, product.minStock);
-        this._productStock.update(list => list.map(s =>
-          s.productId === it.itemId ? { ...s, quantity: newQty, status: newStatus } : s
-        ));
-
-        const kid = `k-${Date.now()}-${it.itemId}-${Math.random().toString(36).slice(2, 6)}`;
-        this.registerKardexEntry({
-          id: kid, productId: it.itemId, itemName: product.name,
-          type: 'in', qty: it.qty, balance: newQty,
-          cost: it.unitCost ?? product.buyPrice,
-          reason, note: noteText,
-          userId: input.userId, userName: input.userName, at: input.receivedAt,
-        });
-        kardexIds.push(kid);
+  /**
+   * Lead time efectivo de un INSUMO. Toma todos sus proveedores activos,
+   * calcula el LT dinámico de cada uno y devuelve el del proveedor que
+   * entrega antes desde `today`. Refleja "si necesito el insumo, ¿cuál es
+   * la entrega más rápida que puedo conseguir?". Devuelve null si el insumo
+   * no tiene proveedores.
+   */
+  supplyLeadTime(supplyId: string, today: Date = new Date()): (LeadTimeResult & { supplierId: string }) | null {
+    const sups = this.suppliersForSupply(supplyId).filter(s => s.active);
+    if (sups.length === 0) return null;
+    let best: (LeadTimeResult & { supplierId: string }) | null = null;
+    for (const s of sups) {
+      const lt = computeSupplierLeadTime(s, today);
+      if (!best || lt.leadTimeDays < best.leadTimeDays) {
+        best = { ...lt, supplierId: s.id };
       }
     }
-
-    this.regenerateRestockAlerts();
-    return { kardexIds };
+    return best;
   }
 }

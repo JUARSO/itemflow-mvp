@@ -1,0 +1,12 @@
+    @if (points().length === 0) {
+      <div class="empty">Sin datos para mostrar.</div>
+    } @else {
+      <div class="chart" [class.chart--mini]="mini()">
+        @if (title() && !mini()) {
+          <div class="chart__title">{{ title() }}</div>
+        }
+        <div class="chart__canvas" [style.height.px]="mini() ? 60 : 200">
+          <canvas #canvas></canvas>
+        </div>
+      </div>
+    }

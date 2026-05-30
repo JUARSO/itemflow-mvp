@@ -1,0 +1,95 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      [title]="editing() ? 'Editar cliente' : 'Nuevo cliente'"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <app-form-field label="Nombre del cliente" [required]="true">
+          <input type="text" formControlName="name" placeholder="Ej: Cafetería La Esquina" />
+        </app-form-field>
+
+        <div class="row">
+          <app-form-field label="Persona de contacto">
+            <input type="text" formControlName="contactPerson" />
+          </app-form-field>
+          <app-form-field label="Teléfono">
+            <input type="text" formControlName="phone" />
+          </app-form-field>
+        </div>
+
+        <app-form-field label="Email">
+          <input type="email" formControlName="email" />
+        </app-form-field>
+
+        <!-- Productos permitidos -->
+        <h3 class="section-title">Productos que puede pedir</h3>
+        <p class="hint">
+          Si no marcas ninguno, el cliente verá todo el catálogo con precio normal.
+          El precio en blanco usa el precio de venta global.
+        </p>
+        <div class="products">
+          @for (p of data.activeProducts(); track p.id) {
+            <div class="product-row" [class.product-row--on]="allowedSet().has(p.id)">
+              <label class="product-row__main">
+                <input type="checkbox"
+                  [checked]="allowedSet().has(p.id)"
+                  (change)="toggleProduct(p.id)" />
+                <span class="product-row__name">{{ p.name }}</span>
+                <span class="product-row__sku mono">{{ p.sku }}</span>
+              </label>
+              @if (allowedSet().has(p.id)) {
+                <div class="product-row__price">
+                  <span class="cur">₡</span>
+                  <input type="number" min="0" step="1"
+                    [value]="priceOf(p.id)"
+                    [placeholder]="p.sellPrice"
+                    (input)="setPrice(p.id, $any($event.target).value)" />
+                </div>
+              } @else {
+                <span class="product-row__global mono">₡{{ p.sellPrice }}</span>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Ventana de pedido -->
+        <h3 class="section-title">Días en que puede crear pedidos</h3>
+        <div class="days">
+          @for (d of dayIndices; track d) {
+            <button type="button" class="day"
+              [class.day--on]="orderSet().has(d)"
+              (click)="toggleOrderDay(d)">
+              {{ dayLabel(d) }}
+            </button>
+          }
+        </div>
+
+        <h3 class="section-title">Días de entrega</h3>
+        <div class="days">
+          @for (d of dayIndices; track d) {
+            <button type="button" class="day"
+              [class.day--on]="deliverySet().has(d)"
+              (click)="toggleDeliveryDay(d)">
+              {{ dayLabel(d) }}
+            </button>
+          }
+        </div>
+
+        <app-form-field label="Notas (opcional)">
+          <textarea formControlName="notes" rows="2"
+            placeholder="Horario de entrega, instrucciones especiales, etc."></textarea>
+        </app-form-field>
+
+        <label class="active-row">
+          <input type="checkbox" formControlName="active" />
+          <span>Cliente activo</span>
+        </label>
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
+          {{ editing() ? 'Guardar cambios' : 'Crear cliente' }}
+        </ion-button>
+      </div>
+    </app-form-modal>

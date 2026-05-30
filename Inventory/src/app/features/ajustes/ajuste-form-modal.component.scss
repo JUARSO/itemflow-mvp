@@ -1,0 +1,78 @@
+    .seg {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--ui-sp-2);
+    }
+    .seg--row {
+      grid-template-columns: 1fr 1fr;
+    }
+    .seg__opt {
+      display: flex;
+      flex-direction: column;
+      padding: var(--ui-sp-3);
+      border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+      border-radius: var(--ui-radius);
+      background: var(--ui-surface);
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    /* Solo aplica hover gris cuando NO está activo, sino el text blanco se pierde. */
+    .seg__opt:not(.seg__opt--active):hover {
+      background: var(--ui-surface-3);
+      border-color: var(--ui-primary);
+    }
+    .seg__opt--active {
+      border-color: var(--ui-primary);
+      background: var(--ui-primary);
+      color: var(--ui-primary-contrast);
+      box-shadow: var(--ui-shadow-sm);
+    }
+    /* Cuando está activo, hover preserva el tema y solo oscurece levemente. */
+    .seg__opt--active:hover {
+      background: var(--ui-primary-shade);
+    }
+    .seg__opt input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .seg__opt span {
+      font-weight: var(--ui-fw-semibold);
+      font-size: var(--ui-fs-md);
+    }
+    .seg__opt small {
+      font-size: var(--ui-fs-xs);
+      margin-top: 2px;
+      opacity: 0.85;
+    }
+
+    .summary {
+      margin-top: var(--ui-sp-3);
+      padding: var(--ui-sp-3) var(--ui-sp-4);
+      background: var(--ui-surface-2);
+      border: var(--ui-border-w-sm) solid var(--ui-border);
+      border-radius: var(--ui-radius);
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: var(--ui-sp-3);
+      align-items: center;
+    }
+    .summary__label {
+      font-size: var(--ui-fs-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-medium);
+    }
+    .summary__value {
+      font-size: var(--ui-fs-lg);
+      font-weight: var(--ui-fw-bold);
+      color: var(--ui-text-strong);
+    }
+    .summary__value.success { color: var(--ui-success); }
+    .summary__value.danger { color: var(--ui-danger); }
+    .summary__arrow {
+      font-size: 24px;
+      color: var(--ui-text-muted);
+      text-align: center;
+    }

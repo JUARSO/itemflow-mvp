@@ -1,0 +1,81 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Punto de venta</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Punto de venta"
+    subtitle="Vende a los clientes del local. Cada venta descuenta del stock del almacén (FIFO).">
+  </app-page-header>
+
+  @if (!almacenId()) {
+    <app-empty-state icon="🏪" title="Sin almacén"
+      body="No hay almacén de ventas configurado."></app-empty-state>
+  } @else {
+    <div class="pos">
+      <!-- Catálogo disponible -->
+      <section class="catalog">
+        <div class="section-title">Disponible en almacén</div>
+        @if (stock().length === 0) {
+          <app-empty-state icon="📦" title="Almacén vacío"
+            body="Pide reposición a producción y recíbela para tener stock que vender.">
+          </app-empty-state>
+        }
+        <div class="catalog__grid">
+          @for (s of stock(); track s.productId) {
+            <button type="button" class="prod"
+              [disabled]="s.enCarrito >= s.quantity"
+              (click)="agregar(s.productId)">
+              <span class="prod__name">{{ s.productName }}</span>
+              <span class="prod__price mono">₡{{ s.price | number:'1.0-0' }}</span>
+              <span class="prod__stock mono" [class.prod__stock--low]="s.quantity - s.enCarrito <= 0">
+                {{ s.quantity - s.enCarrito }} disp.
+              </span>
+            </button>
+          }
+        </div>
+      </section>
+
+      <!-- Ticket -->
+      <aside class="ticket">
+        <div class="section-title">Ticket</div>
+        <div class="ticket__lines">
+          @if (cartLines().length === 0) {
+            <p class="ticket__empty">Toca un producto para agregarlo a la venta.</p>
+          }
+          @for (l of cartLines(); track l.productId) {
+            <div class="tline">
+              <div class="tline__info">
+                <div class="tline__name">{{ l.name }}</div>
+                <div class="tline__price mono">₡{{ l.unitPrice | number:'1.0-0' }} c/u</div>
+              </div>
+              <input type="number" min="0" class="tline__qty"
+                [value]="l.qty" (input)="setQty(l.productId, +$any($event.target).value)" />
+              <div class="tline__total mono">₡{{ l.lineTotal | number:'1.0-0' }}</div>
+              <button type="button" class="tline__rm" (click)="quitar(l.productId)">✕</button>
+            </div>
+          }
+        </div>
+
+        <div class="ticket__foot">
+          <div class="ticket__total">
+            <span>Total</span>
+            <span class="mono">₡{{ total() | number:'1.0-0' }}</span>
+          </div>
+          <div class="ticket__actions">
+            <ion-button fill="clear" class="ghost" [disabled]="cartLines().length === 0" (click)="vaciar()">
+              Vaciar
+            </ion-button>
+            <ion-button [disabled]="cartLines().length === 0" (click)="cobrar()">
+              <ion-icon name="cart-outline" slot="start"></ion-icon>
+              Cobrar ({{ cartCount() }})
+            </ion-button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  }
+</ion-content>

@@ -1,0 +1,44 @@
+<app-form-modal
+  [isOpen]="isOpen()"
+  [title]="'Pedido recurrente — ' + (customer()?.name ?? '')"
+  (dismissed)="cerrar()">
+
+  <div body>
+    <app-form-field label="Nombre (opcional)" hint="Ej. Pedido semanal vitrina">
+      <input type="text" [value]="label()" (input)="label.set($any($event.target).value)"
+        placeholder="Pedido recurrente" />
+    </app-form-field>
+
+    <app-form-field label="Días que se repite" [required]="true">
+      <div class="days">
+        @for (d of weekDays; track d) {
+          <button type="button" class="day" [class.day--on]="isDayOn(d)" (click)="toggleDay(d)">
+            {{ dayLabel(d) }}
+          </button>
+        }
+      </div>
+    </app-form-field>
+
+    <div class="prods">
+      <div class="prods__title">Productos</div>
+      @for (p of productos(); track p.id) {
+        <div class="prod">
+          <div class="prod__info">
+            <span class="prod__name">{{ p.name }}</span>
+            <span class="prod__price mono">₡{{ precioDe(p.id) | number:'1.0-0' }}</span>
+          </div>
+          <input type="number" min="0" class="prod__qty mono"
+            [value]="qtys()[p.id] || 0"
+            (input)="setQty(p.id, +$any($event.target).value)" />
+        </div>
+      }
+    </div>
+  </div>
+
+  <div footer>
+    <ion-button fill="clear" class="ghost" (click)="cerrar()">Cancelar</ion-button>
+    <ion-button [disabled]="totalLineas() === 0 || selectedDays().size === 0" (click)="guardar()">
+      Crear recurrente ({{ totalLineas() }})
+    </ion-button>
+  </div>
+</app-form-modal>

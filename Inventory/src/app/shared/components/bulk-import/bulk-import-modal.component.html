@@ -1,0 +1,97 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      [title]="'Importar ' + config().entityLabelPlural + ' (CSV)'"
+      (dismissed)="onClose()">
+
+      <div body>
+        @if (state() === 'empty') {
+          <div class="empty">
+            <p class="empty__intro">
+              Sube un archivo <strong>.csv</strong> con las columnas esperadas. Si no tienes una plantilla,
+              descárgala aquí abajo.
+            </p>
+
+            @if (config().hint) {
+              <p class="empty__hint">{{ config().hint }}</p>
+            }
+
+            <details class="cols">
+              <summary>Ver columnas esperadas</summary>
+              <ul class="cols__list mono">
+                @for (h of config().headers; track h) {
+                  <li>{{ h }}</li>
+                }
+              </ul>
+            </details>
+
+            <div class="empty__actions">
+              <ion-button fill="outline" (click)="downloadTemplate()">
+                ↓ Descargar plantilla
+              </ion-button>
+              <label class="file-btn">
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  (change)="onFile($event)"
+                  hidden />
+                <span>📂 Elegir archivo CSV…</span>
+              </label>
+            </div>
+          </div>
+        } @else {
+          <div class="preview">
+            <div class="preview__summary">
+              <div class="stat stat--ok">
+                <div class="stat__value mono">{{ validCount() }}</div>
+                <div class="stat__label">Válidos para importar</div>
+              </div>
+              <div class="stat stat--bad" [class.muted]="errorCount() === 0">
+                <div class="stat__value mono">{{ errorCount() }}</div>
+                <div class="stat__label">Con errores (se omiten)</div>
+              </div>
+              <div class="stat">
+                <div class="stat__value mono">{{ totalCount() }}</div>
+                <div class="stat__label">Total leído</div>
+              </div>
+            </div>
+
+            @if (errorCount() > 0) {
+              <details class="errors" open>
+                <summary>Detalles de errores ({{ errorCount() }})</summary>
+                <div class="errors__table">
+                  <div class="errors__head">
+                    <div>Fila</div>
+                    <div>Motivo</div>
+                    <div>Dato</div>
+                  </div>
+                  @for (e of errors(); track $index) {
+                    <div class="errors__row">
+                      <div class="mono">{{ e.row }}</div>
+                      <div>{{ e.message }}</div>
+                      <div class="mono errors__raw">{{ rawPreview(e.raw) }}</div>
+                    </div>
+                  }
+                </div>
+              </details>
+            }
+
+            <button type="button" class="reset" (click)="resetToEmpty()">
+              ← Subir otro archivo
+            </button>
+          </div>
+        }
+      </div>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="onClose()">
+          Cancelar
+        </ion-button>
+        @if (state() === 'preview') {
+          <ion-button
+            (click)="confirm()"
+            [disabled]="validCount() === 0">
+            Importar {{ validCount() }} {{ config().entityLabelPlural }}
+          </ion-button>
+        }
+      </div>
+    </app-form-modal>

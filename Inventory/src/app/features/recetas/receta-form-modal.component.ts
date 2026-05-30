@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { startWith } from 'rxjs';
 import { IonButton } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
-import { Recipe } from '../../core/models';
+import { Recipe, RecipeSheet, RecipeSize } from '../../core/models';
 import { DataService } from '../../core/services/data.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 
@@ -14,155 +16,8 @@ type ItemGroup = ReturnType<RecetaFormModalComponent['buildItemGroup']>;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, IonButton, FormModalComponent, FormFieldComponent],
-  template: `
-    <app-form-modal
-      [isOpen]="isOpen()"
-      [title]="editing() ? 'Editar receta' : 'Nueva receta'"
-      (dismissed)="closed.emit()">
-
-      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-        <div class="row">
-          <app-form-field label="Producto" [required]="true" hint="Solo productos sin receta aparecen aquí">
-            <select formControlName="productId">
-              <option value="">— Selecciona —</option>
-              @for (p of productosDisponibles(); track p.id) {
-                <option [value]="p.id">{{ p.name }}</option>
-              }
-            </select>
-          </app-form-field>
-          <app-form-field label="Rinde (cantidad)" [required]="true" hint="Unidades de producto que produce una corrida">
-            <input type="number" formControlName="yieldQty" min="1" />
-          </app-form-field>
-        </div>
-
-        <div class="items">
-          <div class="items__head">
-            <h3>Componentes de la receta</h3>
-            <div class="items__actions">
-              <ion-button size="small" fill="clear" class="ghost" (click)="addItem('supply')">+ Insumo</ion-button>
-              <ion-button size="small" fill="clear" class="ghost" (click)="addItem('product')">+ Subproducto</ion-button>
-            </div>
-          </div>
-
-          @if (items.controls.length === 0) {
-            <div class="items__empty">
-              Agrega al menos un insumo o subproducto para definir la receta.
-            </div>
-          }
-
-          <div formArrayName="items" class="items__list">
-            @for (ctrl of items.controls; track $index) {
-              <div [formGroupName]="$index" class="item">
-                <select formControlName="kind" class="item__kind" (change)="onKindChange($index)">
-                  <option value="supply">📦 Insumo</option>
-                  <option value="product">🍞 Subproducto</option>
-                </select>
-                <select formControlName="itemId" class="item__supply">
-                  <option value="">— Selecciona —</option>
-                  @if (kindAt($index) === 'supply') {
-                    @for (s of data.activeSupplies(); track s.id) {
-                      <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
-                    }
-                  } @else {
-                    @for (p of subproductosDisponibles(); track p.id) {
-                      <option [value]="p.id">{{ p.name }} ({{ p.unit }})</option>
-                    }
-                  }
-                </select>
-                <input
-                  type="number"
-                  formControlName="qty"
-                  placeholder="Cantidad"
-                  min="0"
-                  step="0.001"
-                  class="item__qty mono" />
-                <button type="button" class="item__remove" (click)="removeItem($index)" aria-label="Eliminar">×</button>
-              </div>
-            }
-          </div>
-        </div>
-
-        <app-form-field label="Observaciones" hint="Tiempos, temperaturas, pasos críticos, advertencias">
-          <textarea
-            formControlName="notes"
-            rows="3"
-            placeholder="Ej: Hornear a 200°C por 25 min. Reposar masa 1h antes de armar."></textarea>
-        </app-form-field>
-      </form>
-
-      <div footer>
-        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
-        <ion-button (click)="onSubmit()" [disabled]="form.invalid || items.length === 0">
-          {{ editing() ? 'Guardar cambios' : 'Crear receta' }}
-        </ion-button>
-      </div>
-    </app-form-modal>
-  `,
-  styles: [`
-    .row { display: grid; grid-template-columns: 2fr 1fr; gap: var(--ui-sp-3); }
-    @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
-
-    .items {
-      border: var(--ui-border-w-md) solid var(--ui-border);
-      background: var(--ui-surface-2);
-      padding: var(--ui-sp-3);
-      margin-top: var(--ui-sp-3);
-    }
-    .items__head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: var(--ui-sp-2);
-    }
-    .items__head h3 {
-      font-size: var(--ui-fs-md);
-      font-weight: var(--ui-fw-black);
-      margin: 0;
-    }
-    .items__empty {
-      padding: var(--ui-sp-4);
-      text-align: center;
-      color: var(--ui-text-muted);
-      font-size: var(--ui-fs-sm);
-    }
-    .items__list { display: grid; gap: var(--ui-sp-2); }
-    .items__actions { display: flex; gap: 4px; flex-wrap: wrap; }
-    .item {
-      display: grid;
-      grid-template-columns: 130px 1fr 100px 36px;
-      gap: var(--ui-sp-2);
-      align-items: center;
-    }
-    @media (max-width: 600px) {
-      .item { grid-template-columns: 130px 1fr 80px 36px; }
-    }
-    @media (max-width: 480px) {
-      .item { grid-template-columns: 1fr 1fr; }
-      .item__remove { grid-column: 2 / 3; justify-self: end; }
-    }
-    .item__kind, .item__supply, .item__qty {
-      padding: 8px 10px;
-      border: var(--ui-border-w-md) solid var(--ui-border);
-      background: var(--ui-surface);
-      font-family: var(--ui-font-sans);
-      font-size: var(--ui-fs-sm);
-      color: var(--ui-text);
-      min-height: 40px;
-    }
-    .item__qty { font-family: var(--ui-font-mono); text-align: right; }
-    .item__remove {
-      width: 36px;
-      height: 36px;
-      background: var(--ui-danger);
-      color: #fff;
-      border: var(--ui-border-w-md) solid var(--ui-border);
-      font-size: 20px;
-      font-weight: var(--ui-fw-black);
-      cursor: pointer;
-      box-shadow: var(--ui-shadow-sm);
-    }
-    .item__remove:active { box-shadow: none; transform: translate(2px, 2px); }
-  `],
+  templateUrl: './receta-form-modal.component.html',
+  styleUrls: ['./receta-form-modal.component.scss'],
 })
 export class RecetaFormModalComponent {
   private readonly fb = inject(FormBuilder);
@@ -177,9 +32,45 @@ export class RecetaFormModalComponent {
   readonly form = this.fb.group({
     productId: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     yieldQty: this.fb.control(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
-    notes: this.fb.control('', { nonNullable: true }),
     items: this.fb.array<ItemGroup>([]),
+    // --- Ficha técnica ---
+    storage: this.fb.control('', { nonNullable: true }),
+    weightRaw: this.fb.control<number | null>(null),
+    weightBaked: this.fb.control<number | null>(null),
+    weightFinal: this.fb.control<number | null>(null),
+    procedure: this.fb.control('', { nonNullable: true }),
+    laminationThickness: this.fb.control('', { nonNullable: true }),
+    fermentationTime: this.fb.control('', { nonNullable: true }),
+    ovenTempBottom: this.fb.control('', { nonNullable: true }),
+    ovenTempTop: this.fb.control('', { nonNullable: true }),
+    bakingTime: this.fb.control('', { nonNullable: true }),
+    // medidas fermentado
+    fAlto: this.fb.control('', { nonNullable: true }),
+    fLargo: this.fb.control('', { nonNullable: true }),
+    fAncho: this.fb.control('', { nonNullable: true }),
+    fDiam: this.fb.control('', { nonNullable: true }),
+    // medidas terminado
+    tAlto: this.fb.control('', { nonNullable: true }),
+    tLargo: this.fb.control('', { nonNullable: true }),
+    tAncho: this.fb.control('', { nonNullable: true }),
+    tDiam: this.fb.control('', { nonNullable: true }),
+    decoration: this.fb.control('', { nonNullable: true }),
+    notes: this.fb.control('', { nonNullable: true }),
   });
+
+  private readonly productIdSig = toSignal(
+    this.form.controls.productId.valueChanges.pipe(startWith(this.form.controls.productId.value)),
+    { initialValue: this.form.controls.productId.value },
+  );
+
+  /** Producto seleccionado (para mostrar SKU/categoría read-only en la ficha). */
+  readonly selectedProduct = computed(() => {
+    const id = this.productIdSig();
+    return id ? this.data.productById(id) ?? null : null;
+  });
+
+  /** Foto del producto (data URL) — se sube aparte del form reactivo. */
+  readonly imageUrl = signal<string | undefined>(undefined);
 
   get items(): FormArray<ItemGroup> {
     return this.form.get('items') as FormArray<ItemGroup>;
@@ -192,9 +83,8 @@ export class RecetaFormModalComponent {
     return this.data.activeProducts().filter(p => {
       // Editando: siempre incluir el producto cuya receta se está editando.
       if (editing && p.id === editing.productId) return true;
-      // Solo productos marcados como "usa receta" en el catálogo.
-      if (!p.hasRecipe) return false;
-      // Y que aún NO tengan una receta definida (sino sería duplicado).
+      // Cualquier producto activo que aún NO tenga receta. Al guardar, el
+      // producto se marca automáticamente como "usa receta".
       return !conRecetaDefinida.has(p.id);
     });
   };
@@ -241,17 +131,118 @@ export class RecetaFormModalComponent {
       const r = this.editing();
       this.items.clear();
       if (r) {
-        this.form.patchValue({ productId: r.productId, yieldQty: r.yieldQty, notes: r.notes ?? '' });
+        this.imageUrl.set(r.imageUrl);
+        const s = r.sheet;
+        this.form.patchValue({
+          productId: r.productId,
+          yieldQty: r.yieldQty,
+          notes: r.notes ?? '',
+          storage: s?.storage ?? '',
+          weightRaw: s?.weightRaw ?? null,
+          weightBaked: s?.weightBaked ?? null,
+          weightFinal: s?.weightFinal ?? null,
+          procedure: (s?.procedure ?? []).join('\n'),
+          laminationThickness: s?.laminationThickness ?? '',
+          fermentationTime: s?.fermentationTime ?? '',
+          ovenTempBottom: s?.ovenTempBottom ?? '',
+          ovenTempTop: s?.ovenTempTop ?? '',
+          bakingTime: s?.bakingTime ?? '',
+          fAlto: s?.fermentedSize?.alto ?? '', fLargo: s?.fermentedSize?.largo ?? '',
+          fAncho: s?.fermentedSize?.ancho ?? '', fDiam: s?.fermentedSize?.diametro ?? '',
+          tAlto: s?.finishedSize?.alto ?? '', tLargo: s?.finishedSize?.largo ?? '',
+          tAncho: s?.finishedSize?.ancho ?? '', tDiam: s?.finishedSize?.diametro ?? '',
+          decoration: s?.decoration ?? '',
+        });
         r.items.forEach(it => {
           const kind: 'supply' | 'product' = it.supplyId ? 'supply' : 'product';
           const itemId = it.supplyId ?? it.productId ?? '';
           this.items.push(this.buildItemGroup(kind, itemId, it.qty));
         });
       } else if (this.isOpen()) {
-        this.form.reset({ productId: '', yieldQty: 1, notes: '', items: [] });
+        this.form.reset();
+        this.imageUrl.set(undefined);
         this.addItem('supply');
       }
     });
+  }
+
+  /** Lee la imagen subida, la redimensiona y la guarda como data URL. */
+  async onImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      await this.toast.show('El archivo debe ser una imagen.', 'danger');
+      return;
+    }
+    try {
+      const dataUrl = await this.resizeImage(file, 700);
+      this.imageUrl.set(dataUrl);
+    } catch {
+      await this.toast.show('No se pudo procesar la imagen.', 'danger');
+    } finally {
+      input.value = ''; // permite volver a subir el mismo archivo
+    }
+  }
+
+  removeImage() {
+    this.imageUrl.set(undefined);
+  }
+
+  /** Redimensiona la imagen (lado mayor = max) y devuelve un data URL JPEG. */
+  private resizeImage(file: File, max: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('imagen inválida'));
+        img.onload = () => {
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('sin canvas'));
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = String(reader.result ?? '');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /** Construye el RecipeSheet a partir del form; devuelve undefined si está vacío. */
+  private buildSheet(v: ReturnType<typeof this.form.getRawValue>): RecipeSheet | undefined {
+    const num = (x: number | null) => (x != null && x >= 0 ? x : undefined);
+    const txt = (x: string) => (x?.trim() ? x.trim() : undefined);
+    const procedure = (v.procedure ?? '')
+      .split('\n').map(l => l.trim()).filter(Boolean);
+    const size = (alto: string, largo: string, ancho: string, diam: string): RecipeSize | undefined => {
+      const s: RecipeSize = {
+        alto: txt(alto), largo: txt(largo), ancho: txt(ancho), diametro: txt(diam),
+      };
+      return (s.alto || s.largo || s.ancho || s.diametro) ? s : undefined;
+    };
+    const sheet: RecipeSheet = {
+      storage: txt(v.storage),
+      weightRaw: num(v.weightRaw),
+      weightBaked: num(v.weightBaked),
+      weightFinal: num(v.weightFinal),
+      procedure: procedure.length > 0 ? procedure : undefined,
+      laminationThickness: txt(v.laminationThickness),
+      fermentationTime: txt(v.fermentationTime),
+      ovenTempBottom: txt(v.ovenTempBottom),
+      ovenTempTop: txt(v.ovenTempTop),
+      bakingTime: txt(v.bakingTime),
+      fermentedSize: size(v.fAlto, v.fLargo, v.fAncho, v.fDiam),
+      finishedSize: size(v.tAlto, v.tLargo, v.tAncho, v.tDiam),
+      decoration: txt(v.decoration),
+    };
+    const hasAny = Object.values(sheet).some(x => x !== undefined);
+    return hasAny ? sheet : undefined;
   }
 
   async onSubmit() {
@@ -290,6 +281,8 @@ export class RecetaFormModalComponent {
           unit: subProd?.unit ?? 'unidad',
         };
       }),
+      sheet: this.buildSheet(v),
+      imageUrl: this.imageUrl(),
     };
     this.data.saveRecipe(recipe);
     await this.toast.show(`Receta de "${product.name}" guardada.`);

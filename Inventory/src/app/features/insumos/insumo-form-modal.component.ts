@@ -1,6 +1,9 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { IonButton } from '@ionic/angular/standalone';
+import { startWith } from 'rxjs';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { Supply, Unit } from '../../core/models';
@@ -12,91 +15,13 @@ import { ToastService } from '../../shared/components/toast/toast.service';
   selector: 'app-insumo-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, IonButton, FormModalComponent, FormFieldComponent],
-  template: `
-    <app-form-modal
-      [isOpen]="isOpen()"
-      [title]="editing() ? 'Editar insumo' : 'Nuevo insumo'"
-      (dismissed)="closed.emit()">
-
-      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-        <div class="row">
-          <app-form-field label="SKU" [required]="true">
-            <input type="text" formControlName="sku" class="mono" />
-          </app-form-field>
-          <app-form-field label="Unidad" [required]="true">
-            <select formControlName="unit">
-              @for (g of unitGroups; track g) {
-                <optgroup [label]="g">
-                  @for (u of unitsGrouped[g]; track u.value) {
-                    <option [value]="u.value">{{ u.label }}</option>
-                  }
-                </optgroup>
-              }
-            </select>
-          </app-form-field>
-        </div>
-
-        <app-form-field label="Nombre" [required]="true">
-          <input type="text" formControlName="name" />
-        </app-form-field>
-
-        <div class="row">
-          <app-form-field label="Categoría">
-            <input type="text" formControlName="category" placeholder="Ej. Cereales" />
-          </app-form-field>
-          <app-form-field label="Proveedor">
-            <input type="text" formControlName="supplier" />
-          </app-form-field>
-        </div>
-
-        <app-form-field label="Costo unitario" [required]="true" hint="Costo de compra promedio">
-          <input type="number" formControlName="cost" min="0" step="0.01" />
-        </app-form-field>
-
-        <div class="row">
-          <app-form-field label="Stock mínimo" [required]="true" hint="Bajo esto = crítico">
-            <input type="number" formControlName="minStock" min="0" step="0.001" />
-          </app-form-field>
-          <app-form-field label="Stock máximo" [required]="true" hint="Sobre esto = exceso">
-            <input type="number" formControlName="maxStock" min="0" step="0.001" />
-          </app-form-field>
-        </div>
-
-        <div class="row">
-          <app-form-field label="Punto de reorden" [required]="true">
-            <input type="number" formControlName="reorderPoint" min="0" step="0.001" />
-          </app-form-field>
-          <app-form-field label="Lead time (días)" [required]="true">
-            <input type="number" formControlName="leadTime" min="0" />
-          </app-form-field>
-        </div>
-
-        <app-form-field label="Descripción">
-          <textarea formControlName="description" rows="2"></textarea>
-        </app-form-field>
-      </form>
-
-      <div footer>
-        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
-        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
-          {{ editing() ? 'Guardar cambios' : 'Crear insumo' }}
-        </ion-button>
-      </div>
-    </app-form-modal>
-  `,
-  styles: [`
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--ui-sp-3);
-    }
-    @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
-  `],
+  imports: [ReactiveFormsModule, DecimalPipe, IonButton, IonIcon, FormModalComponent, FormFieldComponent],
+  templateUrl: './insumo-form-modal.component.html',
+  styleUrls: ['./insumo-form-modal.component.scss'],
 })
 export class InsumoFormModalComponent {
   private readonly fb = inject(FormBuilder);
-  private readonly data = inject(DataService);
+  protected readonly data = inject(DataService);
   private readonly toast = inject(ToastService);
 
   // Para el <select> agrupado de unidades en el template
@@ -108,37 +33,240 @@ export class InsumoFormModalComponent {
   readonly closed = output<void>();
   readonly saved = output<void>();
 
+  /** Proveedores que entregan este insumo (N..M) con precio opcional por proveedor. */
+  readonly selectedEntries = signal<{ supplierId: string; unitCost?: number }[]>([]);
+
+  /** Entradas con precio asignado (filtra los undefined). */
+  readonly pricedEntries = computed(() =>
+    this.selectedEntries().filter(e => e.unitCost != null && e.unitCost > 0)
+  );
+
+  /** Cuántos proveedores tienen precio cargado. */
+  readonly pricedCount = computed(() => this.pricedEntries().length);
+
+  /** Promedio aritmético de los precios de proveedores; null si ninguno tiene precio. */
+  readonly avgPrice = computed<number | null>(() => {
+    const arr = this.pricedEntries();
+    if (arr.length === 0) return null;
+    const sum = arr.reduce((a, e) => a + (e.unitCost ?? 0), 0);
+    return Math.round((sum / arr.length) * 100) / 100;
+  });
+
+  isSelected(supplierId: string): boolean {
+    return this.selectedEntries().some(e => e.supplierId === supplierId);
+  }
+
+  supplierName(id: string): string {
+    return this.data.supplierById(id)?.name ?? '—';
+  }
+
   readonly form = this.fb.group({
     sku: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     name: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     category: this.fb.control(''),
-    supplier: this.fb.control(''),
     unit: this.fb.control<Unit>('kg', { nonNullable: true, validators: [Validators.required] }),
-    cost: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    /**
+     * Stocks ingresados en PRESENTACIONES si hay presentación; en unidad base
+     * si no. Al guardar se multiplica por presentationSize para almacenar en
+     * unidad base internamente.
+     */
     minStock: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
     maxStock: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
     reorderPoint: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
-    leadTime: this.fb.control(1, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
     description: this.fb.control(''),
+    /** Presentación: si tamaño y etiqueta están seteados, el insumo se maneja en presentaciones. */
+    presentationSize: this.fb.control<number | null>(null),
+    presentationLabel: this.fb.control(''),
+  });
+
+  // === Signals reactivos vía toSignal ===
+  // Convertimos los valueChanges de cada FormControl a signals para que los
+  // computed reactivos disparen change detection al cambiar el form.
+  private readonly sizeSig = toSignal(
+    this.form.controls.presentationSize.valueChanges.pipe(
+      startWith(this.form.controls.presentationSize.value),
+    ),
+    { initialValue: this.form.controls.presentationSize.value },
+  );
+  private readonly labelSig = toSignal(
+    this.form.controls.presentationLabel.valueChanges.pipe(
+      startWith(this.form.controls.presentationLabel.value),
+    ),
+    { initialValue: this.form.controls.presentationLabel.value },
+  );
+  private readonly unitSig = toSignal(
+    this.form.controls.unit.valueChanges.pipe(
+      startWith(this.form.controls.unit.value),
+    ),
+    { initialValue: this.form.controls.unit.value },
+  );
+  private readonly minStockSig = toSignal(
+    this.form.controls.minStock.valueChanges.pipe(
+      startWith(this.form.controls.minStock.value),
+    ),
+    { initialValue: this.form.controls.minStock.value },
+  );
+  private readonly maxStockSig = toSignal(
+    this.form.controls.maxStock.valueChanges.pipe(
+      startWith(this.form.controls.maxStock.value),
+    ),
+    { initialValue: this.form.controls.maxStock.value },
+  );
+  private readonly reorderPointSig = toSignal(
+    this.form.controls.reorderPoint.valueChanges.pipe(
+      startWith(this.form.controls.reorderPoint.value),
+    ),
+    { initialValue: this.form.controls.reorderPoint.value },
+  );
+
+  /** Datos de la presentación si el form los tiene completos, sino null. */
+  readonly presentation = computed<{ size: number; label: string } | null>(() => {
+    const size = Number(this.sizeSig());
+    const label = (this.labelSig() ?? '').trim();
+    if (!isFinite(size) || size <= 0 || !label) return null;
+    return { size, label };
+  });
+
+  /** Alias para que el template siga llamando presentationPreview(). */
+  presentationPreview(): { size: number; label: string } | null {
+    return this.presentation();
+  }
+
+  /** Unidad base del form (reactiva). */
+  readonly currentUnit = computed(() => this.unitSig());
+
+  /** Label dinámico de stock: cambia entre "(unidades base)" y "(presentaciones)". */
+  readonly minStockLabel = computed(() => this.buildStockLabel('Stock mínimo'));
+  readonly maxStockLabel = computed(() => this.buildStockLabel('Stock máximo'));
+  readonly reorderPointLabel = computed(() => this.buildStockLabel('Punto de reorden'));
+
+  /** Step del input: 1 para presentaciones (entero), 0.001 para unidad base. */
+  readonly stockStepValue = computed<string>(() => this.presentation() ? '1' : '0.001');
+
+  /** Equivalentes en unidad base, reactivos a cualquier cambio. */
+  readonly minStockEq = computed(() => this.calcEquivalent(this.minStockSig()));
+  readonly maxStockEq = computed(() => this.calcEquivalent(this.maxStockSig()));
+  readonly reorderPointEq = computed(() => this.calcEquivalent(this.reorderPointSig()));
+
+  /**
+   * Reglas:
+   *  - reorderPoint ≥ minStock (el punto de reorden no puede ser menor al mínimo)
+   *  - maxStock ≥ reorderPoint (el máximo debe poder cubrir el reorden)
+   * Devuelve `null` si todo OK, o un mensaje de error específico.
+   */
+  readonly stocksError = computed<string | null>(() => {
+    const min = Number(this.minStockSig() ?? 0);
+    const rop = Number(this.reorderPointSig() ?? 0);
+    const max = Number(this.maxStockSig() ?? 0);
+    if (rop < min) {
+      return `El punto de reorden (${rop}) no puede ser menor al stock mínimo (${min}).`;
+    }
+    if (max < rop) {
+      return `El stock máximo (${max}) no puede ser menor al punto de reorden (${rop}).`;
+    }
+    if (max <= 0) {
+      return 'El stock máximo debe ser mayor a cero.';
+    }
+    return null;
+  });
+
+  private buildStockLabel(base: string): string {
+    const p = this.presentation();
+    return p ? `${base} (${this.pluralLabel(p.label)})` : `${base} (${this.currentUnit()})`;
+  }
+
+  private calcEquivalent(value: number | null): string | null {
+    const p = this.presentation();
+    if (!p) return null;
+    const v = Number(value);
+    if (!isFinite(v) || v <= 0) return null;
+    const total = Math.round(v * p.size * 100) / 100;
+    return `${total} ${this.currentUnit()}`;
+  }
+
+  private pluralLabel(label: string): string {
+    const l = label.trim();
+    if (!l) return '';
+    return l.endsWith('s') ? l : l + 's';
+  }
+
+  /** Costo del insumo previo (cuando se está editando). */
+  private readonly existingCost = signal(0);
+
+  /**
+   * Costo unitario efectivo que se mostrará en el campo (read-only):
+   * promedio de precios de proveedores si los hay; sino, costo previo del
+   * insumo (si se está editando); sino, 0.
+   */
+  readonly effectiveCost = computed(() => {
+    const avg = this.avgPrice();
+    if (avg != null) return avg;
+    return this.existingCost();
+  });
+
+  readonly costHint = computed(() => {
+    if (this.avgPrice() != null) {
+      return `Promedio automático de ${this.pricedCount()} proveedor(es) con precio asignado.`;
+    }
+    if (this.selectedEntries().length > 0) {
+      return 'Ningún proveedor seleccionado tiene precio asignado — define al menos uno arriba.';
+    }
+    return 'Selecciona proveedores arriba y asigna precios para calcular el costo automáticamente.';
   });
 
   constructor() {
     effect(() => {
       const s = this.editing();
       if (s) {
+        const psize = s.presentation?.size ?? 1;
+        const inPresentations = (v: number) =>
+          s.presentation ? Math.round((v / psize) * 1000) / 1000 : v;
         this.form.reset({
-          sku: s.sku, name: s.name, category: s.category ?? '', supplier: s.supplier ?? '',
-          unit: s.unit, cost: s.cost, minStock: s.minStock, maxStock: s.maxStock,
-          reorderPoint: s.reorderPoint, leadTime: s.leadTime, description: s.description ?? '',
+          sku: s.sku, name: s.name, category: s.category ?? '',
+          unit: s.unit,
+          minStock: inPresentations(s.minStock),
+          maxStock: inPresentations(s.maxStock),
+          reorderPoint: inPresentations(s.reorderPoint),
+          description: s.description ?? '',
+          presentationSize: s.presentation?.size ?? null,
+          presentationLabel: s.presentation?.label ?? '',
         });
+        this.existingCost.set(s.cost);
+        // Cargar proveedores que ya tienen este insumo vinculado (con su precio).
+        const entries = this.data.suppliersForSupply(s.id).map(sp => {
+          const item = sp.suppliedItems.find(i => i.kind === 'supply' && i.itemId === s.id);
+          return { supplierId: sp.id, unitCost: item?.unitCost };
+        });
+        this.selectedEntries.set(entries);
       } else if (this.isOpen()) {
         this.form.reset({
-          sku: '', name: '', category: '', supplier: '',
-          unit: 'kg', cost: 0, minStock: 0, maxStock: 0,
-          reorderPoint: 0, leadTime: 1, description: '',
+          sku: '', name: '', category: '',
+          unit: 'kg', minStock: 0, maxStock: 0,
+          reorderPoint: 0, description: '',
+          presentationSize: null, presentationLabel: '',
         });
+        this.existingCost.set(0);
+        this.selectedEntries.set([]);
       }
     });
+  }
+
+  toggleSupplier(id: string) {
+    this.selectedEntries.update(arr =>
+      arr.some(e => e.supplierId === id)
+        ? arr.filter(e => e.supplierId !== id)
+        : [...arr, { supplierId: id, unitCost: undefined }]
+    );
+  }
+
+  /** Actualiza el precio de un proveedor seleccionado. Valor vacío = undefined (usa el costo global). */
+  setPrice(supplierId: string, raw: string) {
+    const trimmed = (raw ?? '').trim();
+    const cost = trimmed === '' ? undefined : Number(trimmed);
+    const safe = cost !== undefined && (isNaN(cost) || cost < 0) ? undefined : cost;
+    this.selectedEntries.update(arr =>
+      arr.map(e => e.supplierId === supplierId ? { ...e, unitCost: safe } : e)
+    );
   }
 
   async onSubmit() {
@@ -147,29 +275,41 @@ export class InsumoFormModalComponent {
       await this.toast.show('Revisa los campos requeridos.', 'danger');
       return;
     }
+    if (this.selectedEntries().length === 0) {
+      await this.toast.show('Tenés que asignar al menos un proveedor al insumo.', 'danger');
+      return;
+    }
     const v = this.form.getRawValue();
+    const presentation = this.presentationPreview();
+    const factor = presentation?.size ?? 1; // multiplica los inputs a unidad base
+    // El cost no se ingresa manualmente: viene del promedio de precios de
+    // proveedores. Si no hay precios, se conserva el cost previo (o 0 si es nuevo).
     const base = {
       sku: v.sku.trim(),
       name: v.name.trim(),
       category: v.category?.trim() || undefined,
-      supplier: v.supplier?.trim() || undefined,
       unit: v.unit,
-      cost: Number(v.cost),
-      minStock: Number(v.minStock),
-      maxStock: Number(v.maxStock),
-      reorderPoint: Number(v.reorderPoint),
-      leadTime: Number(v.leadTime),
+      cost: this.effectiveCost(),
+      minStock: Number(v.minStock) * factor,
+      maxStock: Number(v.maxStock) * factor,
+      reorderPoint: Number(v.reorderPoint) * factor,
       description: v.description?.trim() || undefined,
+      presentation: presentation ?? undefined,
       active: true,
     };
     const editing = this.editing();
+    let supplyId: string;
     if (editing) {
       this.data.updateSupply({ ...editing, ...base });
+      supplyId = editing.id;
       await this.toast.show(`Insumo "${base.name}" actualizado.`);
     } else {
-      this.data.createSupply(base);
+      const created = this.data.createSupply(base);
+      supplyId = created.id;
       await this.toast.show(`Insumo "${base.name}" creado.`);
     }
+    // Sincronizar relación N..M con proveedores (con precios opcionales)
+    this.data.setSuppliersForSupply(supplyId, this.selectedEntries());
     this.saved.emit();
   }
 }

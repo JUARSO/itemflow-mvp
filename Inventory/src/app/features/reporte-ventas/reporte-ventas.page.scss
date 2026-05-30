@@ -1,0 +1,75 @@
+.datefilter {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+  flex-wrap: wrap;
+}
+.datefilter__field { display: flex; flex-direction: column; gap: 4px; }
+.datefilter__label {
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ui-text-muted);
+}
+.datefilter__input {
+  font-size: var(--ui-fs-md);
+  padding: 8px 10px;
+  min-height: 40px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+}
+.datefilter__input:focus-visible { outline: none; box-shadow: var(--ui-shadow-sm); }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+}
+@media (max-width: 760px) { .kpis { grid-template-columns: 1fr; } }
+
+.list {
+  padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+  display: grid;
+  gap: var(--ui-sp-3);
+}
+.ticket {
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+}
+.ticket__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-sp-3);
+  padding: var(--ui-sp-3) var(--ui-sp-4);
+  background: var(--ui-surface-2);
+  border-bottom: var(--ui-border-w-sm) solid var(--ui-border);
+}
+.ticket__code { font-weight: var(--ui-fw-black); color: var(--ui-text); margin-right: var(--ui-sp-2); }
+.ticket__when { font-size: var(--ui-fs-sm); }
+.ticket__total {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-black);
+  font-size: var(--ui-fs-lg);
+  color: var(--ui-success);
+}
+.ticket__lines { padding: var(--ui-sp-2) var(--ui-sp-4) var(--ui-sp-3); }
+.tl {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--ui-sp-3);
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--ui-border);
+  font-size: var(--ui-fs-sm);
+}
+.tl:last-child { border-bottom: none; }
+.tl__qty { color: var(--ui-text-muted); }
+.tl__sub { font-weight: var(--ui-fw-bold); min-width: 70px; text-align: right; }
+.muted { color: var(--ui-text-muted); }

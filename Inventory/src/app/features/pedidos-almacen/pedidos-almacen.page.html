@@ -1,0 +1,81 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Pedidos a producir</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Pedidos a producir"
+    subtitle="Reposiciones de almacén y pedidos de clientes corroborados. Fabrícalos y márcalos listos.">
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Por producir" [value]="porProducir()" tone="warning"></app-kpi-card>
+    <app-kpi-card label="En producción" [value]="enProduccion()" tone="primary"></app-kpi-card>
+    <app-kpi-card label="Listas" [value]="listas()" tone="transit"></app-kpi-card>
+  </div>
+
+  <div class="list">
+    @if (requests().length === 0) {
+      <app-empty-state
+        icon="🏭"
+        title="Sin pedidos por producir"
+        body="Cuando Ventas pida reposición o corrobore un pedido de cliente, aparecerá aquí.">
+      </app-empty-state>
+    }
+    @for (o of requests(); track o.id) {
+      <article class="req" [attr.data-status]="o.status" [attr.data-tipo]="esCliente(o) ? 'cliente' : 'almacen'">
+        <header class="req__head">
+          <div class="req__id">
+            <span class="req__code mono">{{ o.code }}</span>
+            <span class="req__dest" [class.req__dest--cliente]="esCliente(o)">{{ destino(o) }}</span>
+          </div>
+          <ion-badge [color]="statusColor(o)">{{ statusLabel(o) }}</ion-badge>
+        </header>
+
+        <div class="req__meta muted">
+          @if (o.requestedDeliveryDate) { Para {{ o.requestedDeliveryDate | date:'EEE dd-MM-yyyy' }} · }
+          Solicitado {{ o.createdAt | date:'dd-MM-yyyy' }}
+        </div>
+
+        <div class="req__items">
+          @for (it of o.items; track it.productId) {
+            <div class="item">
+              <span class="item__name">{{ it.productName }}</span>
+              <span class="item__qty mono">
+                @if (o.status !== 'pending' && it.fulfilledQty !== it.qty) {
+                  {{ it.fulfilledQty }}/{{ it.qty }}
+                } @else {
+                  ×{{ it.qty }}
+                }
+              </span>
+            </div>
+          }
+        </div>
+
+        @if (tenant.canFulfillAlmacenRequests()) {
+          <footer class="req__actions">
+            @if (o.status === 'pending') {
+              <ion-button size="small" (click)="iniciar(o)">
+                <ion-icon name="hammer-outline" slot="start"></ion-icon>
+                Iniciar producción
+              </ion-button>
+            } @else if (o.status === 'in_production') {
+              <ion-button size="small" color="success" (click)="completar(o)">
+                <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                Marcar listo
+              </ion-button>
+            } @else if (o.status === 'completed') {
+              <span class="muted">
+                @if (o.urnaId) { Esperando que Ventas valide la recepción. }
+                @else { Esperando que Ventas despache el pedido. }
+              </span>
+            }
+          </footer>
+        }
+      </article>
+    }
+  </div>
+</ion-content>

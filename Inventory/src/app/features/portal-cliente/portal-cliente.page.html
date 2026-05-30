@@ -1,0 +1,375 @@
+    <ion-content [fullscreen]="true">
+      <div class="portal">
+        <header class="portal__header">
+          <div class="brand">
+            <ion-icon name="cube-outline"></ion-icon>
+            <span>{{ company().name }}</span>
+          </div>
+          @if (authenticated()) {
+            <button class="logout" (click)="logout()">Salir</button>
+          }
+        </header>
+
+        @if (!customer()) {
+          <div class="error-box">
+            <h2>Acceso no disponible</h2>
+            <p>El link que estás usando no es válido o el cliente fue desactivado.</p>
+          </div>
+        } @else if (!authenticated()) {
+          <div class="pin-box">
+            <h2>Hola, {{ customer()!.name }}</h2>
+            <p>Ingresa tu PIN de acceso para hacer pedidos.</p>
+            <input
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              [value]="pinInput()"
+              (input)="pinInput.set($any($event.target).value)"
+              class="pin-input mono"
+              placeholder="••••••"
+              (keyup.enter)="validatePin()" />
+            @if (pinError()) {
+              <div class="pin-error">PIN incorrecto</div>
+            }
+            <ion-button expand="block" (click)="validatePin()" [disabled]="pinInput().length < 4">
+              Entrar
+            </ion-button>
+          </div>
+        } @else {
+          <main class="portal__main">
+            <h1 class="portal__title">Hola, {{ customer()!.name }}</h1>
+
+            <!-- ALERTA: pedidos por recibir -->
+            @if (porRecibir().length > 0) {
+              <section class="receive-section">
+                <h2 class="section-title">
+                  <ion-icon name="cube-outline"></ion-icon>
+                  Pedidos por recibir
+                  <ion-badge color="warning">{{ porRecibir().length }}</ion-badge>
+                </h2>
+                <p class="receive-section__hint">
+                  Revisá que todo llegue como esperabas. Confirmá la recepción
+                  cuando esté todo bien, o reportá diferencias si recibiste menos
+                  o algún producto está dañado.
+                </p>
+
+                @for (o of porRecibir(); track o.id) {
+                  <article class="receive-card">
+                    <header class="receive-card__head">
+                      <div>
+                        <span class="mono">{{ o.code }}</span>
+                        @if (o.requestedDeliveryDate) {
+                          <span class="receive-card__date">
+                            · Entrega {{ o.requestedDeliveryDate | date:'dd-MM-yyyy' }}
+                          </span>
+                        }
+                      </div>
+                      <ion-badge color="success">Listo para recibir</ion-badge>
+                    </header>
+
+                    @if (editingId() === o.id) {
+                      <!-- Modo edición: input por producto -->
+                      <div class="receive-card__editor">
+                        <div class="editor-hint">
+                          Ajusta la cantidad recibida si llegó menos de lo producido.
+                          El monto se recalcula con los precios originales.
+                        </div>
+                        @for (it of o.items; track it.productId) {
+                          <div class="editor-row">
+                            <div class="editor-row__name">
+                              <strong>{{ it.productName }}</strong>
+                              <span class="muted">
+                                Pedido: <span class="mono">{{ it.qty }}</span> {{ it.unit }} ·
+                                Producido: <span class="mono">{{ it.fulfilledQty }}</span> {{ it.unit }}
+                              </span>
+                            </div>
+                            <div class="editor-row__input">
+                              <label>Recibido</label>
+                              <input
+                                type="number"
+                                min="0"
+                                [max]="it.fulfilledQty"
+                                [value]="draftQty(it.productId, it.fulfilledQty)"
+                                (input)="setDraftQty(it.productId, $any($event.target).value, it.fulfilledQty)"
+                                class="mono" />
+                              <span class="muted">/ {{ it.fulfilledQty }}</span>
+                            </div>
+                            <div class="editor-row__subtotal mono">
+                              ₡{{ subtotalFor(it, draftQty(it.productId, it.fulfilledQty)) | number:'1.0-0' }}
+                            </div>
+                          </div>
+                        }
+
+                        <div class="editor-note">
+                          <label>Motivo o nota (opcional)</label>
+                          <textarea
+                            rows="2"
+                            placeholder="Ej: 3 croissants llegaron quebrados"
+                            [value]="noteDraft()"
+                            (input)="noteDraft.set($any($event.target).value)"></textarea>
+                        </div>
+
+                        <div class="editor-totals">
+                          <div>
+                            <span class="muted">Total original</span>
+                            <span class="mono">₡{{ o.totalAmount | number:'1.0-0' }}</span>
+                          </div>
+                          <div class="editor-totals__final">
+                            <span>Total final</span>
+                            <strong class="mono">₡{{ draftTotal(o) | number:'1.0-0' }}</strong>
+                          </div>
+                          @if (draftTotal(o) < o.totalAmount) {
+                            <div class="editor-totals__diff">
+                              −₡{{ (o.totalAmount - draftTotal(o)) | number:'1.0-0' }} menos
+                            </div>
+                          }
+                        </div>
+
+                        <div class="editor-actions">
+                          <button class="btn btn--ghost" (click)="cancelEdit()">Cancelar</button>
+                          <button class="btn btn--primary" (click)="submitReception(o)">
+                            Confirmar recepción
+                          </button>
+                        </div>
+                      </div>
+                    } @else {
+                      <!-- Vista compacta -->
+                      <div class="receive-card__items">
+                        @for (it of o.items; track it.productId) {
+                          <div class="receive-card__item">
+                            <span>{{ it.productName }}</span>
+                            <span class="mono">
+                              {{ it.fulfilledQty }} {{ it.unit }}
+                            </span>
+                          </div>
+                        }
+                      </div>
+
+                      <div class="receive-card__total mono">
+                        Total estimado: <strong>₡{{ o.totalAmount | number:'1.0-0' }}</strong>
+                      </div>
+
+                      <div class="receive-card__actions">
+                        <button class="btn btn--ghost" (click)="openEdit(o)">
+                          Reportar diferencia
+                        </button>
+                        <button class="btn btn--primary" (click)="confirmAllOk(o)">
+                          Confirmar todo recibido
+                        </button>
+                      </div>
+                    }
+                  </article>
+                }
+              </section>
+            }
+
+            <!-- Estado de ventana de pedidos -->
+            <section class="window-info" [class.window-info--open]="canOrderToday()">
+              @if (canOrderToday()) {
+                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                <div>
+                  <strong>Hoy puedes hacer pedidos</strong>
+                  <div class="window-info__hint">Día válido para crear pedidos: {{ today() }}</div>
+                </div>
+              } @else {
+                <ion-icon name="warning-outline"></ion-icon>
+                <div>
+                  <strong>Hoy ({{ today() }}) no es día de pedidos</strong>
+                  <div class="window-info__hint">
+                    Puedes pedir los días: {{ orderDaysLabel() }}
+                  </div>
+                </div>
+              }
+            </section>
+
+            <div class="layout">
+              <!-- Catálogo -->
+              <section class="catalog">
+                <h2 class="section-title">Productos disponibles</h2>
+                @if (productos().length === 0) {
+                  <p class="empty-msg">No tienes productos asignados.</p>
+                }
+                <div class="products">
+                  @for (p of productos(); track p.id) {
+                    <button class="product" (click)="addToCart(p.id)" [disabled]="!canOrderToday()">
+                      <div class="product__name">{{ p.name }}</div>
+                      <div class="product__price">₡{{ precioProducto(p.id) | number:'1.0-0' }} / {{ p.unit }}</div>
+                      <div class="product__add">+ Agregar</div>
+                    </button>
+                  }
+                </div>
+              </section>
+
+              <!-- Carrito -->
+              <aside class="cart">
+                <h2 class="section-title">Tu pedido</h2>
+
+                @if (cart().length === 0) {
+                  <p class="empty-msg">Tu carrito está vacío. Toca un producto para agregarlo.</p>
+                } @else {
+                  <div class="cart__list">
+                    @for (l of cartDetail(); track l.productId) {
+                      <div class="cart__line">
+                        <div class="cart__line-info">
+                          <span class="cart__line-name">{{ l.name }}</span>
+                          <span class="cart__line-price mono">₡{{ l.subtotal | number:'1.0-0' }}</span>
+                        </div>
+                        <div class="cart__line-actions">
+                          <button (click)="decQty(l.productId)">−</button>
+                          <span class="mono">{{ l.qty }}</span>
+                          <button (click)="incQty(l.productId)">+</button>
+                          <button class="cart__remove" (click)="removeFromCart(l.productId)" title="Quitar">
+                            <ion-icon name="trash-outline"></ion-icon>
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="cart__total">
+                    <span>Total estimado</span>
+                    <strong class="mono">₡{{ totalCart() | number:'1.0-0' }}</strong>
+                  </div>
+
+                  <div class="delivery">
+                    <label class="delivery__label">Fecha de entrega</label>
+                    <select [value]="deliveryDate()"
+                      (change)="deliveryDate.set($any($event.target).value)"
+                      class="delivery__select">
+                      <option value="">— Selecciona día de entrega —</option>
+                      @for (d of nextDeliveryDates(); track d.iso) {
+                        <option [value]="d.iso">{{ d.label }}</option>
+                      }
+                    </select>
+                  </div>
+
+                  <ion-button expand="block" color="primary"
+                    (click)="submitOrder()"
+                    [disabled]="!canOrderToday() || !deliveryDate()">
+                    Enviar pedido
+                  </ion-button>
+                }
+              </aside>
+            </div>
+
+            <!-- HISTORIAL DETALLADO -->
+            <section class="history-section">
+              <div class="history-section__head">
+                <h2 class="section-title">Historial de pedidos</h2>
+                @if (hasHistoryFilters()) {
+                  <button class="link-btn" (click)="clearHistoryFilters()">Limpiar filtros</button>
+                }
+              </div>
+
+              <div class="history-filters">
+                <div class="hf">
+                  <label>Desde</label>
+                  <input type="date"
+                    [value]="histFrom()"
+                    (change)="histFrom.set($any($event.target).value)" />
+                </div>
+                <div class="hf">
+                  <label>Hasta</label>
+                  <input type="date"
+                    [value]="histTo()"
+                    (change)="histTo.set($any($event.target).value)" />
+                </div>
+                <div class="hf">
+                  <label>Estado</label>
+                  <select [value]="histStatus()"
+                    (change)="histStatus.set($any($event.target).value)">
+                    <option value="all">Todos</option>
+                    <option value="pending">Pendiente</option>
+                    <option value="in_production">En producción</option>
+                    <option value="received">Recibido</option>
+                    <option value="cancelled">Cancelado</option>
+                  </select>
+                </div>
+                <div class="hf hf--summary">
+                  <label>Resultados</label>
+                  <span class="hf__count mono">{{ historialFiltrado().length }} / {{ historial().length }}</span>
+                </div>
+              </div>
+
+              @if (historial().length === 0) {
+                <p class="empty-msg">Aún no tienes pedidos en tu historial.</p>
+              } @else if (historialFiltrado().length === 0) {
+                <p class="empty-msg">Ningún pedido coincide con los filtros aplicados.</p>
+              } @else {
+                <div class="history-list">
+                  @for (o of historialFiltrado(); track o.id) {
+                    <article class="history-card" [class.history-card--confirmed]="!!o.customerConfirmedAt">
+                      <header class="history-card__head">
+                        <div>
+                          <span class="mono">{{ o.code }}</span>
+                          <ion-badge [color]="statusColor(o)">{{ statusLabel(o) }}</ion-badge>
+                        </div>
+                        <div class="history-card__dates">
+                          <span>Creado {{ o.createdAt | date:'dd-MM-yyyy' }}</span>
+                          @if (o.customerConfirmedAt) {
+                            <span> · Recibido {{ o.customerConfirmedAt | date:'dd-MM-yyyy' }}</span>
+                          }
+                        </div>
+                      </header>
+
+                      <div class="history-table">
+                        <div class="history-table__row history-table__row--head">
+                          <div>Producto</div>
+                          <div class="num">Pedido</div>
+                          <div class="num">Producido</div>
+                          <div class="num">Recibido</div>
+                          <div class="num">Subtotal</div>
+                        </div>
+                        @for (it of o.items; track it.productId) {
+                          <div class="history-table__row">
+                            <div>{{ it.productName }}</div>
+                            <div class="num mono">{{ it.qty }} {{ it.unit }}</div>
+                            <div class="num mono">{{ it.fulfilledQty }} {{ it.unit }}</div>
+                            <div class="num mono"
+                              [class.diff-down]="hasDiff(it)">
+                              @if (o.customerConfirmedAt) {
+                                {{ it.receivedQty ?? 0 }} {{ it.unit }}
+                              } @else {
+                                <span class="muted">—</span>
+                              }
+                            </div>
+                            <div class="num mono">
+                              ₡{{ historicalSubtotal(o, it) | number:'1.0-0' }}
+                            </div>
+                          </div>
+                        }
+                      </div>
+
+                      <footer class="history-card__foot">
+                        <div class="history-totals">
+                          <div>
+                            <span class="muted">Total original</span>
+                            <span class="mono">₡{{ o.totalAmount | number:'1.0-0' }}</span>
+                          </div>
+                          @if (o.customerConfirmedAt) {
+                            <div class="history-totals__final">
+                              <span>Total final cobrado</span>
+                              <strong class="mono">₡{{ o.finalAmount ?? o.totalAmount | number:'1.0-0' }}</strong>
+                            </div>
+                            @if ((o.finalAmount ?? o.totalAmount) < o.totalAmount) {
+                              <div class="history-totals__diff">
+                                Diferencia: −₡{{ (o.totalAmount - (o.finalAmount ?? 0)) | number:'1.0-0' }}
+                              </div>
+                            }
+                          }
+                        </div>
+                        @if (o.customerNote) {
+                          <div class="history-note">
+                            <strong>Nota:</strong> {{ o.customerNote }}
+                          </div>
+                        }
+                      </footer>
+                    </article>
+                  }
+                </div>
+              }
+            </section>
+          </main>
+        }
+      </div>
+    </ion-content>

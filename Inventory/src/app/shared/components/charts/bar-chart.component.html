@@ -1,0 +1,7 @@
+    @if (items().length === 0) {
+      <div class="empty">Sin datos.</div>
+    } @else {
+      <div class="chart__canvas" [style.height.px]="chartHeight()">
+        <canvas #canvas></canvas>
+      </div>
+    }

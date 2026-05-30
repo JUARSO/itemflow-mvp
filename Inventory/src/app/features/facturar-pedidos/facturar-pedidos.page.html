@@ -1,0 +1,116 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Facturar pedidos</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Facturar pedidos"
+    subtitle="Cierra los pedidos despachados. Si algo falló en la entrega, baja la cantidad entregada y esos productos van a merma.">
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Por facturar" [value]="porFacturar().length" tone="warning"></app-kpi-card>
+    <app-kpi-card label="Facturados" [value]="historial().length" tone="success"></app-kpi-card>
+  </div>
+
+  <div class="tabs">
+    <ion-segment [value]="tab()" (ionChange)="tab.set($any($event.detail.value))">
+      <ion-segment-button value="facturar"><ion-label>Por facturar ({{ porFacturar().length }})</ion-label></ion-segment-button>
+      <ion-segment-button value="historial"><ion-label>Historial ({{ historial().length }})</ion-label></ion-segment-button>
+    </ion-segment>
+  </div>
+
+  @if (tab() === 'facturar') {
+    <div class="list">
+      @if (porFacturar().length === 0) {
+        <app-empty-state icon="🧾" title="Sin pedidos por facturar"
+          body="Cuando despaches un pedido, aparecerá aquí para facturarlo."></app-empty-state>
+      }
+      @for (o of porFacturar(); track o.id) {
+        <article class="ped">
+          <header class="ped__head">
+            <div>
+              <span class="ped__code mono">{{ o.code }}</span>
+              <span class="ped__cliente">{{ clienteNombre(o) }}</span>
+            </div>
+            <span class="ped__when muted">Despachado {{ o.dispatchedAt | date:'dd-MM-yyyy' }}</span>
+          </header>
+
+          <div class="grid">
+            <div class="grid__head">
+              <span>Producto</span>
+              <span class="num">Despachado</span>
+              <span class="num">Entregado</span>
+              <span class="num">Merma</span>
+            </div>
+            @for (it of o.items; track it.productId) {
+              <div class="grid__row" [class.has-merma]="mermaDe(o, it) > 0">
+                <span class="grid__name">{{ it.productName }}</span>
+                <span class="num mono">{{ it.fulfilledQty }}</span>
+                <span class="num">
+                  <input type="number" min="0" [max]="it.fulfilledQty" class="qty mono"
+                    [value]="entregadoDe(o, it)"
+                    (input)="setEntregado(o, it, +$any($event.target).value)" />
+                </span>
+                <span class="num mono merma">{{ mermaDe(o, it) > 0 ? mermaDe(o, it) : '—' }}</span>
+              </div>
+            }
+          </div>
+
+          <footer class="ped__foot">
+            <div class="ped__totals">
+              <span>Total a facturar: <strong class="mono">₡{{ totalFacturar(o) | number:'1.0-0' }}</strong></span>
+              @if (totalMerma(o) > 0) {
+                <span class="merma-tag">{{ totalMerma(o) }} u a merma</span>
+              }
+            </div>
+            @if (tenant.canCreateOrder()) {
+              <ion-button size="small" (click)="facturar(o)">
+                <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+                Facturar
+              </ion-button>
+            }
+          </footer>
+        </article>
+      }
+    </div>
+  } @else {
+    <div class="list">
+      @if (historial().length === 0) {
+        <app-empty-state icon="📚" title="Sin facturas"
+          body="Los pedidos facturados aparecerán aquí como historial."></app-empty-state>
+      }
+      @for (o of historial(); track o.id) {
+        <article class="ped ped--done">
+          <header class="ped__head">
+            <div>
+              <span class="ped__code mono">{{ o.code }}</span>
+              <span class="ped__cliente">{{ clienteNombre(o) }}</span>
+            </div>
+            <div class="ped__hist">
+              <ion-badge color="success">Facturado</ion-badge>
+              <span class="ped__when muted">{{ o.invoicedAt | date:'dd-MM-yyyy' }}</span>
+            </div>
+          </header>
+
+          <div class="hist-items">
+            @for (d of itemsFacturados(o); track d.name) {
+              <div class="hist-item">
+                <span class="hist-item__name">{{ d.name }}</span>
+                <span class="hist-item__qty mono">{{ d.recibido }}@if (d.merma > 0) { <span class="merma">(−{{ d.merma }} merma)</span> }</span>
+                <span class="hist-item__sub mono">₡{{ d.total | number:'1.0-0' }}</span>
+              </div>
+            }
+          </div>
+
+          <footer class="ped__foot">
+            <span class="ped__final">Total facturado: <strong class="mono">₡{{ (o.finalAmount ?? 0) | number:'1.0-0' }}</strong></span>
+          </footer>
+        </article>
+      }
+    </div>
+  }
+</ion-content>

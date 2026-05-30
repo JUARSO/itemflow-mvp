@@ -12,59 +12,8 @@ import { ToastService } from '../../shared/components/toast/toast.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ReactiveFormsModule, IonButton, FormModalComponent, FormFieldComponent],
-  template: `
-    <app-form-modal
-      [isOpen]="isOpen()"
-      [title]="editing() ? 'Editar miembro' : 'Invitar miembro'"
-      (dismissed)="closed.emit()">
-
-      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-        <app-form-field label="Nombre completo" [required]="true">
-          <input type="text" formControlName="displayName" />
-        </app-form-field>
-
-        <app-form-field label="Correo electrónico" [required]="true">
-          <input
-            type="email"
-            formControlName="email"
-            [readOnly]="!!editing()"
-            class="mono" />
-        </app-form-field>
-
-        <app-form-field label="Rol" [required]="true" hint="Define qué pantallas y acciones puede usar el miembro">
-          <select formControlName="role">
-            <option value="admin">Administrativo (acceso completo)</option>
-            <option value="production">Encargado de Producción</option>
-            <option value="inventory">Encargado de Inventario</option>
-            <option value="operator">Operario de Producción</option>
-          </select>
-        </app-form-field>
-
-        @if (!editing()) {
-          <p class="hint-block">
-            En el MVP la invitación crea el miembro directamente. En producción enviaría un email con un link de activación.
-          </p>
-        }
-      </form>
-
-      <div footer>
-        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
-        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
-          {{ editing() ? 'Guardar cambios' : 'Invitar' }}
-        </ion-button>
-      </div>
-    </app-form-modal>
-  `,
-  styles: [`
-    .hint-block {
-      margin-top: var(--ui-sp-3);
-      padding: var(--ui-sp-3);
-      background: var(--ui-surface-2);
-      border: var(--ui-border-w-sm) dashed var(--ui-border);
-      font-size: var(--ui-fs-xs);
-      color: var(--ui-text-muted);
-    }
-  `],
+  templateUrl: './miembro-form-modal.component.html',
+  styleUrls: ['./miembro-form-modal.component.scss'],
 })
 export class MiembroFormModalComponent {
   private readonly fb = inject(FormBuilder);
@@ -79,7 +28,7 @@ export class MiembroFormModalComponent {
   readonly form = this.fb.group({
     displayName: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     email: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    role: this.fb.control<UserRole>('production', { nonNullable: true, validators: [Validators.required] }),
+    role: this.fb.control<UserRole>('ventas', { nonNullable: true, validators: [Validators.required] }),
   });
 
   constructor() {
@@ -88,16 +37,15 @@ export class MiembroFormModalComponent {
       if (m) {
         this.form.reset({ displayName: m.displayName, email: m.email, role: m.role });
       } else if (this.isOpen()) {
-        this.form.reset({ displayName: '', email: '', role: 'production' });
+        this.form.reset({ displayName: '', email: '', role: 'ventas' });
       }
     });
   }
 
   private roleLabel(r: UserRole): string {
     if (r === 'admin') return 'Administrativo';
-    if (r === 'production') return 'Encargado de Producción';
-    if (r === 'inventory') return 'Encargado de Inventario';
-    return 'Operario de Producción';
+    if (r === 'produccion') return 'Producción';
+    return 'Ventas';
   }
 
   async onSubmit() {

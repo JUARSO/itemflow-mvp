@@ -1,0 +1,19 @@
+    .gauge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--ui-sp-2);
+    }
+    .gauge__svg {
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+    }
+    .gauge__value {
+      font-size: var(--ui-fs-2xl);
+      font-weight: var(--ui-fw-bold);
+      line-height: 1;
+    }
+    .gauge__value[data-status="optimo"]  { color: var(--ui-success); }
+    .gauge__value[data-status="alerta"]  { color: var(--ui-warning); }
+    .gauge__value[data-status="critico"] { color: var(--ui-danger); }

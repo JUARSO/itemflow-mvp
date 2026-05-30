@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonButton, IonSearchbar,
+  IonButton, IonSearchbar, IonIcon,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
@@ -22,202 +23,14 @@ const VALID_UNITS = new Set<string>(UNITS.map(u => u.value));
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    DecimalPipe,
+    DatePipe, DecimalPipe, RouterLink,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-    IonButton, IonSearchbar,
+    IonButton, IonSearchbar, IonIcon,
     PageHeaderComponent, StatusBadgeComponent, ConfirmDialogComponent, InsumoFormModalComponent,
     BulkImportModalComponent,
   ],
-  template: `
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-        <ion-title>Insumos</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content>
-      <app-page-header
-        title="Insumos"
-        subtitle="Materias primas que compras a proveedores. Paso 2 del flujo.">
-        @if (tenant.canEditSupplies()) {
-          <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
-          <ion-button (click)="abrirNuevo()">+ Nuevo insumo</ion-button>
-        }
-      </app-page-header>
-
-      <div class="filters">
-        <ion-searchbar
-          [value]="query()"
-          (ionInput)="query.set($any($event.detail.value) ?? '')"
-          placeholder="Buscar por nombre, SKU o categoría"
-          mode="md">
-        </ion-searchbar>
-      </div>
-
-      <div class="grid">
-        @for (item of visibles(); track item.supply.id) {
-          <article class="card">
-            <header class="card__head">
-              <div>
-                <div class="card__cat">{{ item.supply.category ?? 'Sin categoría' }}</div>
-                <h3 class="card__title">{{ item.supply.name }}</h3>
-                <div class="card__sku mono">{{ item.supply.sku }}</div>
-              </div>
-              <app-status-badge [status]="item.worstStatus"></app-status-badge>
-            </header>
-
-            <div class="card__row">
-              @if (tenant.canEditSupplies()) {
-                <div class="card__cell">
-                  <div class="card__label">Costo unitario</div>
-                  <div class="card__value mono">₡{{ item.supply.cost | number:'1.0-0' }}</div>
-                </div>
-              }
-              <div class="card__cell">
-                <div class="card__label">P. reorden</div>
-                <div class="card__value mono">{{ item.supply.reorderPoint }} {{ item.supply.unit }}</div>
-              </div>
-              <div class="card__cell">
-                <div class="card__label">Mín / Máx</div>
-                <div class="card__value mono">{{ item.supply.minStock }} / {{ item.supply.maxStock }}</div>
-              </div>
-              <div class="card__cell">
-                <div class="card__label">Lead time</div>
-                <div class="card__value mono">{{ item.supply.leadTime }} días</div>
-              </div>
-            </div>
-
-            <div class="card__stocks">
-              <div class="card__label">Stock actual</div>
-              <div class="stock-row">
-                <span class="stock-row__qty mono">{{ item.quantity | number:'1.0-3' }} {{ item.supply.unit }}</span>
-                <app-status-badge [status]="item.status"></app-status-badge>
-              </div>
-            </div>
-
-            @if (item.supply.supplier) {
-              <div class="card__footer">
-                Proveedor: <strong>{{ item.supply.supplier }}</strong>
-              </div>
-            }
-
-            @if (tenant.canEditSupplies()) {
-              <div class="card__actions">
-                <ion-button size="small" fill="clear" class="ghost" (click)="abrirEditar(item.supply)">
-                  Editar
-                </ion-button>
-                <ion-button size="small" color="danger" (click)="pedirEliminar(item.supply)">
-                  Eliminar
-                </ion-button>
-              </div>
-            }
-          </article>
-        }
-      </div>
-
-      <app-insumo-form-modal
-        [isOpen]="modalOpen()"
-        [editing]="insumoEdit()"
-        (closed)="cerrarModal()"
-        (saved)="cerrarModal()">
-      </app-insumo-form-modal>
-
-      <app-confirm-dialog
-        [isOpen]="confirmOpen()"
-        title="Eliminar insumo"
-        [message]="confirmMessage()"
-        tone="danger"
-        confirmLabel="Sí, eliminar"
-        (confirmed)="eliminar()"
-        (cancelled)="confirmOpen.set(false)">
-      </app-confirm-dialog>
-
-      <app-bulk-import-modal
-        [isOpen]="bulkOpen()"
-        [config]="bulkConfig"
-        (closed)="bulkOpen.set(false)">
-      </app-bulk-import-modal>
-    </ion-content>
-  `,
-  styles: [`
-    .filters { padding: 0 var(--ui-sp-4) var(--ui-sp-4); }
-    ion-searchbar { --background: var(--ui-surface); padding: 0; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: var(--ui-sp-3);
-      padding: 0 var(--ui-sp-4) var(--ui-sp-8);
-    }
-    .card {
-      background: var(--ui-surface-2);
-      border: var(--ui-border-w-md) solid var(--ui-border);
-      box-shadow: var(--ui-shadow-md);
-      padding: var(--ui-sp-4);
-    }
-    .card__head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: var(--ui-sp-3);
-      margin-bottom: var(--ui-sp-3);
-    }
-    .card__cat {
-      font-size: var(--ui-fs-xs);
-      font-weight: var(--ui-fw-bold);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--ui-text-muted);
-    }
-    .card__title {
-      font-family: var(--ui-font-display);
-      font-weight: var(--ui-fw-black);
-      font-size: var(--ui-fs-lg);
-      line-height: var(--ui-lh-tight);
-      margin: 0;
-    }
-    .card__sku { font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
-    .card__row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--ui-sp-2);
-      margin-bottom: var(--ui-sp-3);
-      padding-bottom: var(--ui-sp-3);
-      border-bottom: var(--ui-border-w-sm) solid var(--ui-border);
-    }
-    .card__label {
-      font-size: var(--ui-fs-xs);
-      color: var(--ui-text-muted);
-      font-weight: var(--ui-fw-medium);
-    }
-    .card__value { font-size: var(--ui-fs-sm); font-weight: var(--ui-fw-bold); }
-    .card__stocks { display: grid; gap: 6px; }
-    .stock-row {
-      display: flex;
-      gap: var(--ui-sp-2);
-      align-items: center;
-      justify-content: space-between;
-      padding: 4px 0;
-      font-size: var(--ui-fs-sm);
-    }
-    .stock-row__qty { font-weight: var(--ui-fw-bold); }
-    .card__footer {
-      margin-top: var(--ui-sp-3);
-      padding-top: var(--ui-sp-2);
-      border-top: var(--ui-border-w-sm) solid var(--ui-border);
-      font-size: var(--ui-fs-xs);
-      color: var(--ui-text-muted);
-    }
-    .card__actions {
-      display: flex;
-      gap: var(--ui-sp-2);
-      justify-content: flex-end;
-      margin-top: var(--ui-sp-3);
-      padding-top: var(--ui-sp-2);
-      border-top: var(--ui-border-w-sm) solid var(--ui-border);
-    }
-  `],
+  templateUrl: './insumos.page.html',
+  styleUrls: ['./insumos.page.scss'],
 })
 export class InsumosPage {
   protected readonly data = inject(DataService);
@@ -237,18 +50,18 @@ export class InsumosPage {
     templateFilename: 'plantilla-insumos.csv',
     headers: [
       'sku', 'nombre', 'descripcion', 'categoria', 'unidad', 'costo',
-      'stock_min', 'stock_max', 'punto_reorden', 'lead_time_dias', 'proveedor',
+      'stock_min', 'stock_max', 'punto_reorden', 'proveedor',
     ],
     templateRows: [
-      ['INS-XXX-001', 'Harina especial', 'Harina 000 panadería', 'Cereales', 'kg', '900', '20', '200', '50', '3', 'Molinos del Sur'],
-      ['INS-XXX-002', 'Azúcar morena', '', 'Endulzantes', 'kg', '1100', '10', '100', '25', '2', 'IANSA'],
-      ['INS-XXX-003', 'Vainilla líquida', 'Esencia natural 250ml', 'Aromas', 'ml', '8500', '500', '5000', '1500', '5', ''],
+      ['INS-XXX-001', 'Harina especial', 'Harina 000 panadería', 'Cereales', 'kg', '900', '20', '200', '50', 'Molinos del Sur'],
+      ['INS-XXX-002', 'Azúcar morena', '', 'Endulzantes', 'kg', '1100', '10', '100', '25', 'IANSA'],
+      ['INS-XXX-003', 'Vainilla líquida', 'Esencia natural 250ml', 'Aromas', 'ml', '8500', '500', '5000', '1500', ''],
     ],
-    hint: `Columnas obligatorias: sku, nombre, unidad, costo, stock_min, stock_max, punto_reorden, lead_time_dias.
-Opcionales: descripcion, categoria, proveedor.
+    hint: `Columnas obligatorias: sku, nombre, unidad, costo, stock_min, stock_max, punto_reorden, proveedor.
+Opcionales: descripcion, categoria.
 Unidades válidas: ${[...VALID_UNITS].join(', ')}.
 SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
-"proveedor" se intenta vincular por nombre exacto con los proveedores registrados; si no existe se guarda como texto libre.`,
+"proveedor" debe coincidir EXACTAMENTE con el nombre de un proveedor ya registrado (todo insumo necesita al menos uno).`,
     process: (rows) => {
       const existing = new Set(this.data.supplies().map(s => s.sku.toLowerCase()));
       const seen = new Set<string>();
@@ -264,7 +77,6 @@ SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
         const min = Number(r['stock_min']);
         const max = Number(r['stock_max']);
         const rop = Number(r['punto_reorden']);
-        const lead = Number(r['lead_time_dias']);
         if (!sku) { errors.push({ row: rowNum, raw: r, message: 'SKU vacío' }); return; }
         if (!nombre) { errors.push({ row: rowNum, raw: r, message: 'Nombre vacío' }); return; }
         if (!unidad) { errors.push({ row: rowNum, raw: r, message: 'Unidad vacía' }); return; }
@@ -278,14 +90,25 @@ SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
         if (!isFinite(min) || min < 0) { errors.push({ row: rowNum, raw: r, message: 'stock_min inválido (debe ser número ≥ 0)' }); return; }
         if (!isFinite(max) || max <= 0) { errors.push({ row: rowNum, raw: r, message: 'stock_max inválido (debe ser número > 0)' }); return; }
         if (!isFinite(rop) || rop < 0) { errors.push({ row: rowNum, raw: r, message: 'punto_reorden inválido (debe ser número ≥ 0)' }); return; }
-        if (!isFinite(lead) || lead < 0) { errors.push({ row: rowNum, raw: r, message: 'lead_time_dias inválido (debe ser número ≥ 0)' }); return; }
         if (!(min <= rop && rop <= max)) {
           errors.push({ row: rowNum, raw: r, message: `Debe cumplirse stock_min(${min}) ≤ punto_reorden(${rop}) ≤ stock_max(${max})` });
           return;
         }
-        seen.add(sku.toLowerCase());
         const proveedorText = (r['proveedor'] ?? '').trim();
-        const matched = proveedorText ? suppliersByName.get(proveedorText.toLowerCase()) : undefined;
+        if (!proveedorText) {
+          errors.push({ row: rowNum, raw: r, message: 'Proveedor vacío (obligatorio)' });
+          return;
+        }
+        const matched = suppliersByName.get(proveedorText.toLowerCase());
+        if (!matched) {
+          errors.push({
+            row: rowNum,
+            raw: r,
+            message: `Proveedor "${proveedorText}" no existe. Crealo primero en Proveedores con nombre exacto.`,
+          });
+          return;
+        }
+        seen.add(sku.toLowerCase());
         valid.push({
           sku,
           name: nombre,
@@ -296,15 +119,23 @@ SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
           minStock: min,
           maxStock: max,
           reorderPoint: rop,
-          leadTime: lead,
-          supplier: proveedorText || undefined,
-          supplierId: matched?.id,
+          supplier: proveedorText,
+          supplierId: matched.id,
           active: true,
         });
       });
       return { valid, errors };
     },
-    commit: (valid) => this.data.createSuppliesBulk(valid),
+    commit: (valid) => {
+      const created = this.data.createSuppliesBulk(valid);
+      // Vincular cada insumo creado al proveedor que vino en el CSV.
+      created.forEach((s, i) => {
+        const supplierId = valid[i].supplierId;
+        if (supplierId) {
+          this.data.setSuppliersForSupply(s.id, [{ supplierId, unitCost: s.cost }]);
+        }
+      });
+    },
   };
 
   readonly visibles = computed(() => {
@@ -336,6 +167,67 @@ SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
     this.insumoEdit.set(s);
     this.modalOpen.set(true);
   }
+
+  /** Proveedores que entregan un insumo (relación N..M en Supplier.suppliedItems). */
+  suppliersOf(supplyId: string) {
+    return this.data.suppliersForSupply(supplyId);
+  }
+
+  /**
+   * Lead time DINÁMICO del insumo: del proveedor que entrega antes desde
+   * hoy, calculado contra su calendario semanal. null si el insumo no
+   * tiene proveedores.
+   */
+  leadTimeOf(supplyId: string) {
+    return this.data.supplyLeadTime(supplyId);
+  }
+
+  leadTimeSupplierName(supplierId: string): string {
+    return this.data.supplierById(supplierId)?.name ?? '—';
+  }
+
+  /** OCs pending que traen este insumo, con cantidad y fecha esperada. */
+  pendingPOs(supplyId: string) {
+    return this.data.pendingPOsForSupply(supplyId);
+  }
+
+  /** Total de unidades en camino para un insumo (suma de las OCs pendientes). */
+  totalIncoming(pos: { qty: number }[]): number {
+    return pos.reduce((s, p) => s + p.qty, 0);
+  }
+
+  /** true si la fecha esperada ya pasó (OC atrasada). */
+  isOverdue(d: Date): boolean {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return d.getTime() < t.getTime();
+  }
+
+  /**
+   * Formatea una cantidad (en unidad base) según la presentación del insumo.
+   * - Con presentación: "3 sacos" (o "5.5 sacos" si no es entero).
+   * - Sin presentación: "75 kg" usando la unidad base.
+   * Si `whole = true`, fuerza redondeo a entero (útil para min/max).
+   */
+  presentationOf(s: Supply, baseQty: number, whole = false): string {
+    if (s.presentation && s.presentation.size > 0) {
+      const n = baseQty / s.presentation.size;
+      const display = whole ? Math.round(n) : Math.round(n * 100) / 100;
+      return `${display} ${this.pluralLabel(s.presentation.label, display)}`;
+    }
+    return `${baseQty} ${s.unit}`;
+  }
+
+  /** Texto descriptivo de la presentación: "1 saco = 25 kg". */
+  presentationDetail(s: Supply): string {
+    if (!s.presentation) return '';
+    return `1 ${s.presentation.label} = ${s.presentation.size} ${s.unit}`;
+  }
+
+  private pluralLabel(label: string, n: number): string {
+    if (n === 1) return label;
+    return label.endsWith('s') ? label : label + 's';
+  }
+
   cerrarModal() {
     this.modalOpen.set(false);
     this.insumoEdit.set(null);

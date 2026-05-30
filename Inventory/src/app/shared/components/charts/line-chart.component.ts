@@ -15,44 +15,8 @@ export interface LinePoint { label: string; value: number; }
   selector: 'app-line-chart',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (points().length === 0) {
-      <div class="empty">Sin datos para mostrar.</div>
-    } @else {
-      <div class="chart" [class.chart--mini]="mini()">
-        @if (title() && !mini()) {
-          <div class="chart__title">{{ title() }}</div>
-        }
-        <div class="chart__canvas" [style.height.px]="mini() ? 60 : 200">
-          <canvas #canvas></canvas>
-        </div>
-      </div>
-    }
-  `,
-  styles: [`
-    .chart { width: 100%; }
-    .chart__title {
-      font-size: var(--ui-fs-xs);
-      font-weight: var(--ui-fw-bold);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--ui-text-muted);
-      margin-bottom: 6px;
-    }
-    .chart__canvas {
-      position: relative;
-      width: 100%;
-    }
-    canvas { width: 100% !important; }
-    .empty {
-      padding: var(--ui-sp-4);
-      text-align: center;
-      color: var(--ui-text-muted);
-      font-size: var(--ui-fs-sm);
-      background: var(--ui-surface-2);
-      border-radius: 4px;
-    }
-  `],
+  templateUrl: './line-chart.component.html',
+  styleUrls: ['./line-chart.component.scss'],
 })
 export class LineChartComponent implements AfterViewInit, OnDestroy {
   readonly points = input.required<LinePoint[]>();

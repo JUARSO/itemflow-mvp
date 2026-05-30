@@ -7,11 +7,7 @@ import { BrandingService } from './core/services/branding.service';
   selector: 'app-root',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <ion-app>
-      <ion-router-outlet></ion-router-outlet>
-    </ion-app>
-  `,
+  templateUrl: './app.component.html',
   imports: [IonApp, IonRouterOutlet],
 })
 export class AppComponent {

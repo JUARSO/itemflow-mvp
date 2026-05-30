@@ -1,0 +1,67 @@
+    <div class="alert" [attr.data-type]="alert().type" [attr.data-priority]="alert().priority">
+      <div class="alert__stripe"></div>
+      <div class="alert__body">
+        <div class="alert__header">
+          <div class="alert__type">{{ typeLabel() }}</div>
+          <div class="alert__priority">{{ priorityLabel() }}</div>
+        </div>
+        <div class="alert__title">{{ alert().itemName }}</div>
+        <p class="alert__message">{{ alert().message }}</p>
+        @if (alert().projectedDaysUntilStockout !== undefined && alert().projectedDaysUntilStockout !== null) {
+          <div class="alert__meta mono">
+            ⚠ Quiebre proyectado en {{ alert().projectedDaysUntilStockout }} días
+          </div>
+        }
+        @if (alert().leadTimeDays !== undefined && alert().leadTimeDays !== null) {
+          <div class="alert__meta mono">
+            🚚 Entrega más rápida: {{ alert().leadTimeDays }} día(s)
+          </div>
+        }
+        @if (alert().expectedDate) {
+          <div class="alert__meta mono">
+            📅 Entrega esperada: {{ alert().expectedDate | date:'EEE d MMM' }}
+          </div>
+        }
+        @if (alert().orderedQty !== undefined && alert().receivedQty !== undefined) {
+          <div class="alert__meta mono">
+            📦 Recibido: {{ alert().receivedQty }} / {{ alert().orderedQty }}
+          </div>
+        }
+        @if (alert().excessValue) {
+          <div class="alert__meta mono">
+            💰 Capital congelado: {{ alert().excessValue | number:'1.0-0' }} CLP
+          </div>
+        }
+
+        @if (alert().status === 'active') {
+          @if (actionsEnabled()) {
+            <div class="alert__actions">
+              @if (canReorder()) {
+                <ion-button size="small" (click)="onReorder.emit(alert())">
+                  Generar OC
+                </ion-button>
+              }
+              <ion-button size="small" fill="clear" class="ghost" (click)="onAcknowledge.emit(alert())">
+                Marcar revisada
+              </ion-button>
+              <ion-button size="small" fill="clear" class="ghost" (click)="onResolve.emit(alert())">
+                Resolver
+              </ion-button>
+            </div>
+          }
+        } @else if (alert().status === 'acknowledged') {
+          <div class="alert__meta">
+            Revisada por {{ alert().acknowledgedBy }}
+          </div>
+          @if (actionsEnabled()) {
+            <div class="alert__actions">
+              <ion-button size="small" (click)="onResolve.emit(alert())">Resolver</ion-button>
+            </div>
+          }
+        } @else {
+          <div class="alert__meta">
+            Resuelta por {{ alert().resolvedBy }}
+          </div>
+        }
+      </div>
+    </div>

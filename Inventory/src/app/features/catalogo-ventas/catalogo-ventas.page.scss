@@ -1,0 +1,72 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+}
+@media (max-width: 600px) { .kpis { grid-template-columns: 1fr; } }
+
+.table {
+  padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+}
+.thead, .trow {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr;
+  gap: var(--ui-sp-3);
+  align-items: center;
+}
+.thead {
+  padding: var(--ui-sp-2) var(--ui-sp-3);
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ui-text-muted);
+}
+.num { text-align: right; }
+
+.trow {
+  padding: var(--ui-sp-3);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  margin-bottom: var(--ui-sp-2);
+}
+.trow__name { font-family: var(--ui-font-display); font-weight: var(--ui-fw-bold); color: var(--ui-text); }
+.trow__cost { color: var(--ui-text-muted); }
+
+.trow__final {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.cur { color: var(--ui-text-muted); }
+.price-input {
+  width: 96px;
+  text-align: right;
+  padding: 6px 8px;
+  font-weight: var(--ui-fw-bold);
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.price-input:focus-visible { outline: none; box-shadow: var(--ui-shadow-sm); }
+.price-input:disabled { background: var(--ui-surface-2); color: var(--ui-text-muted); }
+
+.trow__margin { font-weight: var(--ui-fw-bold); color: var(--ui-text-muted); }
+.trow__margin.pos { color: var(--ui-success); }
+.trow__margin.neg { color: var(--ui-danger); }
+.trow__margin .pct { font-size: var(--ui-fs-xs); font-weight: var(--ui-fw-medium); }
+
+@media (max-width: 640px) {
+  .thead { display: none; }
+  .trow {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px var(--ui-sp-3);
+  }
+  .trow__name { grid-column: 1 / -1; }
+  .num { text-align: left; }
+  .trow__final { justify-content: flex-start; }
+}

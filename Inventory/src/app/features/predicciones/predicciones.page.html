@@ -1,0 +1,380 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Predicciones IA</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Panel de Predicciones"
+        subtitle="Decisión de compra y proyección de stock basadas en dos modelos LightGBM.">
+      </app-page-header>
+
+      <div class="layout">
+        <!-- ============ ZONA IZQUIERDA: FORMULARIO ============ -->
+        <aside class="form-zone">
+
+          <!-- Cargar desde catálogo -->
+          <div class="load-bar">
+            <div class="load-bar__label">📦 Cargar desde catálogo</div>
+            <p class="load-bar__hint">
+              Selecciona un insumo o producto de reventa para autollenar el formulario
+              con su stock, política y demanda histórica.
+            </p>
+            <div class="load-bar__row">
+              <select [(ngModel)]="selectedItemRef" class="load-bar__select">
+                <option value="">— Selecciona item —</option>
+                @if (supplyItems().length > 0) {
+                  <optgroup label="Insumos">
+                    @for (it of supplyItems(); track it.id) {
+                      <option [value]="'supply:' + it.id">{{ it.name }} ({{ it.unit }})</option>
+                    }
+                  </optgroup>
+                }
+                @if (productItems().length > 0) {
+                  <optgroup label="Productos de reventa">
+                    @for (it of productItems(); track it.id) {
+                      <option [value]="'product:' + it.id">{{ it.name }} ({{ it.unit }})</option>
+                    }
+                  </optgroup>
+                }
+              </select>
+              <ion-button
+                size="small"
+                (click)="loadFromCatalog()"
+                [disabled]="!selectedItemRef">
+                Cargar datos
+              </ion-button>
+            </div>
+            @if (loadedItemLabel()) {
+              <div class="load-bar__loaded">
+                ✓ Datos cargados de: <strong>{{ loadedItemLabel() }}</strong>
+              </div>
+            }
+          </div>
+
+          <form [formGroup]="form" novalidate (ngSubmit)="onSubmit()">
+
+            <!-- INVENTARIO -->
+            <details class="acc" [open]="isOpen('inventario')" (toggle)="onToggle('inventario', $event)">
+              <summary class="acc__summary">
+                <span class="acc__title">Inventario</span>
+                <span class="acc__chevron">▾</span>
+              </summary>
+              <div class="acc__body">
+                <label class="field">
+                  <span class="field__label">Stock actual (u) <span class="req">*</span></span>
+                  <input type="number" formControlName="actual_stock" min="0" step="1" />
+                  @if (showError('actual_stock')) {
+                    <span class="field__error">{{ errorFor('actual_stock') }}</span>
+                  }
+                </label>
+                <label class="field">
+                  <span class="field__label">Días desde último restock <span class="req">*</span></span>
+                  <input type="number" formControlName="dias_desde_ultimo_restock" min="0" step="1" />
+                  @if (showError('dias_desde_ultimo_restock')) {
+                    <span class="field__error">{{ errorFor('dias_desde_ultimo_restock') }}</span>
+                  }
+                </label>
+              </div>
+            </details>
+
+            <!-- POLÍTICA -->
+            <details class="acc" [open]="isOpen('politica')" (toggle)="onToggle('politica', $event)">
+              <summary class="acc__summary">
+                <span class="acc__title">Política de inventario</span>
+                <span class="acc__chevron">▾</span>
+              </summary>
+              <div class="acc__body">
+                <div class="row-2">
+                  <label class="field">
+                    <span class="field__label">Stock mínimo <span class="req">*</span></span>
+                    <input type="number" formControlName="stock_min" min="0" step="1" />
+                    @if (showError('stock_min')) {
+                      <span class="field__error">{{ errorFor('stock_min') }}</span>
+                    }
+                  </label>
+                  <label class="field">
+                    <span class="field__label">Stock máximo <span class="req">*</span></span>
+                    <input type="number" formControlName="stock_max" min="0" step="1" />
+                    @if (showError('stock_max')) {
+                      <span class="field__error">{{ errorFor('stock_max') }}</span>
+                    }
+                  </label>
+                </div>
+                <label class="field">
+                  <span class="field__label">Punto de reorden manual <span class="req">*</span></span>
+                  <input type="number" formControlName="reorder_point_manual" min="0" step="1" />
+                  <span class="field__hint mono">
+                    Mínimo teórico:
+                    @if (theoreticalMin() != null) {
+                      {{ theoreticalMin() | number:'1.0-0' }} u
+                    } @else {
+                      —
+                    }
+                  </span>
+                  @if (showError('reorder_point_manual')) {
+                    <span class="field__error">{{ errorFor('reorder_point_manual') }}</span>
+                  }
+                </label>
+              </div>
+            </details>
+
+            <!-- DEMANDA -->
+            <details class="acc" [open]="isOpen('demanda')" (toggle)="onToggle('demanda', $event)">
+              <summary class="acc__summary">
+                <span class="acc__title">Demanda histórica</span>
+                <span class="acc__chevron">▾</span>
+              </summary>
+              <div class="acc__body">
+                <label class="field">
+                  <span class="field__label">Promedio diario 7d (un/día) <span class="req">*</span></span>
+                  <input type="number" formControlName="rolling_mean_7d" min="0" step="0.01" />
+                  @if (showError('rolling_mean_7d')) {
+                    <span class="field__error">{{ errorFor('rolling_mean_7d') }}</span>
+                  }
+                </label>
+                <label class="field">
+                  <span class="field__label">Promedio diario 14d (un/día) <span class="req">*</span></span>
+                  <input type="number" formControlName="rolling_mean_14d" min="0" step="0.01" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Promedio diario 30d (un/día) <span class="req">*</span></span>
+                  <input type="number" formControlName="rolling_mean_30d" min="0" step="0.01" />
+                </label>
+                <label class="field">
+                  <span class="field__label">Desv. estándar 7d (un/día) <span class="req">*</span></span>
+                  <input type="number" formControlName="rolling_std_7d" min="0" step="0.01" />
+                </label>
+              </div>
+            </details>
+
+            <!-- LOGÍSTICA -->
+            <details class="acc" [open]="isOpen('logistica')" (toggle)="onToggle('logistica', $event)">
+              <summary class="acc__summary">
+                <span class="acc__title">Logística</span>
+                <span class="acc__chevron">▾</span>
+              </summary>
+              <div class="acc__body">
+                <div class="row-2">
+                  <label class="field">
+                    <span class="field__label">Lead time prom. (días) <span class="req">*</span></span>
+                    <input type="number" formControlName="lt_avg" min="1" step="0.1" />
+                    @if (showError('lt_avg')) {
+                      <span class="field__error">{{ errorFor('lt_avg') }}</span>
+                    }
+                  </label>
+                  <label class="field">
+                    <span class="field__label">Lead time desv. est. (días) <span class="req">*</span></span>
+                    <input type="number" formControlName="lt_std" min="0" step="0.1" />
+                  </label>
+                </div>
+              </div>
+            </details>
+
+            <div class="submit-wrap">
+              <ion-button
+                type="submit"
+                expand="block"
+                [disabled]="!canSubmit() || pred.state().loading">
+                @if (pred.state().loading) {
+                  ⏳ Procesando…
+                } @else {
+                  ⚡ Analizar con IA
+                }
+              </ion-button>
+              @if (!canSubmit() && form.touched) {
+                <p class="submit-hint">Revisa los campos con error para habilitar el análisis.</p>
+              }
+              @if (pred.state().simulated && pred.state().result) {
+                <p class="submit-hint">⚠️ Backend no disponible — resultado generado por simulador local determinista.</p>
+              }
+            </div>
+          </form>
+        </aside>
+
+        <!-- ============ ZONA DERECHA: RESULTADOS ============ -->
+        <main class="result-zone">
+
+          @if (!pred.state().result && !pred.state().loading) {
+            <div class="placeholder">
+              <div class="placeholder__icon">🔮</div>
+              <h2>Complete los parámetros y presione "Analizar con IA"</h2>
+              <p>Los resultados aparecerán aquí: decisión de compra, proyección de stock y consulta interactiva por día.</p>
+            </div>
+          }
+
+          @if (pred.state().loading) {
+            <div class="skeleton skeleton--cards"></div>
+            <div class="skeleton skeleton--chart"></div>
+          }
+
+          @if (pred.state().result; as r) {
+            <!-- SECCIÓN 1: DECISIÓN DE COMPRA -->
+            <section class="card-section">
+              <div class="cards-row">
+                <!-- A: Decisión -->
+                <article class="result-card" [attr.data-status]="decisionMeta().status">
+                  <div class="result-card__label">Decisión de compra</div>
+                  <div class="result-card__main">
+                    <span class="result-card__icon">{{ decisionMeta().icon }}</span>
+                    <span class="result-card__title">{{ decisionMeta().title }}</span>
+                  </div>
+                  <div class="result-card__sub">Stock cubre ~{{ r.derivados.dias_cobertura | number:'1.0-1' }} días</div>
+                </article>
+
+                <!-- B: Gauge -->
+                <article class="result-card">
+                  <div class="result-card__label">Urgencia de orden</div>
+                  <app-urgency-gauge [value]="r.orden.urgencia"></app-urgency-gauge>
+                </article>
+
+                <!-- C: Cantidad -->
+                <article class="result-card">
+                  <div class="result-card__label">Cantidad recomendada</div>
+                  <div class="result-card__bignum mono">{{ r.orden.cantidad_final | number:'1.0-0' }}</div>
+                  <div class="result-card__sub">unidades a ordenar</div>
+                  @if (r.orden.cantidad_final < r.orden.cantidad_modelo) {
+                    <div class="result-card__note">Limitado por capacidad máxima ({{ r.orden.cantidad_modelo }} u sugeridas por el modelo)</div>
+                  }
+                </article>
+              </div>
+
+              <!-- Chips derivados -->
+              <div class="chips">
+                <div class="chip" [attr.data-status]="chipStatus('cobertura', r.derivados.dias_cobertura)">
+                  <div class="chip__label">Días cobertura</div>
+                  <div class="chip__value mono">{{ r.derivados.dias_cobertura | number:'1.0-1' }} d</div>
+                </div>
+                <div class="chip">
+                  <div class="chip__label">Punto de reorden</div>
+                  <div class="chip__value mono">{{ r.derivados.reorder_point | number:'1.0-0' }} u</div>
+                </div>
+                <div class="chip">
+                  <div class="chip__label">Stock seguridad</div>
+                  <div class="chip__value mono">{{ r.derivados.safety_stock | number:'1.0-0' }} u</div>
+                </div>
+                <div class="chip" [attr.data-status]="chipStatus('ratio', r.derivados.stock_ratio)">
+                  <div class="chip__label">Stock / ROP</div>
+                  <div class="chip__value mono">{{ r.derivados.stock_ratio | number:'1.2-2' }}</div>
+                </div>
+                <div class="chip" [attr.data-status]="r.derivados.tendencia >= 0 ? 'optimo' : 'alerta'">
+                  <div class="chip__label">Tendencia demanda</div>
+                  <div class="chip__value mono">{{ r.derivados.tendencia > 0 ? '+' : '' }}{{ r.derivados.tendencia | number:'1.0-2' }}</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- SECCIÓN 2: PROYECCIÓN -->
+            <section class="card-section">
+              <header class="section-head">
+                <h2>Simulación de Stock (consumo diario + reposición)</h2>
+              </header>
+              <app-projection-chart
+                [trayectoria]="r.simulacion.trayectoria"
+                [markers]="markersForChart()"
+                [stockMin]="pred.state().request!.stock_min"
+                [stockMax]="pred.state().request!.stock_max"
+                [reorderPoint]="r.derivados.reorder_point"
+                [recommendedRop]="recommendedRop()"
+                [maxDay]="60">
+              </app-projection-chart>
+
+              <div class="metrics">
+                <table class="metrics__table">
+                  <thead>
+                    <tr>
+                      <th>Horizonte</th>
+                      <th class="num">MAE</th>
+                      <th class="num">RMSE</th>
+                      <th class="num">R²</th>
+                      <th class="num">MAPE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (m of METRICS; track m.horizonte) {
+                      <tr>
+                        <td>{{ m.horizonte }}</td>
+                        <td class="num mono">{{ m.mae }}u</td>
+                        <td class="num mono">{{ m.rmse }}u</td>
+                        <td class="num mono">{{ m.r2 }}</td>
+                        <td class="num mono">{{ m.mape }}%</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+                <p class="metrics__note">Métricas evaluadas en test set (15% temporal).</p>
+              </div>
+            </section>
+
+            <!-- SECCIÓN 3: CONSULTA POR DÍA -->
+            <section class="card-section">
+              <header class="section-head">
+                <h2>¿En cuántos días quiero conocer mi stock?</h2>
+              </header>
+
+              <div class="slider-row">
+                <input
+                  type="range"
+                  min="1"
+                  max="180"
+                  step="1"
+                  [value]="sliderDay()"
+                  (input)="sliderDay.set(+$any($event.target).value)"
+                  class="slider" />
+                <span class="slider__value mono">Día {{ sliderDay() }}</span>
+              </div>
+
+              <div class="cards-row">
+                <article class="result-card" [attr.data-status]="sliderStatus()">
+                  <div class="result-card__label">Stock proyectado</div>
+                  <div class="result-card__bignum mono">{{ sliderStock() | number:'1.0-0' }}</div>
+                  <div class="result-card__sub">unidades en día {{ sliderDay() }}</div>
+                </article>
+
+                <article class="result-card" [attr.data-status]="sliderStatus()">
+                  <div class="result-card__label">Estado</div>
+                  <div class="result-card__main">
+                    <span class="result-card__icon">{{ sliderStatusIcon() }}</span>
+                    <span class="result-card__title">{{ sliderStatusLabel() }}</span>
+                  </div>
+                  <div class="result-card__sub">{{ sliderStatusExplain() }}</div>
+                </article>
+
+                <article class="result-card">
+                  <div class="result-card__label">Pedidos hasta día {{ sliderDay() }}</div>
+                  <div class="events-list">
+                    @if (eventsUntilSlider().length === 0) {
+                      <div class="events-empty">Sin pedidos en este período</div>
+                    } @else {
+                      @for (e of eventsUntilSlider(); track e.trigger) {
+                        <div class="event-row" [attr.data-status]="e.arrival <= sliderDay() ? 'recibido' : 'transito'">
+                          <span class="mono">Día {{ e.trigger }} → llega día {{ e.arrival }}</span>
+                          <span class="event-row__qty mono">+{{ e.qty }} u</span>
+                          <span class="event-row__tag">{{ e.arrival <= sliderDay() ? 'recibido' : 'en tránsito' }}</span>
+                        </div>
+                      }
+                    }
+                  </div>
+                </article>
+              </div>
+
+              <app-projection-chart
+                [trayectoria]="r.simulacion.trayectoria"
+                [markers]="[{ day: sliderDay(), value: sliderStock(), label: 'Día ' + sliderDay() }]"
+                [stockMin]="pred.state().request!.stock_min"
+                [stockMax]="pred.state().request!.stock_max"
+                [reorderPoint]="r.derivados.reorder_point"
+                [maxDay]="sliderDay()">
+              </app-projection-chart>
+            </section>
+
+            <!-- BARRA DE ESTADO INFERIOR -->
+            <div class="status-bar">
+              ✓ Análisis completado · Urgencia: <strong class="mono">{{ (r.orden.urgencia * 100) | number:'1.0-0' }}%</strong> · Cantidad recomendada: <strong class="mono">{{ r.orden.cantidad_final }} u</strong>
+            </div>
+          }
+        </main>
+      </div>
+    </ion-content>

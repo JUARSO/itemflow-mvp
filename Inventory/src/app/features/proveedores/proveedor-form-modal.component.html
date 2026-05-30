@@ -1,0 +1,146 @@
+    <ion-modal [isOpen]="isOpen" (didDismiss)="closed.emit()">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>{{ editing ? 'Editar proveedor' : 'Nuevo proveedor' }}</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="closed.emit()">
+                <ion-icon name="close-outline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <form class="form" (ngSubmit)="save()">
+            <div class="field">
+              <label>Nombre del proveedor</label>
+              <input type="text" [value]="name()" (input)="name.set($any($event.target).value)" required />
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Persona de contacto</label>
+                <input type="text" [value]="contactPerson()" (input)="contactPerson.set($any($event.target).value)" />
+              </div>
+              <div class="field">
+                <label>Teléfono</label>
+                <input type="text" [value]="phone()" (input)="phone.set($any($event.target).value)" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input type="email" [value]="email()" (input)="email.set($any($event.target).value)" />
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>Lead time (días entre pedido y entrega)</label>
+                <input type="number" min="0" [value]="leadTimeDays()"
+                  (input)="leadTimeDays.set(asNum($any($event.target).value))" />
+              </div>
+              <div class="field">
+                <label>Términos de pago</label>
+                <input type="text" placeholder="Contado, 30 días, etc."
+                  [value]="paymentTerms()"
+                  (input)="paymentTerms.set($any($event.target).value)" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Días para pedir</label>
+              <div class="days">
+                @for (d of weekDays; track d) {
+                  <button type="button"
+                    class="day"
+                    [class.day--on]="orderDays().includes(d)"
+                    (click)="toggleOrderDay(d)">{{ dayLabel(d) }}</button>
+                }
+              </div>
+              <small>Vacío = cualquier día</small>
+            </div>
+
+            <div class="field">
+              <label>Días de entrega</label>
+              <div class="days">
+                @for (d of weekDays; track d) {
+                  <button type="button"
+                    class="day"
+                    [class.day--on]="deliveryDays().includes(d)"
+                    (click)="toggleDeliveryDay(d)">{{ dayLabel(d) }}</button>
+                }
+              </div>
+              <small>Vacío = cualquier día</small>
+            </div>
+
+            <div class="field">
+              <label>Insumos y productos que entrega</label>
+              <input type="search" class="filter-input"
+                placeholder="Filtrar por nombre…"
+                [value]="itemFilter()"
+                (input)="itemFilter.set($any($event.target).value)" />
+
+              <div class="items-block">
+                <div class="items-group">
+                  <div class="items-group__title">
+                    Insumos ({{ selectedSuppliesCount() }} seleccionados)
+                  </div>
+                  <div class="items-grid">
+                    @for (s of filteredSupplies(); track s.id) {
+                      <label class="item-chip">
+                        <input type="checkbox"
+                          [checked]="isItemSelected('supply', s.id)"
+                          (change)="toggleItem('supply', s.id)" />
+                        <span>{{ s.name }}</span>
+                        <small>{{ s.unit }}</small>
+                      </label>
+                    }
+                  </div>
+                </div>
+
+                <div class="items-group">
+                  <div class="items-group__title">
+                    Productos terminados sin receta ({{ selectedProductsCount() }} seleccionados)
+                  </div>
+                  <div class="items-grid">
+                    @for (p of filteredProducts(); track p.id) {
+                      <label class="item-chip">
+                        <input type="checkbox"
+                          [checked]="isItemSelected('product', p.id)"
+                          (change)="toggleItem('product', p.id)" />
+                        <span>{{ p.name }}</span>
+                        <small>{{ p.unit }} · reventa</small>
+                      </label>
+                    }
+                    @if (filteredProducts().length === 0 && !itemFilter()) {
+                      <small class="muted-msg">
+                        No hay productos sin receta. Los productos con receta se fabrican internamente.
+                      </small>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Notas</label>
+              <textarea rows="3" [value]="notes()" (input)="notes.set($any($event.target).value)"></textarea>
+            </div>
+
+            <div class="field field--check">
+              <label>
+                <input type="checkbox"
+                  [checked]="active()"
+                  (change)="active.set($any($event.target).checked)" />
+                Proveedor activo
+              </label>
+            </div>
+
+            <div class="actions">
+              <ion-button fill="outline" (click)="closed.emit()">Cancelar</ion-button>
+              <ion-button type="submit" [disabled]="!canSave()">
+                {{ editing ? 'Guardar cambios' : 'Crear proveedor' }}
+              </ion-button>
+            </div>
+          </form>
+        </ion-content>
+      </ng-template>
+    </ion-modal>

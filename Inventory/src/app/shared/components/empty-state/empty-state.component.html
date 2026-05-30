@@ -1,0 +1,8 @@
+    <div class="empty">
+      <div class="empty__icon">{{ icon() }}</div>
+      <h2 class="empty__title">{{ title() }}</h2>
+      <p class="empty__body">{{ body() }}</p>
+      @if (ctaLabel()) {
+        <ion-button (click)="ctaClick.emit()">{{ ctaLabel() }}</ion-button>
+      }
+    </div>

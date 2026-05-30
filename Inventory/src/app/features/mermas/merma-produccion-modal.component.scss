@@ -1,0 +1,55 @@
+    .form { padding: var(--ui-sp-3); display: flex; flex-direction: column; gap: var(--ui-sp-3); }
+    .hint {
+      padding: var(--ui-sp-2) var(--ui-sp-3);
+      background: var(--ui-warning-tint);
+      border-left: 3px solid var(--ui-warning);
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text);
+    }
+    .row { display: grid; grid-template-columns: 1fr 1.4fr; gap: var(--ui-sp-2); }
+    @media (max-width: 500px) { .row { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label {
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-black);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+    }
+    .field input, .field select, .field textarea {
+      padding: 8px 10px;
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      background: var(--ui-surface);
+      font-family: var(--ui-font-sans);
+      font-size: var(--ui-fs-sm);
+    }
+    .preview {
+      padding: var(--ui-sp-2) var(--ui-sp-3);
+      background: var(--ui-surface-2);
+      border-left: 4px solid var(--ui-danger);
+      display: flex; flex-direction: column;
+      gap: 4px;
+    }
+    .preview__title {
+      display: flex; align-items: center; gap: 6px;
+      font-weight: var(--ui-fw-black);
+      font-size: var(--ui-fs-sm);
+      margin-bottom: 4px;
+    }
+    .preview__title ion-icon { color: var(--ui-danger); }
+    .preview__row {
+      display: flex; justify-content: space-between;
+      font-size: var(--ui-fs-sm);
+    }
+    .preview__row--sub { font-size: var(--ui-fs-xs); }
+    .preview__row--detail {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      padding-left: var(--ui-sp-2);
+    }
+    .muted { color: var(--ui-text-muted); font-style: italic; }
+    .actions {
+      display: flex; gap: var(--ui-sp-2); justify-content: flex-start; flex-wrap: wrap;
+      padding-top: var(--ui-sp-2);
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+    }

@@ -16,7 +16,7 @@ export interface Branding {
   logoImage?: string;
 }
 
-const STORAGE_KEY = 'itemflow_branding_v1';
+const STORAGE_KEY = 'noble_branding_v1';
 
 const DEFAULTS: Branding = {
   displayName: 'NOBLE',

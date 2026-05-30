@@ -1,0 +1,40 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      [title]="editing() ? 'Editar miembro' : 'Invitar miembro'"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <app-form-field label="Nombre completo" [required]="true">
+          <input type="text" formControlName="displayName" />
+        </app-form-field>
+
+        <app-form-field label="Correo electrónico" [required]="true">
+          <input
+            type="email"
+            formControlName="email"
+            [readOnly]="!!editing()"
+            class="mono" />
+        </app-form-field>
+
+        <app-form-field label="Rol" [required]="true" hint="Define qué pantallas y acciones puede usar el miembro">
+          <select formControlName="role">
+            <option value="admin">Administrativo (acceso completo)</option>
+            <option value="produccion">Producción (catálogo, inventario, compras, análisis)</option>
+            <option value="ventas">Ventas (clientes y pedidos)</option>
+          </select>
+        </app-form-field>
+
+        @if (!editing()) {
+          <p class="hint-block">
+            En el MVP la invitación crea el miembro directamente. En producción enviaría un email con un link de activación.
+          </p>
+        }
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
+          {{ editing() ? 'Guardar cambios' : 'Invitar' }}
+        </ion-button>
+      </div>
+    </app-form-modal>

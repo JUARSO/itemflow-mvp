@@ -1,0 +1,66 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Ventas del día</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Control de ventas"
+    subtitle="Revisa las ventas del punto de venta y fíltralas por fecha.">
+  </app-page-header>
+
+  <div class="datefilter">
+    <div class="datefilter__field">
+      <label class="datefilter__label" for="rv-desde">Desde</label>
+      <input id="rv-desde" type="date" class="datefilter__input"
+        [value]="desde()" [max]="hasta()" (change)="desde.set($any($event.target).value)" />
+    </div>
+    <div class="datefilter__field">
+      <label class="datefilter__label" for="rv-hasta">Hasta</label>
+      <input id="rv-hasta" type="date" class="datefilter__input"
+        [value]="hasta()" [min]="desde()" (change)="hasta.set($any($event.target).value)" />
+    </div>
+    <ion-button size="small" fill="outline" (click)="hoy()">
+      <ion-icon name="calendar-outline" slot="start"></ion-icon>
+      Hoy
+    </ion-button>
+  </div>
+
+  <div class="kpis">
+    <app-kpi-card label="Total vendido" [value]="'₡' + (totalVendido() | number:'1.0-0')" tone="success"></app-kpi-card>
+    <app-kpi-card label="Tickets" [value]="numTickets()" tone="primary"></app-kpi-card>
+    <app-kpi-card label="Unidades" [value]="numUnidades()" tone="transit"></app-kpi-card>
+  </div>
+
+  <div class="list">
+    @if (ventas().length === 0) {
+      <app-empty-state
+        icon="🧾"
+        title="Sin ventas en este rango"
+        body="No hay ventas registradas en las fechas seleccionadas. Cambia el filtro o registra ventas en el punto de venta.">
+      </app-empty-state>
+    }
+    @for (v of ventas(); track v.id) {
+      <article class="ticket">
+        <header class="ticket__head">
+          <div>
+            <span class="ticket__code mono">{{ v.code }}</span>
+            <span class="ticket__when muted">{{ v.at | date:'dd-MM-yyyy HH:mm' }} · {{ v.soldBy }}</span>
+          </div>
+          <div class="ticket__total mono">₡{{ v.total | number:'1.0-0' }}</div>
+        </header>
+        <div class="ticket__lines">
+          @for (l of v.lines; track l.productId) {
+            <div class="tl">
+              <span class="tl__name">{{ l.productName }}</span>
+              <span class="tl__qty mono">×{{ l.qty }}</span>
+              <span class="tl__sub mono">₡{{ l.lineTotal | number:'1.0-0' }}</span>
+            </div>
+          }
+        </div>
+      </article>
+    }
+  </div>
+</ion-content>

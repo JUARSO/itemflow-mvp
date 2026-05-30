@@ -6,10 +6,28 @@ const STORAGE_KEY = 'itemflow_session_v1';
 
 /** Landing route por defecto para cada rol. */
 const DEFAULT_ROUTE: Record<UserRole, string> = {
-  admin: '/panel-pedidos',
-  production: '/produccion',
-  inventory: '/inventario',
-  operator: '/produccion',
+  admin: '/inventario',
+  // produccion NO tiene acceso a /produccion (ahora es de Ventas); su landing
+  // debe ser una ruta de su dominio (catálogo hacia abajo) para no entrar en
+  // un bucle de redirección.
+  produccion: '/inventario',
+  ventas: '/punto-venta',
+};
+
+/**
+ * Migración de roles legacy (sesiones persistidas con el modelo de 4 roles) al
+ * modelo actual de 3 roles:
+ *  - inventory → produccion   (encargado de inventario = catálogo hacia abajo)
+ *  - production / operator / sales → ventas  (manejo de pedidos de clientes)
+ */
+const LEGACY_ROLE_MAP: Record<string, UserRole> = {
+  admin: 'admin',
+  produccion: 'produccion',
+  ventas: 'ventas',
+  inventory: 'produccion',
+  production: 'ventas',
+  operator: 'ventas',
+  sales: 'ventas',
 };
 
 @Injectable({ providedIn: 'root' })
@@ -21,19 +39,18 @@ export class AuthService {
   readonly role = computed<UserRole | null>(() => this._user()?.role ?? null);
 
   readonly isAdmin = computed(() => this.role() === 'admin');
-  readonly isProduction = computed(() => this.role() === 'production');
-  readonly isInventory = computed(() => this.role() === 'inventory');
-  readonly isOperator = computed(() => this.role() === 'operator');
+  /** Producción: de catálogo hacia abajo (catálogo, inventario, compras, análisis, alertas). */
+  readonly isProduccion = computed(() => this.role() === 'produccion');
+  /** Ventas: la parte de clientes (clientes, pedidos, planificación). */
+  readonly isVentas = computed(() => this.role() === 'ventas');
 
   constructor() {
     const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as Member;
-        // Migración: roles legacy 'sales' u 'operator-legacy' caen a 'production'
-        if ((parsed.role as string) === 'sales') {
-          parsed.role = 'production';
-        }
+        // Migración de roles legacy (modelo de 4 roles) al modelo de 3 roles.
+        parsed.role = LEGACY_ROLE_MAP[parsed.role as string] ?? 'admin';
         this._user.set(parsed);
       } catch { /* ignore */ }
     }

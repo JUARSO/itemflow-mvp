@@ -1,0 +1,216 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Más</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Más"
+        subtitle="Cuenta, miembros y configuración">
+      </app-page-header>
+
+      <section class="card">
+        <h3>Perfil</h3>
+        <div class="kv">
+          <span class="muted">Nombre</span>
+          <strong>{{ auth.user()?.displayName }}</strong>
+        </div>
+        <div class="kv">
+          <span class="muted">Email</span>
+          <span class="mono">{{ auth.user()?.email }}</span>
+        </div>
+        <div class="kv">
+          <span class="muted">Rol</span>
+          <ion-badge [color]="roleColor()">{{ roleLabel() }}</ion-badge>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Marca</h3>
+          @if (brandingDirty()) {
+            <span class="dirty-pill">Sin guardar</span>
+          }
+        </div>
+        <p class="muted brand-hint">
+          Personaliza el nombre y el logo que aparecen en el menú lateral y la pestaña del navegador.
+        </p>
+
+        <div class="brand-preview">
+          <div class="brand-preview__logo">
+            @if (branding.branding().logoImage) {
+              <img [src]="branding.branding().logoImage" alt="Logo" />
+            } @else {
+              <span>{{ logoDraft() || '—' }}</span>
+            }
+          </div>
+          <div class="brand-preview__text">
+            <div class="brand-preview__name">{{ nameDraft() || 'ItemFlow' }}</div>
+            <div class="brand-preview__company">{{ tenant.company().name }}</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span class="field__label">Nombre visible</span>
+            <input
+              type="text"
+              [(ngModel)]="nameDraftRaw"
+              (ngModelChange)="onBrandingChange()"
+              maxlength="32"
+              placeholder="ItemFlow" />
+          </label>
+          <label class="field field--narrow">
+            <span class="field__label">Logo (emoji o texto)</span>
+            <input
+              type="text"
+              [(ngModel)]="logoDraftRaw"
+              (ngModelChange)="onBrandingChange()"
+              maxlength="3"
+              placeholder="📦"
+              [disabled]="!!branding.branding().logoImage" />
+          </label>
+        </div>
+
+        <div class="upload-row">
+          <div class="upload-row__info">
+            <div class="field__label">Imagen de logo</div>
+            <div class="upload-row__hint">
+              @if (branding.branding().logoImage) {
+                Imagen cargada. Reemplaza el texto/emoji. Quítala para volver al texto.
+              } @else {
+                PNG/JPG hasta 2 MB. Se redimensiona automáticamente a 192px.
+              }
+            </div>
+          </div>
+          <div class="upload-row__actions">
+            <label class="file-btn">
+              <input
+                type="file"
+                accept="image/*"
+                (change)="onLogoFile($event)"
+                hidden />
+              <span>{{ branding.branding().logoImage ? '📷 Reemplazar imagen' : '📷 Subir imagen…' }}</span>
+            </label>
+            @if (branding.branding().logoImage) {
+              <ion-button fill="clear" class="ghost" size="small" (click)="clearLogo()">
+                Quitar imagen
+              </ion-button>
+            }
+          </div>
+        </div>
+
+        <div class="actions">
+          <ion-button (click)="saveBranding()" [disabled]="!brandingDirty()">
+            Guardar marca
+          </ion-button>
+          <ion-button fill="clear" class="ghost" (click)="resetBranding()">
+            Restaurar default
+          </ion-button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Apariencia</h3>
+        <p class="muted brand-hint">
+          Tema visual del color principal de marca. Los colores semánticos (éxito, alerta, error) se mantienen estables.
+        </p>
+
+        <div class="theme-selector">
+          <div class="theme-selector__current">
+            <span class="theme-selector__swatch" [style.background]="theme.current().primary"></span>
+            <div class="theme-selector__meta">
+              <div class="theme-selector__name">{{ theme.current().name }}</div>
+              <div class="theme-selector__desc">{{ theme.current().description }}</div>
+            </div>
+          </div>
+          <label class="field">
+            <span class="field__label">Cambiar tema</span>
+            <select
+              [value]="theme.currentId()"
+              (change)="selectTheme($any($event.target).value)">
+              @for (t of theme.availableThemes; track t.id) {
+                <option [value]="t.id">{{ t.name }} — {{ t.description }}</option>
+              }
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Empresa</h3>
+        <div class="kv">
+          <span class="muted">Tenant</span>
+          <strong>{{ tenant.company().name }}</strong>
+        </div>
+        <div class="kv">
+          <span class="muted">ID</span>
+          <span class="mono">{{ tenant.tenantId() }}</span>
+        </div>
+        <div class="kv">
+          <span class="muted">Moneda</span>
+          <span class="mono">{{ tenant.company().currency }}</span>
+        </div>
+        <div class="kv">
+          <span class="muted">Zona horaria</span>
+          <span class="mono">{{ tenant.company().timezone }}</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card__head">
+          <h3>Miembros del equipo</h3>
+          @if (tenant.canManageMembers()) {
+            <ion-button size="small" (click)="abrirInvitar()">+ Invitar</ion-button>
+          }
+        </div>
+        <div class="members">
+          @for (m of data.members(); track m.uid) {
+            <div class="member">
+              <div class="member__avatar">{{ initials(m.displayName) }}</div>
+              <div class="member__info">
+                <div class="member__name">{{ m.displayName }}</div>
+                <div class="member__email mono">{{ m.email }}</div>
+              </div>
+              <div class="member__right">
+                <ion-badge [color]="memberBadgeColor(m.role)">
+                  {{ memberBadgeLabel(m.role) }}
+                </ion-badge>
+                @if (tenant.canManageMembers() && m.uid !== auth.user()?.uid) {
+                  <div class="member__actions">
+                    <button class="link-btn" (click)="abrirEditar(m)">Editar</button>
+                    <button class="link-btn link-btn--danger" (click)="pedirEliminar(m)">Eliminar</button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Acceso</h3>
+        <ion-button (click)="logout()" color="danger" expand="block">
+          Cerrar sesión
+        </ion-button>
+      </section>
+
+      <app-miembro-form-modal
+        [isOpen]="modalOpen()"
+        [editing]="miembroEdit()"
+        (closed)="cerrarModal()"
+        (saved)="cerrarModal()">
+      </app-miembro-form-modal>
+
+      <app-confirm-dialog
+        [isOpen]="confirmOpen()"
+        title="Eliminar miembro"
+        [message]="confirmMessage()"
+        tone="danger"
+        confirmLabel="Sí, eliminar"
+        (confirmed)="eliminar()"
+        (cancelled)="confirmOpen.set(false)">
+      </app-confirm-dialog>
+    </ion-content>

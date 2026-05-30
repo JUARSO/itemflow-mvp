@@ -1,0 +1,99 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Merma de urnas</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Merma"
+    subtitle="Registra los productos que se pierden en la vitrina (vencidos, dañados) y revisa el historial.">
+  </app-page-header>
+
+  @if (!urna()) {
+    <app-empty-state
+      icon="🏪"
+      title="Sin almacén"
+      body="No hay almacén de ventas configurado.">
+    </app-empty-state>
+  } @else {
+    <div class="kpis">
+      <app-kpi-card label="Mermas registradas" [value]="historial().length" tone="warning"></app-kpi-card>
+      <app-kpi-card label="Unidades perdidas" [value]="totalMerma()" tone="danger"></app-kpi-card>
+    </div>
+
+    @if (tenant.canManageUrnas()) {
+      <div class="form-card">
+        <div class="form-card__title">Registrar merma</div>
+        @if (disponibles().length === 0) {
+          <p class="muted">No hay productos con stock en esta urna para mermar.</p>
+        } @else {
+          <app-form-field label="Producto" [required]="true">
+            <select [value]="productId()" (change)="productId.set($any($event.target).value)">
+              <option value="" disabled>Selecciona un producto…</option>
+              @for (d of disponibles(); track d.productId) {
+                <option [value]="d.productId">{{ d.productName }} ({{ d.quantity }} disp.)</option>
+              }
+            </select>
+          </app-form-field>
+
+          <div class="form-row">
+            <app-form-field label="Cantidad" [required]="true">
+              <input type="number" min="1" [max]="maxQty()"
+                [value]="qty()" (input)="qty.set(+$any($event.target).value)" />
+            </app-form-field>
+            <app-form-field label="Motivo" [required]="true">
+              <select [value]="reason()" (change)="reason.set($any($event.target).value)">
+                @for (r of mermaReasons; track r.value) {
+                  <option [value]="r.value">{{ r.label }}</option>
+                }
+              </select>
+            </app-form-field>
+          </div>
+
+          <app-form-field label="Nota" hint="Opcional">
+            <input type="text" [value]="note()" (input)="note.set($any($event.target).value)"
+              placeholder="Detalle del motivo…" />
+          </app-form-field>
+
+          <div class="form-card__actions">
+            <ion-button
+              [disabled]="!productId() || qty() < 1 || qty() > maxQty()"
+              (click)="registrar()">
+              <ion-icon name="arrow-undo-outline" slot="start"></ion-icon>
+              Registrar merma
+            </ion-button>
+          </div>
+        }
+      </div>
+    }
+
+    <div class="section-title">Historial de mermas (almacén y entregas)</div>
+    <div class="list">
+      @if (historial().length === 0) {
+        <app-empty-state
+          icon="✅"
+          title="Sin mermas registradas"
+          body="Aquí aparecen las mermas del almacén y las de entrega registradas al facturar pedidos.">
+        </app-empty-state>
+      }
+      @for (lot of historial(); track lot.id) {
+        <article class="lot" [attr.data-kind]="lot.kind">
+          <div class="lot__info">
+            <div class="lot__name">
+              {{ lot.productName }}
+              @if (lot.kind === 'delivery') { <span class="lot__tag">entrega</span> }
+            </div>
+            <div class="lot__sub muted">
+              {{ origenLabel(lot) }}
+              @if (lot.productionReasonText) { · {{ lot.productionReasonText }} }
+              · {{ lot.createdAt | date:'dd-MM-yyyy HH:mm' }} · {{ lot.reviewedBy }}
+            </div>
+          </div>
+          <ion-badge color="danger">−{{ lot.mermaQty }} {{ lot.unit }}</ion-badge>
+        </article>
+      }
+    </div>
+  }
+</ion-content>

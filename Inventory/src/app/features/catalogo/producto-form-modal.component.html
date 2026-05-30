@@ -1,0 +1,87 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      [title]="editing() ? 'Editar producto' : 'Nuevo producto'"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <div class="row">
+          <app-form-field label="SKU" [required]="true" hint="Código único, ej. PROD-BAG-001">
+            <input type="text" formControlName="sku" class="mono" />
+          </app-form-field>
+          <app-form-field label="Unidad" [required]="true">
+            <select formControlName="unit">
+              @for (g of unitGroups; track g) {
+                <optgroup [label]="g">
+                  @for (u of unitsGrouped[g]; track u.value) {
+                    <option [value]="u.value">{{ u.label }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </app-form-field>
+        </div>
+
+        <app-form-field label="Nombre" [required]="true">
+          <input type="text" formControlName="name" />
+        </app-form-field>
+
+        <div class="row">
+          <app-form-field label="Categoría">
+            <input type="text" formControlName="category" placeholder="Ej. Panes" />
+          </app-form-field>
+          <app-form-field label="Lead time (días)" [required]="true">
+            <input type="number" formControlName="leadTime" min="0" />
+          </app-form-field>
+        </div>
+
+        <div class="row">
+          <app-form-field
+            [label]="isReventa() ? 'Precio compra (costo)' : 'Costo (calculado desde receta)'"
+            [required]="isReventa()"
+            [hint]="isReventa() ? undefined : (recipeCostHint() ?? undefined)">
+            <input
+              type="number"
+              formControlName="buyPrice"
+              min="0"
+              [readonly]="!isReventa()"
+              [class.input--computed]="!isReventa()" />
+          </app-form-field>
+          <app-form-field label="Precio venta" [required]="true">
+            <input type="number" formControlName="sellPrice" min="0" />
+          </app-form-field>
+        </div>
+
+        <app-form-field label="¿Usa receta?" hint="Marca si vender este producto debe descontar insumos (no su propio stock)">
+          <label class="check">
+            <input type="checkbox" formControlName="hasRecipe" (change)="onHasRecipeChange()" />
+            <span>Sí, descontar insumos al vender</span>
+          </label>
+        </app-form-field>
+
+        @if (!isReventa()) {
+          <div class="info-box">
+            ℹ️ Producto con receta. El stock se controla mediante los insumos definidos en la receta.
+          </div>
+        } @else {
+          <div class="row">
+            <app-form-field label="Punto de reorden" hint="Stock bajo este nivel dispara alerta de restock (opcional)">
+              <input type="number" formControlName="reorderPoint" min="0" step="0.001" />
+            </app-form-field>
+            <app-form-field label="Stock mínimo" hint="Stock crítico, por debajo aplica alerta alta (opcional)">
+              <input type="number" formControlName="minStock" min="0" step="0.001" />
+            </app-form-field>
+          </div>
+        }
+
+        <app-form-field label="Descripción">
+          <textarea formControlName="description" rows="2"></textarea>
+        </app-form-field>
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
+          {{ editing() ? 'Guardar cambios' : 'Crear producto' }}
+        </ion-button>
+      </div>
+    </app-form-modal>

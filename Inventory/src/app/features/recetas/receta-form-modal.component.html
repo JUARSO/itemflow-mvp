@@ -1,0 +1,176 @@
+    <app-form-modal
+      [isOpen]="isOpen()"
+      [title]="editing() ? 'Editar receta' : 'Nueva receta'"
+      size="wide"
+      (dismissed)="closed.emit()">
+
+      <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <!-- ===== Producto ===== -->
+        <h3 class="sheet-title">Producto</h3>
+        <div class="row">
+          <app-form-field label="Producto" [required]="true" hint="Solo productos sin receta aparecen aquí">
+            <select formControlName="productId">
+              <option value="">— Selecciona —</option>
+              @for (p of productosDisponibles(); track p.id) {
+                <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Unidades por lote" [required]="true" hint="Unidades que produce una corrida">
+            <input type="number" formControlName="yieldQty" min="1" />
+          </app-form-field>
+        </div>
+        @if (selectedProduct(); as p) {
+          <div class="product-meta">
+            <span><strong>SKU:</strong> <span class="mono">{{ p.sku }}</span></span>
+            <span><strong>Categoría:</strong> {{ p.category || '—' }}</span>
+            <span><strong>Unidad:</strong> {{ p.unit }}</span>
+          </div>
+        }
+        <div class="row row--3">
+          <app-form-field label="Peso crudo (g)">
+            <input type="number" formControlName="weightRaw" min="0" step="1" placeholder="100" />
+          </app-form-field>
+          <app-form-field label="Peso horneado (g)">
+            <input type="number" formControlName="weightBaked" min="0" step="1" placeholder="95" />
+          </app-form-field>
+          <app-form-field label="Peso final (g)">
+            <input type="number" formControlName="weightFinal" min="0" step="1" placeholder="95" />
+          </app-form-field>
+        </div>
+        <app-form-field label="Almacenamiento">
+          <input type="text" formControlName="storage" placeholder="Ej: Congelado -18°C / Ambiente seco" />
+        </app-form-field>
+
+        <!-- ===== Receta (ingredientes) ===== -->
+        <div class="items">
+          <div class="items__head">
+            <h3>Receta — ingredientes</h3>
+            <div class="items__actions">
+              <ion-button size="small" fill="clear" class="ghost" (click)="addItem('supply')">+ Insumo</ion-button>
+              <ion-button size="small" fill="clear" class="ghost" (click)="addItem('product')">+ Subproducto</ion-button>
+            </div>
+          </div>
+
+          @if (items.controls.length === 0) {
+            <div class="items__empty">
+              Agrega al menos un insumo o subproducto para definir la receta.
+            </div>
+          }
+
+          <div formArrayName="items" class="items__list">
+            @for (ctrl of items.controls; track $index) {
+              <div [formGroupName]="$index" class="item">
+                <select formControlName="kind" class="item__kind" (change)="onKindChange($index)">
+                  <option value="supply">📦 Insumo</option>
+                  <option value="product">🍞 Subproducto</option>
+                </select>
+                <select formControlName="itemId" class="item__supply">
+                  <option value="">— Selecciona —</option>
+                  @if (kindAt($index) === 'supply') {
+                    @for (s of data.activeSupplies(); track s.id) {
+                      <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+                    }
+                  } @else {
+                    @for (p of subproductosDisponibles(); track p.id) {
+                      <option [value]="p.id">{{ p.name }} ({{ p.unit }})</option>
+                    }
+                  }
+                </select>
+                <input
+                  type="number"
+                  formControlName="qty"
+                  placeholder="Cantidad"
+                  min="0"
+                  step="0.001"
+                  class="item__qty mono" />
+                <button type="button" class="item__remove" (click)="removeItem($index)" aria-label="Eliminar">×</button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- ===== Procedimiento ===== -->
+        <app-form-field label="Procedimiento" hint="Un paso por línea. Cada línea se muestra como viñeta en la ficha.">
+          <textarea
+            formControlName="procedure"
+            rows="6"
+            placeholder="Hacer el empaste de mantequilla…&#10;Pesar todos los ingredientes…&#10;Amasar 1 min a velocidad baja…"></textarea>
+        </app-form-field>
+
+        <!-- ===== Laminado y horneo ===== -->
+        <h3 class="sheet-title">Laminado y horneo</h3>
+        <div class="row">
+          <app-form-field label="Gruesor del laminado">
+            <input type="text" formControlName="laminationThickness" placeholder="Ej: 3mm" />
+          </app-form-field>
+          <app-form-field label="Tiempo de fermentación">
+            <input type="text" formControlName="fermentationTime" placeholder="Ej: 12 horas" />
+          </app-form-field>
+        </div>
+        <div class="row row--3">
+          <app-form-field label="Temp. horno (abajo)">
+            <input type="text" formControlName="ovenTempBottom" placeholder="200°C" />
+          </app-form-field>
+          <app-form-field label="Temp. horno (arriba)">
+            <input type="text" formControlName="ovenTempTop" placeholder="230°C" />
+          </app-form-field>
+          <app-form-field label="Tiempo de horneo">
+            <input type="text" formControlName="bakingTime" placeholder="20 minutos" />
+          </app-form-field>
+        </div>
+
+        <!-- ===== Medidas ===== -->
+        <h3 class="sheet-title">Medidas</h3>
+        <div class="sizes">
+          <div class="sizes__label">Producto fermentado</div>
+          <div class="sizes__grid">
+            <input type="text" formControlName="fAlto" placeholder="Alto" />
+            <input type="text" formControlName="fLargo" placeholder="Largo" />
+            <input type="text" formControlName="fAncho" placeholder="Ancho" />
+            <input type="text" formControlName="fDiam" placeholder="Diámetro" />
+          </div>
+        </div>
+        <div class="sizes">
+          <div class="sizes__label">Producto terminado</div>
+          <div class="sizes__grid">
+            <input type="text" formControlName="tAlto" placeholder="Alto" />
+            <input type="text" formControlName="tLargo" placeholder="Largo" />
+            <input type="text" formControlName="tAncho" placeholder="Ancho" />
+            <input type="text" formControlName="tDiam" placeholder="Diámetro" />
+          </div>
+        </div>
+
+        <app-form-field label="Tipo de remate / decoración">
+          <input type="text" formControlName="decoration" placeholder="Ej: Pintar con brillo (sunset), espolvorear azúcar" />
+        </app-form-field>
+
+        <app-form-field label="Observaciones" hint="Notas extra: advertencias, controles de calidad">
+          <textarea
+            formControlName="notes"
+            rows="2"
+            placeholder="Ej: Comprobar 26-27°C antes de hornear."></textarea>
+        </app-form-field>
+
+        <app-form-field label="Imagen del producto" hint="Se muestra en la tarjeta y en la ficha técnica (PDF).">
+          <div class="image-upload">
+            @if (imageUrl(); as img) {
+              <img [src]="img" alt="Foto del producto" class="image-upload__preview" />
+              <button type="button" class="image-upload__remove" (click)="removeImage()">Quitar imagen</button>
+            } @else {
+              <label class="image-upload__drop">
+                <input type="file" accept="image/*" (change)="onImageSelected($event)" hidden />
+                <span>📷 Subir imagen…</span>
+              </label>
+            }
+          </div>
+        </app-form-field>
+      </form>
+
+      <div footer>
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid || items.length === 0">
+          {{ editing() ? 'Guardar cambios' : 'Crear receta' }}
+        </ion-button>
+      </div>
+    </app-form-modal>

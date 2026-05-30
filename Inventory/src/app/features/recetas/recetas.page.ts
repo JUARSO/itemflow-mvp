@@ -6,6 +6,7 @@ import {
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
+import { BrandingService } from '../../core/services/branding.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -13,6 +14,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { RecetaFormModalComponent } from './receta-form-modal.component';
 import { BulkImportModalComponent, BulkImportConfig } from '../../shared/components/bulk-import/bulk-import-modal.component';
 import { Recipe, RecipeItem } from '../../core/models';
+import { printFichaTecnica } from '../../shared/utils/ficha-tecnica';
 
 @Component({
   selector: 'app-recetas',
@@ -25,207 +27,13 @@ import { Recipe, RecipeItem } from '../../core/models';
     PageHeaderComponent, EmptyStateComponent, ConfirmDialogComponent, RecetaFormModalComponent,
     BulkImportModalComponent,
   ],
-  template: `
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-        <ion-title>Recetas</ion-title>
-      </ion-toolbar>
-    </ion-header>
-
-    <ion-content>
-      <app-page-header
-        title="Recetas"
-        subtitle="Cuántos insumos consume cada producto. Paso 3 del flujo.">
-        @if (tenant.canEditRecipes()) {
-          <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
-          <ion-button (click)="abrirNuevo()">+ Nueva receta</ion-button>
-        }
-      </app-page-header>
-
-      @if (data.recipes().length === 0) {
-        <app-empty-state
-          icon="📖"
-          title="No hay recetas configuradas"
-          body="Define cuántos insumos consume cada producto terminado. Al vender, la receta descuenta los insumos automáticamente."
-          ctaLabel="Crear primera receta"
-          (ctaClick)="abrirNuevo()">
-        </app-empty-state>
-      } @else {
-        <div class="grid">
-          @for (recipe of data.recipes(); track recipe.id) {
-            <article class="card">
-              <header class="card__head">
-                <div>
-                  <h3 class="card__title">{{ recipe.productName }}</h3>
-                  <div class="card__yield">Rinde <strong class="mono">{{ recipe.yieldQty }}</strong> unidades</div>
-                </div>
-                @if (tenant.canEditRecipes()) {
-                  <div class="card__cost mono">
-                    <div>
-                      Total corrida: <strong>₡{{ costoReceta(recipe.id) | number:'1.0-0' }}</strong>
-                    </div>
-                    <div class="card__cost-unit">
-                      Por unidad: ₡{{ costoPorUnidad(recipe.productId) | number:'1.0-0' }}
-                    </div>
-                  </div>
-                }
-              </header>
-
-              <div class="card__items">
-                <div class="items__head">Insumos requeridos por corrida</div>
-                @for (it of recipe.items; track $index) {
-                  <div class="item-row">
-                    <span class="item-row__name">{{ it.itemName }}</span>
-                    <span class="item-row__qty mono">{{ it.qty | number:'1.0-3' }} {{ it.unit }}</span>
-                  </div>
-                }
-              </div>
-
-              @if (recipe.notes) {
-                <div class="card__notes">
-                  <div class="card__notes-label">Observaciones</div>
-                  <p class="card__notes-text">{{ recipe.notes }}</p>
-                </div>
-              }
-
-              @if (tenant.canEditRecipes()) {
-                <div class="card__actions">
-                  <ion-button size="small" fill="clear" class="ghost" (click)="abrirEditar(recipe)">
-                    Editar
-                  </ion-button>
-                  <ion-button size="small" color="danger" (click)="pedirEliminar(recipe)">
-                    Eliminar
-                  </ion-button>
-                </div>
-              }
-            </article>
-          }
-        </div>
-      }
-
-      <app-receta-form-modal
-        [isOpen]="modalOpen()"
-        [editing]="recetaEdit()"
-        (closed)="cerrarModal()"
-        (saved)="cerrarModal()">
-      </app-receta-form-modal>
-
-      <app-confirm-dialog
-        [isOpen]="confirmOpen()"
-        title="Eliminar receta"
-        [message]="confirmMessage()"
-        tone="danger"
-        confirmLabel="Sí, eliminar"
-        (confirmed)="eliminar()"
-        (cancelled)="confirmOpen.set(false)">
-      </app-confirm-dialog>
-
-      <app-bulk-import-modal
-        [isOpen]="bulkOpen()"
-        [config]="bulkConfig"
-        (closed)="bulkOpen.set(false)">
-      </app-bulk-import-modal>
-    </ion-content>
-  `,
-  styles: [`
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-      gap: var(--ui-sp-3);
-      padding: 0 var(--ui-sp-4) var(--ui-sp-8);
-    }
-    .card {
-      background: var(--ui-surface-2);
-      border: var(--ui-border-w-md) solid var(--ui-border);
-      box-shadow: var(--ui-shadow-md);
-      padding: var(--ui-sp-4);
-    }
-    .card__head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: var(--ui-sp-3);
-      margin-bottom: var(--ui-sp-3);
-      padding-bottom: var(--ui-sp-3);
-      border-bottom: var(--ui-border-w-sm) solid var(--ui-border);
-    }
-    .card__title {
-      font-family: var(--ui-font-display);
-      font-weight: var(--ui-fw-black);
-      font-size: var(--ui-fs-lg);
-      margin: 0;
-    }
-    .card__yield { font-size: var(--ui-fs-sm); color: var(--ui-text-muted); margin-top: 4px; }
-    .card__cost {
-      font-size: var(--ui-fs-sm);
-      font-weight: var(--ui-fw-bold);
-      background: var(--ui-success-tint);
-      padding: 6px 10px;
-      border: var(--ui-border-w-sm) solid var(--ui-border);
-      color: var(--ui-success);
-      text-align: right;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .card__cost-unit {
-      font-weight: var(--ui-fw-medium);
-      font-size: var(--ui-fs-xs);
-      color: var(--ui-text);
-    }
-    .items__head {
-      font-size: var(--ui-fs-xs);
-      font-weight: var(--ui-fw-bold);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--ui-text-muted);
-      margin-bottom: var(--ui-sp-2);
-    }
-    .item-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px dashed var(--ui-border);
-      font-size: var(--ui-fs-sm);
-    }
-    .item-row:last-child { border-bottom: none; }
-    .item-row__qty { font-weight: var(--ui-fw-bold); }
-
-    .card__notes {
-      margin-top: var(--ui-sp-3);
-      padding: var(--ui-sp-2) var(--ui-sp-3);
-      background: var(--ui-surface-2);
-      border-left: 3px solid var(--ui-primary);
-    }
-    .card__notes-label {
-      font-size: var(--ui-fs-xs);
-      font-weight: var(--ui-fw-black);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--ui-text-muted);
-      margin-bottom: 4px;
-    }
-    .card__notes-text {
-      margin: 0;
-      font-size: var(--ui-fs-sm);
-      color: var(--ui-text);
-      white-space: pre-wrap;
-      line-height: 1.4;
-    }
-    .card__actions {
-      display: flex;
-      gap: var(--ui-sp-2);
-      justify-content: flex-end;
-      margin-top: var(--ui-sp-3);
-      padding-top: var(--ui-sp-2);
-      border-top: var(--ui-border-w-sm) solid var(--ui-border);
-    }
-  `],
+  templateUrl: './recetas.page.html',
+  styleUrls: ['./recetas.page.scss'],
 })
 export class RecetasPage {
   protected readonly data = inject(DataService);
   protected readonly tenant = inject(TenantContextService);
+  private readonly branding = inject(BrandingService);
   private readonly toast = inject(ToastService);
 
   readonly modalOpen = signal(false);
@@ -360,6 +168,36 @@ El producto destino y los componentes deben existir previamente. No se permite a
   /** Costo por cada unidad producida (delega al helper del service). */
   costoPorUnidad(productId: string): number {
     return this.data.computeRecipeCost(productId) ?? 0;
+  }
+
+  /** Abre la ficha técnica en una ventana e invoca imprimir → Guardar como PDF. */
+  descargarFicha(recipe: Recipe) {
+    const product = this.data.productById(recipe.productId);
+    const s = recipe.sheet;
+    printFichaTecnica({
+      brand: this.branding.branding().displayName,
+      productName: recipe.productName,
+      sku: product?.sku,
+      category: product?.category,
+      unit: product?.unit,
+      unitsPerBatch: recipe.yieldQty,
+      storage: s?.storage,
+      weightRaw: s?.weightRaw,
+      weightBaked: s?.weightBaked,
+      weightFinal: s?.weightFinal,
+      ingredients: recipe.items.map(it => ({ name: it.itemName, qty: it.qty, unit: it.unit })),
+      procedure: s?.procedure ?? [],
+      laminationThickness: s?.laminationThickness,
+      fermentationTime: s?.fermentationTime,
+      ovenTempTop: s?.ovenTempTop,
+      ovenTempBottom: s?.ovenTempBottom,
+      bakingTime: s?.bakingTime,
+      fermentedSize: s?.fermentedSize,
+      finishedSize: s?.finishedSize,
+      decoration: s?.decoration,
+      notes: recipe.notes,
+      imageUrl: recipe.imageUrl,
+    });
   }
 
   abrirNuevo() {

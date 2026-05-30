@@ -1,0 +1,31 @@
+    <ion-modal
+      [isOpen]="isOpen()"
+      [backdropDismiss]="true"
+      (didDismiss)="cancelled.emit()"
+      class="nb-confirm">
+      <ng-template>
+        <div class="confirm">
+          <div class="confirm__icon" [attr.data-tone]="tone()">
+            @switch (tone()) {
+              @case ('danger') { ⚠ }
+              @case ('warning') { ⚠ }
+              @default { ? }
+            }
+          </div>
+          <h2 class="confirm__title">{{ title() }}</h2>
+          @if (message()) {
+            <p class="confirm__message">{{ message() }}</p>
+          }
+          <div class="confirm__actions">
+            <ion-button fill="clear" class="ghost" (click)="cancelled.emit()">
+              {{ cancelLabel() }}
+            </ion-button>
+            <ion-button
+              [color]="tone() === 'danger' ? 'danger' : 'primary'"
+              (click)="confirmed.emit()">
+              {{ confirmLabel() }}
+            </ion-button>
+          </div>
+        </div>
+      </ng-template>
+    </ion-modal>

@@ -1,0 +1,21 @@
+    <ion-modal
+      [isOpen]="isOpen()"
+      [backdropDismiss]="true"
+      (didDismiss)="dismissed.emit()"
+      class="nb-modal"
+      [class.nb-modal--wide]="size() === 'wide'">
+      <ng-template>
+        <div class="modal-shell">
+          <header class="modal-shell__head">
+            <div class="modal-shell__title">{{ title() }}</div>
+            <button type="button" class="modal-shell__close" (click)="dismissed.emit()" aria-label="Cerrar">×</button>
+          </header>
+          <div class="modal-shell__body">
+            <ng-content select="[body]"></ng-content>
+          </div>
+          <footer class="modal-shell__foot">
+            <ng-content select="[footer]"></ng-content>
+          </footer>
+        </div>
+      </ng-template>
+    </ion-modal>

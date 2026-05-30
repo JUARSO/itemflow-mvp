@@ -1,0 +1,104 @@
+    <ion-modal [isOpen]="isOpen" (didDismiss)="closed.emit()">
+      <ng-template>
+        <ion-header>
+          <ion-toolbar>
+            <ion-title>Nueva merma de producción</ion-title>
+            <ion-buttons slot="end">
+              <ion-button (click)="closed.emit()">
+                <ion-icon name="close-outline"></ion-icon>
+              </ion-button>
+            </ion-buttons>
+          </ion-toolbar>
+        </ion-header>
+        <ion-content>
+          <div class="form">
+            <div class="hint">
+              Registra unidades que se descartaron durante la fabricación.
+              Los insumos consumidos se restarán del inventario automáticamente.
+              El producto NO se toca (no entró al stock terminado).
+            </div>
+
+            <div class="field">
+              <label>Producto</label>
+              <select [value]="productId()" (change)="productId.set($any($event.target).value)" required>
+                <option value="">— Selecciona producto —</option>
+                @for (p of productos(); track p.id) {
+                  <option [value]="p.id">{{ p.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>Cantidad (unidades)</label>
+                <input type="number" min="1" step="1"
+                  [value]="qty()"
+                  (input)="setQty($any($event.target).value)"
+                  required />
+              </div>
+              <div class="field">
+                <label>Motivo</label>
+                <select [value]="reason()" (change)="reason.set($any($event.target).value)" required>
+                  @for (r of reasons; track r.value) {
+                    <option [value]="r.value">{{ r.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
+            @if (reason() === 'other') {
+              <div class="field">
+                <label>Detalle del motivo</label>
+                <input type="text"
+                  placeholder="Describe brevemente"
+                  [value]="reasonText()"
+                  (input)="reasonText.set($any($event.target).value)" />
+              </div>
+            }
+
+            <div class="field">
+              <label>Nota interna (opcional)</label>
+              <textarea rows="2"
+                placeholder="Ej: lote del horno 2, segunda tanda…"
+                [value]="reviewNote()"
+                (input)="reviewNote.set($any($event.target).value)"></textarea>
+            </div>
+
+            @if (productId() && qty() > 0) {
+              <div class="preview">
+                <div class="preview__title">
+                  <ion-icon name="cash-outline"></ion-icon>
+                  Impacto estimado
+                </div>
+                <div class="preview__row">
+                  <span>Costo perdido</span>
+                  <strong class="mono">₡{{ costPerdido() | number:'1.0-0' }}</strong>
+                </div>
+                @if (hasRecipe()) {
+                  <div class="preview__row preview__row--sub">
+                    <span class="muted">Se descontarán insumos:</span>
+                  </div>
+                  @for (s of supplyImpact(); track s.id) {
+                    <div class="preview__row preview__row--detail">
+                      <span>· {{ s.name }}</span>
+                      <span class="mono">{{ s.qty | number:'1.0-3' }} {{ s.unit }}</span>
+                    </div>
+                  }
+                } @else {
+                  <div class="preview__row preview__row--sub">
+                    <span class="muted">Producto de reventa — solo se registra costo perdido.</span>
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="actions">
+              <ion-button fill="outline" (click)="closed.emit()">Cancelar</ion-button>
+              <ion-button color="danger" [disabled]="!canSave()" (click)="save()">
+                Registrar merma
+              </ion-button>
+            </div>
+          </div>
+        </ion-content>
+      </ng-template>
+    </ion-modal>

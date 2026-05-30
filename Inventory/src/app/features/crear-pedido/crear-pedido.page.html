@@ -1,0 +1,176 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Crear pedido</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Crear pedido para cliente"
+        subtitle="Genera un pedido a nombre de un cliente externo. Aparecerá en la cola de producción como pendiente.">
+        <ion-button fill="outline" routerLink="/clientes">Ver clientes</ion-button>
+        <ion-button fill="outline" routerLink="/produccion">Ver pedidos</ion-button>
+      </app-page-header>
+
+      <!-- Selector de cliente -->
+      <section class="picker">
+        <label class="picker__label">Cliente</label>
+        <select [value]="selectedCustomerId()"
+          (change)="onSelectCustomer($any($event.target).value)"
+          class="picker__select">
+          <option value="">— Selecciona un cliente —</option>
+          @for (c of activeCustomers(); track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+
+        @if (selectedCustomer(); as c) {
+          <div class="customer-meta">
+            <div class="meta-row">
+              <ion-icon name="library-outline"></ion-icon>
+              @if (c.allowedProductIds.length === 0) {
+                <span>Acceso a todo el catálogo</span>
+              } @else {
+                <span>{{ c.allowedProductIds.length }} producto(s) asignado(s) —
+                  <a routerLink="/clientes" class="link-inline">editar en clientes</a>
+                </span>
+              }
+            </div>
+            <div class="meta-row">
+              <ion-icon name="calendar-outline"></ion-icon>
+              <span>Días de entrega del cliente: <strong>{{ deliveryDaysLabel(c) }}</strong></span>
+            </div>
+            @if (c.notes) {
+              <div class="meta-row meta-row--note">
+                <ion-icon name="alert-circle-outline"></ion-icon>
+                <span>{{ c.notes }}</span>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      @if (selectedCustomer(); as c) {
+        <div class="layout">
+          <!-- Catálogo -->
+          <section class="catalog">
+            <header class="catalog__head">
+              <h2 class="section-title">Catálogo</h2>
+              <input type="search"
+                placeholder="Buscar producto…"
+                [value]="search()"
+                (input)="search.set($any($event.target).value)"
+                class="catalog__search" />
+            </header>
+
+            @if (productosFiltrados().length === 0) {
+              <p class="empty-msg">Sin productos para mostrar.</p>
+            } @else {
+              <div class="products">
+                @for (p of productosFiltrados(); track p.id) {
+                  <button class="product"
+                    [class.product--not-assigned]="!isAssigned(p)"
+                    (click)="addToCart(p.id)">
+                    <div class="product__row">
+                      <span class="product__name">{{ p.name }}</span>
+                      @if (!isAssigned(p)) {
+                        <ion-badge color="warning" title="No está en los productos asignados al cliente">
+                          Fuera de catálogo
+                        </ion-badge>
+                      }
+                    </div>
+                    <div class="product__row">
+                      <span class="product__price mono">₡{{ data.priceForCustomer(selectedCustomer(), p.id) | number:'1.0-0' }} / {{ p.unit }}</span>
+                      <span class="product__add">+ Agregar</span>
+                    </div>
+                  </button>
+                }
+              </div>
+            }
+          </section>
+
+          <!-- Carrito -->
+          <aside class="cart">
+            <h2 class="section-title">Pedido para {{ c.name }}</h2>
+
+            @if (cart().length === 0) {
+              <p class="empty-msg">Sin productos. Selecciona del catálogo para agregar.</p>
+            } @else {
+              <div class="cart__list">
+                @for (l of cartDetail(); track l.productId) {
+                  <div class="cart__line">
+                    <div class="cart__line-info">
+                      <span class="cart__line-name">{{ l.name }}</span>
+                      <span class="cart__line-price mono">₡{{ l.subtotal | number:'1.0-0' }}</span>
+                    </div>
+                    <div class="cart__line-actions">
+                      <button (click)="decQty(l.productId)" title="−">−</button>
+                      <input type="number"
+                        min="1"
+                        [value]="l.qty"
+                        (input)="setQty(l.productId, $any($event.target).value)"
+                        class="cart__qty mono" />
+                      <button (click)="incQty(l.productId)" title="+">+</button>
+                      <button class="cart__remove" (click)="removeFromCart(l.productId)" title="Quitar">
+                        <ion-icon name="trash-outline"></ion-icon>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+
+              <div class="cart__total">
+                <span>Total</span>
+                <strong class="mono">₡{{ totalCart() | number:'1.0-0' }}</strong>
+              </div>
+            }
+
+            <div class="field">
+              <label>Fecha de entrega</label>
+              <input type="date"
+                [value]="deliveryDate()"
+                [min]="todayIso()"
+                (change)="deliveryDate.set($any($event.target).value)"
+                class="field__input" />
+              @if (deliveryDate() && !isDeliveryDateInWindow()) {
+                <div class="warn-inline">
+                  <ion-icon name="warning-outline"></ion-icon>
+                  Esta fecha cae fuera de los días de entrega configurados para el cliente
+                  ({{ deliveryDaysLabel(c) }})
+                </div>
+              }
+            </div>
+
+            <div class="field">
+              <label>Notas internas (opcional)</label>
+              <textarea rows="2"
+                placeholder="Ej: cliente solicitó entrega temprano"
+                [value]="notes()"
+                (input)="notes.set($any($event.target).value)"
+                class="field__input"></textarea>
+            </div>
+
+            <ion-button expand="block" color="primary"
+              (click)="submit()"
+              [disabled]="cart().length === 0 || !deliveryDate()">
+              Crear pedido
+            </ion-button>
+            @if (cart().length > 0) {
+              <ion-button expand="block" fill="clear" color="medium" (click)="clearCart()">
+                Vaciar carrito
+              </ion-button>
+            }
+          </aside>
+        </div>
+      } @else {
+        <div class="empty">
+          <h3>Selecciona un cliente</h3>
+          <p>Una vez elegido el cliente, podrás agregar productos del catálogo y generar el pedido.</p>
+          @if (activeCustomers().length === 0) {
+            <p><strong>No hay clientes activos.</strong>
+              <a routerLink="/clientes">Crea uno</a> antes de generar pedidos.</p>
+          }
+        </div>
+      }
+    </ion-content>

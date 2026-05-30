@@ -1,0 +1,22 @@
+    .chart { width: 100%; }
+    .chart__title {
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+      margin-bottom: 6px;
+    }
+    .chart__canvas {
+      position: relative;
+      width: 100%;
+    }
+    canvas { width: 100% !important; }
+    .empty {
+      padding: var(--ui-sp-4);
+      text-align: center;
+      color: var(--ui-text-muted);
+      font-size: var(--ui-fs-sm);
+      background: var(--ui-surface-2);
+      border-radius: 4px;
+    }

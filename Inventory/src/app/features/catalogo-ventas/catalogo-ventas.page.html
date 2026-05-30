@@ -1,0 +1,49 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Catálogo de ventas</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Catálogo de ventas"
+    subtitle="Configura el precio final al consumidor. El costo es el precio base que vende Producción.">
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Productos" [value]="filas().length" tone="primary"></app-kpi-card>
+    <app-kpi-card label="Margen promedio" [value]="margenPromedio() + '%'" tone="success"></app-kpi-card>
+  </div>
+
+  <div class="table">
+    <div class="thead">
+      <span>Producto</span>
+      <span class="num">Costo (producción)</span>
+      <span class="num">Precio final</span>
+      <span class="num">Margen</span>
+    </div>
+
+    @for (r of filas(); track r.id) {
+      <article class="trow">
+        <div class="trow__name">{{ r.name }}</div>
+
+        <div class="trow__cost num mono">₡{{ r.costo | number:'1.0-0' }}</div>
+
+        <div class="trow__final num">
+          <span class="cur">₡</span>
+          <input type="number" min="0" class="price-input mono"
+            [value]="r.final"
+            [disabled]="!tenant.canManageUrnas()"
+            (input)="setFinal(r.id, +$any($event.target).value)" />
+        </div>
+
+        <div class="trow__margin num mono"
+          [class.pos]="r.margen > 0" [class.neg]="r.margen < 0">
+          ₡{{ r.margen | number:'1.0-0' }}
+          <span class="pct">({{ r.margenPct }}%)</span>
+        </div>
+      </article>
+    }
+  </div>
+</ion-content>

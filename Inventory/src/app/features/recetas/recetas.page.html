@@ -1,0 +1,109 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Recetas</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Recetas"
+        subtitle="Cuántos insumos consume cada producto. Paso 3 del flujo.">
+        @if (tenant.canEditRecipes()) {
+          <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
+          <ion-button (click)="abrirNuevo()">+ Nueva receta</ion-button>
+        }
+      </app-page-header>
+
+      @if (data.recipes().length === 0) {
+        <app-empty-state
+          icon="📖"
+          title="No hay recetas configuradas"
+          body="Define cuántos insumos consume cada producto terminado. Al vender, la receta descuenta los insumos automáticamente."
+          ctaLabel="Crear primera receta"
+          (ctaClick)="abrirNuevo()">
+        </app-empty-state>
+      } @else {
+        <div class="grid">
+          @for (recipe of data.recipes(); track recipe.id) {
+            <article class="card">
+              <header class="card__head">
+                <div class="card__head-main">
+                  @if (recipe.imageUrl) {
+                    <img [src]="recipe.imageUrl" alt="{{ recipe.productName }}" class="card__thumb" />
+                  }
+                  <div>
+                    <h3 class="card__title">{{ recipe.productName }}</h3>
+                    <div class="card__yield">Rinde <strong class="mono">{{ recipe.yieldQty }}</strong> unidades</div>
+                  </div>
+                </div>
+                @if (tenant.canEditRecipes()) {
+                  <div class="card__cost mono">
+                    <div>
+                      Total corrida: <strong>₡{{ costoReceta(recipe.id) | number:'1.0-0' }}</strong>
+                    </div>
+                    <div class="card__cost-unit">
+                      Por unidad: ₡{{ costoPorUnidad(recipe.productId) | number:'1.0-0' }}
+                    </div>
+                  </div>
+                }
+              </header>
+
+              <div class="card__items">
+                <div class="items__head">Insumos requeridos por corrida</div>
+                @for (it of recipe.items; track $index) {
+                  <div class="item-row">
+                    <span class="item-row__name">{{ it.itemName }}</span>
+                    <span class="item-row__qty mono">{{ it.qty | number:'1.0-3' }} {{ it.unit }}</span>
+                  </div>
+                }
+              </div>
+
+              @if (recipe.notes) {
+                <div class="card__notes">
+                  <div class="card__notes-label">Observaciones</div>
+                  <p class="card__notes-text">{{ recipe.notes }}</p>
+                </div>
+              }
+
+              <div class="card__actions">
+                <ion-button size="small" fill="outline" (click)="descargarFicha(recipe)">
+                  Descargar ficha técnica
+                </ion-button>
+                @if (tenant.canEditRecipes()) {
+                  <ion-button size="small" fill="outline" (click)="abrirEditar(recipe)">
+                    Editar
+                  </ion-button>
+                  <ion-button size="small" color="danger" (click)="pedirEliminar(recipe)">
+                    Eliminar
+                  </ion-button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+
+      <app-receta-form-modal
+        [isOpen]="modalOpen()"
+        [editing]="recetaEdit()"
+        (closed)="cerrarModal()"
+        (saved)="cerrarModal()">
+      </app-receta-form-modal>
+
+      <app-confirm-dialog
+        [isOpen]="confirmOpen()"
+        title="Eliminar receta"
+        [message]="confirmMessage()"
+        tone="danger"
+        confirmLabel="Sí, eliminar"
+        (confirmed)="eliminar()"
+        (cancelled)="confirmOpen.set(false)">
+      </app-confirm-dialog>
+
+      <app-bulk-import-modal
+        [isOpen]="bulkOpen()"
+        [config]="bulkConfig"
+        (closed)="bulkOpen.set(false)">
+      </app-bulk-import-modal>
+    </ion-content>

@@ -1,0 +1,180 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Insumos</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Insumos"
+        subtitle="Materias primas que compras a proveedores. Paso 2 del flujo.">
+        @if (tenant.canEditSupplies()) {
+          <ion-button fill="outline" (click)="bulkOpen.set(true)">↥ Importar CSV</ion-button>
+          <ion-button (click)="abrirNuevo()">+ Nuevo insumo</ion-button>
+        }
+      </app-page-header>
+
+      <div class="filters">
+        <ion-searchbar
+          [value]="query()"
+          (ionInput)="query.set($any($event.detail.value) ?? '')"
+          placeholder="Buscar por nombre, SKU o categoría"
+          mode="md">
+        </ion-searchbar>
+      </div>
+
+      <div class="grid">
+        @for (item of visibles(); track item.supply.id) {
+          <article class="card">
+            <header class="card__head">
+              <div>
+                <div class="card__cat">{{ item.supply.category ?? 'Sin categoría' }}</div>
+                <h3 class="card__title">{{ item.supply.name }}</h3>
+                <div class="card__sku mono">{{ item.supply.sku }}</div>
+              </div>
+              <app-status-badge [status]="item.worstStatus"></app-status-badge>
+            </header>
+
+            <div class="card__row">
+              @if (tenant.canEditSupplies()) {
+                <div class="card__cell">
+                  <div class="card__label">Costo unitario</div>
+                  <div class="card__value mono">₡{{ item.supply.cost | number:'1.0-0' }}</div>
+                </div>
+              }
+              <div class="card__cell">
+                <div class="card__label">P. reorden</div>
+                <div class="card__value mono">{{ presentationOf(item.supply, item.supply.reorderPoint) }}</div>
+              </div>
+              <div class="card__cell">
+                <div class="card__label">Mín / Máx</div>
+                <div class="card__value mono">
+                  {{ presentationOf(item.supply, item.supply.minStock, true) }}
+                  / {{ presentationOf(item.supply, item.supply.maxStock, true) }}
+                </div>
+                @if (item.supply.presentation) {
+                  <div class="card__hint">
+                    {{ presentationDetail(item.supply) }}
+                  </div>
+                }
+              </div>
+              <div class="card__cell">
+                <div class="card__label">Lead time hoy</div>
+                @if (leadTimeOf(item.supply.id); as lt) {
+                  <div class="card__value mono">{{ lt.leadTimeDays }} día(s)</div>
+                  @if (lt.fromCalendar) {
+                    <div class="card__hint">
+                      {{ leadTimeSupplierName(lt.supplierId) }} ·
+                      entrega {{ lt.nextDeliveryDate | date:'EEE dd/MM' }}
+                    </div>
+                  } @else {
+                    <div class="card__hint muted">
+                      {{ leadTimeSupplierName(lt.supplierId) }} · sin calendario
+                    </div>
+                  }
+                } @else {
+                  <div class="card__value muted">—</div>
+                  <div class="card__hint muted">sin proveedor</div>
+                }
+              </div>
+            </div>
+
+            <div class="card__stocks">
+              <div class="card__label">Stock actual</div>
+              <div class="stock-row">
+                <span class="stock-row__qty mono">{{ presentationOf(item.supply, item.quantity) }}</span>
+                <app-status-badge [status]="item.status"></app-status-badge>
+              </div>
+              @if (item.supply.presentation) {
+                <div class="card__hint">
+                  Equivale a {{ item.quantity | number:'1.0-2' }} {{ item.supply.unit }}
+                </div>
+              }
+            </div>
+
+            @if (pendingPOs(item.supply.id); as pos) {
+              @if (pos.length > 0) {
+                <div class="card__incoming">
+                  <div class="incoming__head">
+                    <ion-icon name="cart-outline"></ion-icon>
+                    <strong>En camino:</strong>
+                    <span class="mono">{{ presentationOf(item.supply, totalIncoming(pos)) }}</span>
+                  </div>
+                  @for (po of pos; track po.poId) {
+                    <div class="incoming__row">
+                      <a [routerLink]="['/ordenes-compra']" class="mono incoming__code">{{ po.code }}</a>
+                      <span class="incoming__qty mono">{{ presentationOf(item.supply, po.qty) }}</span>
+                      @if (po.expectedDate) {
+                        <span class="incoming__eta"
+                          [class.incoming__eta--overdue]="isOverdue(po.expectedDate)">
+                          @if (isOverdue(po.expectedDate)) {
+                            atrasada · esperada {{ po.expectedDate | date:'EEE dd/MM' }}
+                          } @else {
+                            llega {{ po.expectedDate | date:'EEE dd/MM' }}
+                          }
+                        </span>
+                      } @else {
+                        <span class="incoming__eta muted">sin fecha estimada</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            }
+
+            @if (suppliersOf(item.supply.id); as sups) {
+              @if (sups.length > 0) {
+                <div class="card__footer">
+                  Proveedores:
+                  <span class="supplier-list">
+                    @for (s of sups; track s.id; let last = $last) {
+                      <strong>{{ s.name }}</strong>{{ last ? '' : ', ' }}
+                    }
+                  </span>
+                </div>
+              } @else if (item.supply.supplier) {
+                <div class="card__footer">
+                  Proveedor: <strong>{{ item.supply.supplier }}</strong>
+                  <small class="muted">(texto libre — vincula desde Editar)</small>
+                </div>
+              }
+            }
+
+            @if (tenant.canEditSupplies()) {
+              <div class="card__actions">
+                <ion-button size="small" fill="outline" (click)="abrirEditar(item.supply)">
+                  Editar
+                </ion-button>
+                <ion-button size="small" color="danger" (click)="pedirEliminar(item.supply)">
+                  Eliminar
+                </ion-button>
+              </div>
+            }
+          </article>
+        }
+      </div>
+
+      <app-insumo-form-modal
+        [isOpen]="modalOpen()"
+        [editing]="insumoEdit()"
+        (closed)="cerrarModal()"
+        (saved)="cerrarModal()">
+      </app-insumo-form-modal>
+
+      <app-confirm-dialog
+        [isOpen]="confirmOpen()"
+        title="Eliminar insumo"
+        [message]="confirmMessage()"
+        tone="danger"
+        confirmLabel="Sí, eliminar"
+        (confirmed)="eliminar()"
+        (cancelled)="confirmOpen.set(false)">
+      </app-confirm-dialog>
+
+      <app-bulk-import-modal
+        [isOpen]="bulkOpen()"
+        [config]="bulkConfig"
+        (closed)="bulkOpen.set(false)">
+      </app-bulk-import-modal>
+    </ion-content>

@@ -1,0 +1,62 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Pedidos recibidos</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Pedidos recibidos"
+    subtitle="Pedidos de clientes por corroborar. Al aceptarlos se envían a producción.">
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Por corroborar" [value]="recibidos().length" tone="warning"></app-kpi-card>
+    <app-kpi-card label="Unidades" [value]="totalUnidades()" tone="primary"></app-kpi-card>
+  </div>
+
+  <div class="list">
+    @if (recibidos().length === 0) {
+      <app-empty-state icon="📥" title="Sin pedidos por corroborar"
+        body="Cuando entren pedidos de clientes (portal o Crear pedido), aparecerán aquí para revisarlos."></app-empty-state>
+    }
+    @for (o of recibidos(); track o.id) {
+      <article class="ped">
+        <header class="ped__head">
+          <div>
+            <span class="ped__code mono">{{ o.code }}</span>
+            <span class="ped__cliente">{{ clienteNombre(o) }}</span>
+          </div>
+          <div class="ped__when muted">
+            @if (o.requestedDeliveryDate) { Para {{ o.requestedDeliveryDate | date:'EEE dd-MM-yyyy' }} }
+            @else { Recibido {{ o.createdAt | date:'dd-MM-yyyy' }} }
+          </div>
+        </header>
+
+        <div class="ped__items">
+          @for (it of o.items; track it.productId) {
+            <div class="item">
+              <span class="item__name">{{ it.productName }}</span>
+              <span class="item__qty mono">×{{ it.qty }}</span>
+            </div>
+          }
+        </div>
+
+        @if (o.notes) { <p class="ped__notes muted">“{{ o.notes }}”</p> }
+
+        @if (tenant.canCreateOrder()) {
+          <footer class="ped__actions">
+            <ion-button size="small" (click)="aceptar(o)">
+              <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
+              Aceptar y enviar a producción
+            </ion-button>
+            <ion-button size="small" fill="clear" color="danger" class="ghost" (click)="cancelar(o)">
+              Cancelar
+            </ion-button>
+          </footer>
+        }
+      </article>
+    }
+  </div>
+</ion-content>

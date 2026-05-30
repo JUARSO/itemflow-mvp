@@ -5,15 +5,13 @@ import { MOCK_COMPANY } from '../mocks/dummy-data';
 /**
  * Contexto del tenant + helpers de permisos por feature.
  *
- * Modelo de roles:
- *  - admin (administrativos): TODO + análisis + paneles + miembros + branding.
- *  - production (encargado de producción): pedidos de clientes, planificación,
- *    creación de pedidos, historial, recetas (edición).
- *  - inventory (encargado de inventario): catálogo, insumos, recetas (lectura
- *    para vincular en BOM), inventario, mermas, ajustes, proveedores, OCs,
- *    ingresos, alertas.
- *  - operator (operario de producción): cola de pedidos (ejecución),
- *    planificación, recetas (lectura).
+ * Modelo de roles (3 roles):
+ *  - admin: TODO + análisis + paneles + miembros + branding.
+ *  - produccion: de catálogo hacia abajo — catálogo, recetas, inventario,
+ *    insumos, mermas, ajustes, proveedores, pre-compras, OCs, planificación,
+ *    análisis y alertas. NO toca clientes/pedidos ni paneles administrativos.
+ *  - ventas: la parte de clientes — clientes, crear pedido y cola de pedidos
+ *    (recibidos/aceptados/completados).
  */
 @Injectable({ providedIn: 'root' })
 export class TenantContextService {
@@ -24,26 +22,30 @@ export class TenantContextService {
   readonly isReady = computed(() => this.auth.isAuthenticated());
   readonly role = this.auth.role;
   readonly isAdmin = this.auth.isAdmin;
-  readonly isProduction = this.auth.isProduction;
-  readonly isInventory = this.auth.isInventory;
-  readonly isOperator = this.auth.isOperator;
+  readonly isProduccion = this.auth.isProduccion;
+  readonly isVentas = this.auth.isVentas;
 
   // ===== Permisos por feature =====
-  // INVENTARIO (admin + inventory + production)
-  // Producción tiene acceso completo a todo lo que no sea panel administrativo,
-  // por eso también puede editar catálogo, insumos, OCs, etc.
+  // CATÁLOGO HACIA ABAJO (admin + produccion): catálogo, recetas, inventario,
+  // insumos, mermas, ajustes, proveedores, compras, análisis y alertas.
   private readonly canManageInventory = computed(() =>
-    this.auth.isAdmin() || this.auth.isInventory() || this.auth.isProduction()
+    this.auth.isAdmin() || this.auth.isProduccion()
   );
 
-  /** Edita catálogo de productos. Inventory NO entra al catálogo. */
-  readonly canEditCatalog = computed(() => this.auth.isAdmin() || this.auth.isProduction());
+  /** Edita catálogo de productos. */
+  readonly canEditCatalog = computed(() => this.auth.isAdmin() || this.auth.isProduccion());
 
   /** Edita insumos / materias primas. */
   readonly canEditSupplies = this.canManageInventory;
 
   /** Crea/recibe/cancela órdenes de compra. */
   readonly canManagePurchaseOrders = this.canManageInventory;
+
+  /**
+   * Crea y aprueba pre-compras. Mismo grupo que OCs; la regla "el aprobador
+   * debe ser distinto del creador" se valida a nivel de servicio.
+   */
+  readonly canManagePrePurchaseOrders = this.canManageInventory;
 
   /** Registra ajustes de stock. */
   readonly canAdjustStock = this.canManageInventory;
@@ -60,26 +62,28 @@ export class TenantContextService {
   /** Procesa lotes de merma. */
   readonly canProcessMermas = this.canManageInventory;
 
-  // PRODUCCIÓN (admin + production)
+  /** Edita recetas (BOM). Forma parte de "catálogo hacia abajo". */
+  readonly canEditRecipes = computed(() => this.auth.isAdmin() || this.auth.isProduccion());
 
-  /** Edita recetas (BOM). Producción define; inventario solo lee. */
-  readonly canEditRecipes = computed(() => this.auth.isAdmin() || this.auth.isProduction());
+  // CLIENTES Y PEDIDOS (admin + ventas)
 
-  /** Crear órdenes de fabricación (pedidos de clientes manuales). */
-  readonly canCreateOrder = computed(() => this.auth.isAdmin() || this.auth.isProduction());
+  /** Crear órdenes de fabricación (pedidos de clientes). */
+  readonly canCreateOrder = computed(() => this.auth.isAdmin() || this.auth.isVentas());
 
-  /** Cancelar órdenes. Admin y production (no operario). */
-  readonly canCancelOrder = computed(() => this.auth.isAdmin() || this.auth.isProduction());
+  /** Cancelar órdenes. */
+  readonly canCancelOrder = computed(() => this.auth.isAdmin() || this.auth.isVentas());
 
   /** Gestiona clientes externos. */
-  readonly canManageCustomers = computed(() => this.auth.isAdmin() || this.auth.isProduction());
+  readonly canManageCustomers = computed(() => this.auth.isAdmin() || this.auth.isVentas());
 
-  // PRODUCCIÓN OPERATIVA (admin + production + operator)
+  /** Gestiona urnas (vitrinas) y su sistema de ventas. */
+  readonly canManageUrnas = computed(() => this.auth.isAdmin() || this.auth.isVentas());
 
-  /** Operar la cola: iniciar y completar órdenes. */
-  readonly canOperateProduction = computed(() =>
-    this.auth.isAdmin() || this.auth.isProduction() || this.auth.isOperator()
-  );
+  /** Operar la cola de pedidos de clientes: aceptar, iniciar y completar. Lado Ventas. */
+  readonly canOperateProduction = computed(() => this.auth.isAdmin() || this.auth.isVentas());
+
+  /** Fabricar las solicitudes de reposición de almacén. Lado Producción. */
+  readonly canFulfillAlmacenRequests = computed(() => this.auth.isAdmin() || this.auth.isProduccion());
 
   // SOLO ADMIN
 

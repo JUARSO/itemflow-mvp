@@ -1,0 +1,134 @@
+    .filters { padding: 0 var(--ui-sp-4) var(--ui-sp-4); }
+    ion-searchbar { --background: var(--ui-surface); padding: 0; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--ui-sp-3);
+      padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+    }
+    .card {
+      background: var(--ui-surface-2);
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-md);
+      padding: var(--ui-sp-4);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .card__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--ui-sp-3);
+      margin-bottom: var(--ui-sp-3);
+    }
+    .card__cat {
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+    }
+    .card__title {
+      font-family: var(--ui-font-display);
+      font-weight: var(--ui-fw-black);
+      font-size: var(--ui-fs-lg);
+      line-height: var(--ui-lh-tight);
+      margin: 0;
+    }
+    .card__sku { font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
+    .card__row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--ui-sp-2);
+      margin-bottom: var(--ui-sp-3);
+      padding-bottom: var(--ui-sp-3);
+      border-bottom: var(--ui-border-w-sm) solid var(--ui-border);
+    }
+    .card__label {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-medium);
+    }
+    .card__value { font-size: var(--ui-fs-sm); font-weight: var(--ui-fw-bold); }
+    .card__hint {
+      font-size: 10px;
+      color: var(--ui-text-muted);
+      margin-top: 2px;
+      font-style: italic;
+    }
+    .card__stocks { display: grid; gap: 6px; }
+    .stock-row {
+      display: flex;
+      gap: var(--ui-sp-2);
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: var(--ui-fs-sm);
+    }
+    .stock-row__qty { font-weight: var(--ui-fw-bold); }
+
+    .card__incoming {
+      margin-top: var(--ui-sp-2);
+      padding: var(--ui-sp-2) var(--ui-sp-3);
+      background: var(--ui-transit-tint);
+      border-left: 3px solid var(--ui-transit);
+      display: grid;
+      gap: 4px;
+    }
+    .incoming__head {
+      display: flex; align-items: center; gap: 6px;
+      font-size: var(--ui-fs-sm);
+      color: var(--ui-text);
+    }
+    .incoming__head ion-icon {
+      font-size: 16px; color: var(--ui-transit);
+    }
+    .incoming__head strong { font-weight: var(--ui-fw-black); }
+    .incoming__row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px;
+      align-items: baseline;
+      padding-left: 22px;
+      font-size: var(--ui-fs-xs);
+    }
+    .incoming__code {
+      color: var(--ui-primary);
+      font-weight: var(--ui-fw-bold);
+      text-decoration: none;
+    }
+    .incoming__code:hover { text-decoration: underline; }
+    .incoming__qty { color: var(--ui-text); }
+    .incoming__eta { color: var(--ui-text-muted); justify-self: end; }
+    .incoming__eta--overdue {
+      color: var(--ui-danger);
+      font-weight: var(--ui-fw-bold);
+    }
+
+    .card__footer {
+      margin-top: var(--ui-sp-3);
+      padding-top: var(--ui-sp-2);
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+    }
+    .card__footer .supplier-list strong {
+      color: var(--ui-text);
+      font-weight: var(--ui-fw-bold);
+    }
+    .card__footer .muted {
+      color: var(--ui-text-muted);
+      font-style: italic;
+      margin-left: 4px;
+    }
+    .card__actions {
+      display: flex;
+      gap: var(--ui-sp-2);
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: var(--ui-sp-3);
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+    }

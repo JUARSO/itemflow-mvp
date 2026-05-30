@@ -1,0 +1,186 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Pre-compras</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Pre-compras sugeridas"
+        subtitle="Cálculo en tiempo real según stock, consumo diario y calendario del proveedor. Al aprobar se genera la OC.">
+      </app-page-header>
+
+      <div class="kpis">
+        <app-kpi-card
+          label="Proveedores con sugerencia"
+          [value]="suggestions().length"
+          tone="primary"></app-kpi-card>
+        <app-kpi-card
+          label="Insumos a reponer"
+          [value]="totalItems()"
+          tone="warning"></app-kpi-card>
+        <app-kpi-card
+          label="Total estimado"
+          [value]="'₡' + (totalCost() | number:'1.0-0')"
+          tone="transit"></app-kpi-card>
+        <app-kpi-card
+          label="Actualizado"
+          [value]="updatedLabel()"
+          tone="success"
+          [hint]="updatedHint()"></app-kpi-card>
+      </div>
+
+      <div class="toolbar">
+        <button class="refresh" (click)="recalc()">
+          <ion-icon name="refresh-outline"></ion-icon>
+          Recalcular ahora
+        </button>
+        <small class="hint">
+          La sugerencia se reconstruye al entrar a esta página y al pulsar "Recalcular".
+        </small>
+      </div>
+
+      @if (suggestions().length === 0) {
+        <div class="empty">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          <h3>Nada para ordenar hoy</h3>
+          <p>Todos los insumos tienen stock suficiente para cubrir el lead time de sus proveedores.</p>
+        </div>
+      }
+
+      <div class="list">
+        @for (pre of suggestions(); track pre.supplierId) {
+          <article class="pre">
+            <header class="pre__head">
+              <div class="pre__title">
+                <h3 class="pre__supplier">{{ pre.supplierName }}</h3>
+                <div class="pre__meta">
+                  <ion-badge color="warning">{{ pre.items.length }} insumo(s)</ion-badge>
+                  @if (pre.fromCalendar) {
+                    <span>
+                      Pedido <strong>{{ pre.nextOrderDate | date:'EEE dd-MM' }}</strong>
+                      · Entrega <strong>{{ pre.nextDeliveryDate | date:'EEE dd-MM' }}</strong>
+                      · LT {{ pre.leadTimeDays }}d
+                    </span>
+                  } @else {
+                    <span>
+                      Entrega estimada <strong>{{ pre.nextDeliveryDate | date:'EEE dd-MM' }}</strong>
+                      · LT {{ pre.leadTimeDays }}d (sin calendario)
+                    </span>
+                  }
+                </div>
+              </div>
+              <div class="pre__total">
+                <span class="muted">Total</span>
+                <strong class="mono">₡{{ pre.totalCost | number:'1.0-0' }}</strong>
+              </div>
+            </header>
+
+            <div class="pre__items">
+              <div class="pre-item pre-item--head">
+                <span>Insumo</span>
+                <span>Stock</span>
+                <span>Días</span>
+                <span>Sugerido</span>
+                <span>Subtotal</span>
+                <span></span>
+              </div>
+              @for (it of pre.items; track it.supplyId) {
+                <div class="pre-item" [attr.data-reason]="it.reason">
+                  <span class="pre-item__name">
+                    {{ it.itemName }}
+                    @switch (it.reason) {
+                      @case ('below_rop')     { <ion-badge color="danger" class="mini">Bajo ROP</ion-badge> }
+                      @case ('wont_cover_lt') { <ion-badge color="warning" class="mini">No cubre LT</ion-badge> }
+                      @case ('manual')        { <ion-badge color="primary" class="mini">Manual</ion-badge> }
+                    }
+                    @if (it.pendingQty > 0) {
+                      <small class="pending">+{{ it.pendingQty | number:'1.0-1' }} en camino</small>
+                    }
+                  </span>
+                  <span class="mono">
+                    {{ it.currentStock | number:'1.0-1' }}
+                    <small class="muted">/ {{ it.reorderPoint | number:'1.0-0' }}</small>
+                  </span>
+                  <span class="mono" [class.urgent]="it.daysUntilEmpty < pre.leadTimeDays">
+                    @if (isFinite(it.daysUntilEmpty)) {
+                      {{ it.daysUntilEmpty | number:'1.0-1' }}d
+                    } @else {
+                      —
+                    }
+                  </span>
+                  <span class="mono"><strong>{{ it.qty }}</strong></span>
+                  <span class="mono">₡{{ it.qty * it.unitCost | number:'1.0-0' }}</span>
+                  <span class="pre-item__action">
+                    @if (it.manual && tenant.canManagePrePurchaseOrders()) {
+                      <button class="remove" (click)="quitarManual(pre.supplierId, it.supplyId)"
+                        title="Quitar del carrito">×</button>
+                    }
+                  </span>
+                </div>
+              }
+            </div>
+
+            @if (tenant.canManagePrePurchaseOrders()) {
+              <div class="pre__add">
+                @if (addingFor() === pre.supplierId) {
+                  <div class="add-form">
+                    <select [value]="addSupplyId()" (change)="addSupplyId.set($any($event.target).value)">
+                      <option value="">— Insumo del proveedor —</option>
+                      @for (s of supplierAvailableSupplies(pre); track s.id) {
+                        <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+                      }
+                    </select>
+                    <input type="number" min="0.001" step="0.001"
+                      [value]="addQty()"
+                      (input)="addQty.set(+$any($event.target).value)"
+                      placeholder="Cant." class="mono" />
+                    <ion-button size="small" (click)="confirmarAgregar(pre.supplierId)"
+                      [disabled]="!addSupplyId() || addQty() <= 0">
+                      Agregar
+                    </ion-button>
+                    <ion-button size="small" fill="clear" class="ghost" (click)="cancelarAgregar()">
+                      Cancelar
+                    </ion-button>
+                  </div>
+                  @if (supplierAvailableSupplies(pre).length === 0) {
+                    <small class="muted">
+                      Todos los insumos de este proveedor ya están en el carrito.
+                    </small>
+                  }
+                } @else {
+                  <button class="add-trigger" (click)="abrirAgregar(pre.supplierId)">
+                    <ion-icon name="add-outline"></ion-icon>
+                    Agregar insumo manualmente
+                  </button>
+                }
+              </div>
+            }
+
+            <footer class="pre__footer">
+              @if (tenant.canManagePrePurchaseOrders()) {
+                <ion-button color="success" (click)="pedirAprobar(pre)">
+                  <ion-icon name="thumbs-up-outline" slot="start"></ion-icon>
+                  Aprobar y generar OC
+                </ion-button>
+              }
+              <a routerLink="/ordenes-compra" class="link">
+                <ion-icon name="document-text-outline"></ion-icon>
+                Ver OCs existentes
+              </a>
+            </footer>
+          </article>
+        }
+      </div>
+
+      <app-confirm-dialog
+        [isOpen]="confirmOpen()"
+        [title]="confirmTitle()"
+        [message]="confirmMessage()"
+        tone="info"
+        [confirmLabel]="'Aprobar y generar OC'"
+        (confirmed)="ejecutar()"
+        (cancelled)="confirmOpen.set(false)">
+      </app-confirm-dialog>
+    </ion-content>

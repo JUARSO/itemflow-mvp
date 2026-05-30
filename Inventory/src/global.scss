@@ -96,7 +96,7 @@ ion-button {
 ion-button.button-solid {
   --background: var(--ui-primary);
   --color: var(--ui-primary-contrast);
-  --border-color: transparent;
+  --border-color: var(--ui-border-strong);
 }
 
 ion-button[color="success"].button-solid { --color: #ffffff; }
@@ -118,7 +118,11 @@ ion-button[fill="outline"].ghost,
 ion-button.ghost {
   --background: transparent;
   --color: var(--ui-text);
-  --border-color: transparent;
+  // Ionic fuerza --border-width:0 en .button-clear con :host(); el !important
+  // es necesario para que estos botones también muestren borde.
+  --border-width: var(--ui-border-w-sm) !important;
+  --border-style: solid;
+  --border-color: var(--ui-border-strong);
   --box-shadow: none;
 }
 

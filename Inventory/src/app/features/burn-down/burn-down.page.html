@@ -1,0 +1,190 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Análisis de stock</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Análisis de stock (burn-down)"
+        subtitle="Proyecta cuánto stock queda día a día y cuándo conviene generar la orden de compra.">
+      </app-page-header>
+
+      <!-- Selector de item -->
+      <section class="picker">
+        <div class="picker__row">
+          <label class="field">
+            <span class="field__label">Selecciona item a analizar</span>
+            <select [(ngModel)]="selectedRef" (ngModelChange)="onSelect()">
+              <option value="">— Selecciona insumo o producto —</option>
+              @if (supplyItems().length > 0) {
+                <optgroup label="Insumos">
+                  @for (it of supplyItems(); track it.id) {
+                    <option [value]="'supply:' + it.id">{{ it.name }} ({{ it.unit }})</option>
+                  }
+                </optgroup>
+              }
+              @if (productItems().length > 0) {
+                <optgroup label="Productos de reventa">
+                  @for (it of productItems(); track it.id) {
+                    <option [value]="'product:' + it.id">{{ it.name }} ({{ it.unit }})</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </label>
+          <label class="field field--narrow">
+            <span class="field__label">Horizonte (días)</span>
+            <select [(ngModel)]="horizon" (ngModelChange)="onSelect()">
+              <option [ngValue]="30">30 días</option>
+              <option [ngValue]="60">60 días</option>
+              <option [ngValue]="90">90 días</option>
+              <option [ngValue]="180">180 días</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      @if (!sim()) {
+        <div class="placeholder">
+          <div class="placeholder__icon">📉</div>
+          <h2>Selecciona un item para empezar</h2>
+          <p>Verás su trayectoria de stock proyectada, el día en que debes ordenar y la cantidad sugerida.</p>
+        </div>
+      } @else {
+        <!-- ============ MÉTRICAS CLAVE ============ -->
+        <section class="card-section">
+          <div class="kpis">
+            <div class="kpi" [attr.data-status]="coverageStatus()">
+              <div class="kpi__label">Stock actual</div>
+              <div class="kpi__value mono">{{ sim()!.initialStock | number:'1.0-2' }}</div>
+              <div class="kpi__unit">{{ unitLabel() }}</div>
+            </div>
+            <div class="kpi" [attr.data-status]="coverageStatus()">
+              <div class="kpi__label">Días de cobertura</div>
+              <div class="kpi__value mono">{{ sim()!.daysOfCoverage | number:'1.0-1' }}</div>
+              <div class="kpi__unit">días al consumo actual</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi__label">Demanda diaria</div>
+              <div class="kpi__value mono">{{ avgDemandWithBoost() | number:'1.0-2' }}</div>
+              <div class="kpi__unit">{{ unitLabel() }}/día (rolling 7d)</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi__label">Lead time</div>
+              <div class="kpi__value mono">{{ sim()!.leadTime }}</div>
+              <div class="kpi__unit">días desde la orden</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ FECHAS CLAVE ============ -->
+        <section class="card-section">
+          <header class="section-head">
+            <h2>Fechas clave</h2>
+          </header>
+          <div class="dates">
+            <div class="date-row" [attr.data-status]="orderUrgencyStatus()">
+              <div class="date-row__icon">📅</div>
+              <div class="date-row__body">
+                <div class="date-row__title">Día sugerido para ordenar</div>
+                <div class="date-row__detail">
+                  @if (sim()!.dayToOrder !== null) {
+                    <strong>Día {{ sim()!.dayToOrder }}</strong> · {{ dateOf(sim()!.dayToOrder!) }}
+                  } @else {
+                    Sin recomendación — stock no cruza ROP en el horizonte
+                  }
+                </div>
+              </div>
+              @if (sim()!.dayToOrder !== null) {
+                <ion-button size="small" (click)="goToCreatePO()">
+                  Crear OC →
+                </ion-button>
+              }
+            </div>
+
+            <div class="date-row" [attr.data-status]="sim()!.dayCrossesReorder !== null ? 'alerta' : 'optimo'">
+              <div class="date-row__icon">⚠️</div>
+              <div class="date-row__body">
+                <div class="date-row__title">Cruce de punto de reorden ({{ sim()!.reorderPoint }} {{ unitLabel() }})</div>
+                <div class="date-row__detail">
+                  @if (sim()!.dayCrossesReorder !== null) {
+                    <strong>Día {{ sim()!.dayCrossesReorder }}</strong> · {{ dateOf(sim()!.dayCrossesReorder!) }}
+                  } @else {
+                    No cruza en el horizonte proyectado
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="date-row" [attr.data-status]="sim()!.dayHitsZero !== null ? 'critico' : 'optimo'">
+              <div class="date-row__icon">🚨</div>
+              <div class="date-row__body">
+                <div class="date-row__title">Stock = 0 si NO ordenas</div>
+                <div class="date-row__detail">
+                  @if (sim()!.dayHitsZero !== null) {
+                    <strong>Día {{ sim()!.dayHitsZero }}</strong> · {{ dateOf(sim()!.dayHitsZero!) }}
+                  } @else {
+                    No llega a cero en el horizonte (cobertura suficiente o llegada de OC programada)
+                  }
+                </div>
+              </div>
+            </div>
+
+            @if (sim()!.suggestedOrderQty > 0 && sim()!.dayToOrder !== null) {
+              <div class="date-row" data-status="informativo">
+                <div class="date-row__icon">📦</div>
+                <div class="date-row__body">
+                  <div class="date-row__title">Cantidad sugerida a ordenar</div>
+                  <div class="date-row__detail">
+                    <strong class="mono">{{ sim()!.suggestedOrderQty | number:'1.0-0' }} {{ unitLabel() }}</strong>
+                    · llevar al máximo ({{ sim()!.maxStock }} {{ unitLabel() }}) tras la recepción
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- ============ OCs EN TRÁNSITO ============ -->
+        @if (sim()!.incomingPOs.length > 0) {
+          <section class="card-section">
+            <header class="section-head">
+              <h2>Órdenes en tránsito que aportan stock</h2>
+            </header>
+            <ul class="incoming">
+              @for (po of sim()!.incomingPOs; track po.code) {
+                <li class="incoming__item">
+                  <span class="mono">{{ po.code }}</span>
+                  · llega <strong>día {{ po.arrivalDay }}</strong> ({{ dateOf(po.arrivalDay) }})
+                  · <span class="incoming__qty mono">+{{ po.qty }} {{ unitLabel() }}</span>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        <!-- ============ CHART ============ -->
+        <section class="card-section">
+          <header class="section-head">
+            <h2>Trayectoria proyectada de stock</h2>
+          </header>
+          <app-projection-chart
+            [trayectoria]="sim()!.trayectoria"
+            [markers]="chartMarkers()"
+            [stockMin]="sim()!.minStock"
+            [stockMax]="sim()!.maxStock"
+            [reorderPoint]="sim()!.reorderPoint"
+            [maxDay]="horizon">
+          </app-projection-chart>
+          <p class="legend">
+            <strong>Cómo leer:</strong> la línea cae a ritmo de la demanda diaria histórica
+            (rolling 7d) modificada por boosts activos. Saltos hacia arriba son llegadas
+            de OCs pending con fecha esperada. La línea cambia de color al cruzar
+            punto de reorden (amarillo) o stock mínimo (rojo).
+          </p>
+        </section>
+      }
+
+    </ion-content>

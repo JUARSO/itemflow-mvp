@@ -1,0 +1,73 @@
+    .filters { padding: 0 var(--ui-sp-4) var(--ui-sp-4); }
+    ion-searchbar { --background: var(--ui-surface); padding: 0; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--ui-sp-3);
+      padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+    }
+    .card {
+      background: var(--ui-surface-2);
+      border: var(--ui-border-w-md) solid var(--ui-border);
+      box-shadow: var(--ui-shadow-md);
+      padding: var(--ui-sp-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--ui-sp-2);
+      height: 100%;
+    }
+    .card.archived { opacity: 0.5; }
+    .card__head { display: flex; justify-content: space-between; align-items: center; }
+    .card__cat {
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+    }
+    .card__title {
+      font-family: var(--ui-font-display);
+      font-weight: var(--ui-fw-black);
+      font-size: var(--ui-fs-lg);
+      line-height: var(--ui-lh-tight);
+      margin: 0;
+    }
+    .card__sku { font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
+    .card__row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--ui-sp-2);
+      margin-top: var(--ui-sp-2);
+      padding-top: var(--ui-sp-2);
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+    }
+    .card__cell { min-width: 0; }
+    .card__label {
+      font-size: var(--ui-fs-xs);
+      color: var(--ui-text-muted);
+      font-weight: var(--ui-fw-medium);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .card__tag {
+      font-size: 9px;
+      font-weight: var(--ui-fw-bold);
+      padding: 1px 6px;
+      background: var(--ui-warning-tint);
+      color: var(--ui-warning);
+      border-radius: var(--ui-radius-pill);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card__value { font-size: var(--ui-fs-md); font-weight: var(--ui-fw-bold); }
+    .card__actions {
+      display: flex;
+      gap: var(--ui-sp-2);
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: var(--ui-sp-2);
+      border-top: var(--ui-border-w-sm) solid var(--ui-border);
+    }

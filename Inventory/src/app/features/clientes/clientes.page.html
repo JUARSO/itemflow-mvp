@@ -1,0 +1,224 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Clientes</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Clientes"
+        subtitle="Gestiona los clientes con acceso al portal externo. Cada cliente recibe un link único y un PIN.">
+        <ion-button (click)="abrirNuevo()">+ Nuevo cliente</ion-button>
+      </app-page-header>
+
+      <div class="kpis">
+        <app-kpi-card label="Clientes activos" [value]="data.activeCustomers().length" tone="success"></app-kpi-card>
+        <app-kpi-card label="Total clientes" [value]="data.customers().length" tone="primary"></app-kpi-card>
+        <app-kpi-card label="Pedidos de clientes" [value]="pedidosDesdeClientes()" tone="transit"
+          hint="órdenes generadas desde portal"></app-kpi-card>
+      </div>
+
+      @if (data.customers().length === 0) {
+        <div class="empty">
+          <h3>No hay clientes registrados</h3>
+          <p>Crea un cliente para generar su link de portal y PIN de acceso.</p>
+          <ion-button (click)="abrirNuevo()">+ Crear primer cliente</ion-button>
+        </div>
+      }
+
+      <div class="cards">
+        @for (c of data.customers(); track c.id) {
+          <article class="card" [class.card--inactive]="!c.active">
+            <header class="card__head">
+              <div>
+                <h3 class="card__name">{{ c.name }}</h3>
+                @if (c.contactPerson) {
+                  <div class="card__contact">{{ c.contactPerson }}</div>
+                }
+              </div>
+              <ion-badge [color]="c.active ? 'success' : 'medium'">
+                {{ c.active ? 'Activo' : 'Inactivo' }}
+              </ion-badge>
+            </header>
+
+            @if (c.email || c.phone) {
+              <div class="card__info">
+                @if (c.email) { <span><ion-icon name="mail-open-outline"></ion-icon> {{ c.email }}</span> }
+                @if (c.phone) { <span class="mono">{{ c.phone }}</span> }
+              </div>
+            }
+
+            <!-- Acceso del portal -->
+            <div class="access">
+              <div class="access__row">
+                <span class="access__label">
+                  <ion-icon name="link-outline"></ion-icon> Link del portal
+                </span>
+                <button class="access__btn" (click)="copyLink(c)" title="Copiar link">
+                  <ion-icon name="copy-outline"></ion-icon>
+                </button>
+              </div>
+              <code class="access__url">{{ portalUrl(c) }}</code>
+
+              <div class="access__row">
+                <span class="access__label">PIN de acceso</span>
+                <button class="access__btn" (click)="regenerarPin(c)" title="Regenerar PIN">
+                  <ion-icon name="refresh-outline"></ion-icon>
+                </button>
+              </div>
+              <code class="access__pin mono">{{ c.accessPin }}</code>
+            </div>
+
+            <!-- Ventanas -->
+            <div class="windows">
+              <div class="window">
+                <div class="window__label">Días para pedir</div>
+                <div class="window__days">
+                  @for (d of weekDays; track d) {
+                    <span class="dot" [class.dot--on]="c.window.orderDays.includes(d)">{{ dayLabel(d) }}</span>
+                  }
+                </div>
+              </div>
+              <div class="window">
+                <div class="window__label">Días de entrega</div>
+                <div class="window__days">
+                  @for (d of weekDays; track d) {
+                    <span class="dot" [class.dot--on]="c.window.deliveryDays.includes(d)">{{ dayLabel(d) }}</span>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div class="card__products">
+              <ion-icon name="library-outline"></ion-icon>
+              @if (c.allowedProductIds.length === 0) {
+                Acceso a todo el catálogo
+              } @else {
+                {{ c.allowedProductIds.length }} producto(s) permitido(s)
+              }
+            </div>
+
+            @if (c.notes) {
+              <p class="card__notes">{{ c.notes }}</p>
+            }
+
+            <!-- Catálogo de productos permitidos (expandible) -->
+            <button class="history-toggle" (click)="toggleProducts(c.id)">
+              <ion-icon [name]="expanded() === c.id ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+              <span>Catálogo permitido ({{ allowedProductsOf(c).length }})</span>
+              @if (c.allowedProductIds.length === 0) {
+                <ion-badge color="medium">todo el catálogo</ion-badge>
+              }
+            </button>
+            @if (expanded() === c.id) {
+              @if (allowedProductsOf(c).length === 0) {
+                <div class="history-empty">No hay productos disponibles en el catálogo.</div>
+              } @else {
+                <div class="catalog">
+                  @for (p of allowedProductsOf(c); track p.id) {
+                    <div class="catalog__row">
+                      <div class="catalog__info">
+                        <span class="catalog__name">{{ p.name }}</span>
+                        @if (p.category) {
+                          <span class="catalog__cat">{{ p.category }}</span>
+                        }
+                      </div>
+                      <span class="catalog__price mono">
+                        ₡{{ data.priceForCustomer(c, p.id) | number:'1.0-0' }}
+                        @if (data.priceForCustomer(c, p.id) !== p.sellPrice) {
+                          <span class="catalog__custom" title="Precio personalizado (global ₡{{ p.sellPrice | number:'1.0-0' }})">★</span>
+                        }
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
+            }
+
+            <!-- Pedidos del cliente: pendientes + último -->
+            <div class="orders">
+              <div class="orders__title">Pedidos</div>
+              @if (pendientesDe(c).length === 0 && !ultimoPedidoDe(c)) {
+                <div class="orders__empty muted">Sin pedidos.</div>
+              } @else {
+                @if (pendientesDe(c).length > 0) {
+                  <div class="orders__group">
+                    <span class="orders__k">Pendientes ({{ pendientesDe(c).length }})</span>
+                    @for (o of pendientesDe(c); track o.id) {
+                      <div class="oline">
+                        <span class="oline__code mono">{{ o.code }}</span>
+                        <ion-badge [color]="estadoColor(o)">{{ estadoLabel(o) }}</ion-badge>
+                        <span class="oline__date muted mono">{{ (o.requestedDeliveryDate ?? o.createdAt) | date:'dd-MM' }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+                @if (ultimoPedidoDe(c); as last) {
+                  <div class="orders__group">
+                    <span class="orders__k">Último pedido</span>
+                    <div class="oline">
+                      <span class="oline__code mono">{{ last.code }}</span>
+                      <ion-badge [color]="estadoColor(last)">{{ estadoLabel(last) }}</ion-badge>
+                      <span class="oline__date muted mono">{{ last.createdAt | date:'dd-MM-yyyy' }}</span>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+
+            <!-- Pedidos recurrentes -->
+            <div class="recurrentes">
+              <div class="recurrentes__head">
+                <span class="orders__title">Recurrentes ({{ recurrentesDe(c).length }})</span>
+                <ion-button size="small" fill="outline" (click)="abrirRecurrente(c)">
+                  <ion-icon name="add-outline" slot="start"></ion-icon> Recurrente
+                </ion-button>
+              </div>
+              @for (ro of recurrentesDe(c); track ro.id) {
+                <div class="rec">
+                  <div class="rec__info">
+                    <div class="rec__label">{{ ro.label ?? 'Pedido recurrente' }}</div>
+                    <div class="rec__days muted">{{ recurrenteDias(ro) }} · {{ ro.items.length }} producto(s)</div>
+                  </div>
+                  <div class="rec__actions">
+                    <ion-button size="small" (click)="generarRecurrente(ro)">Generar</ion-button>
+                    <button type="button" class="rec__rm" (click)="eliminarRecurrente(ro)" title="Eliminar">
+                      <ion-icon name="trash-outline"></ion-icon>
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <footer class="card__foot">
+              <span class="card__since">Desde {{ c.createdAt | date:'dd-MM-yyyy' }}</span>
+              <div class="card__actions">
+                <ion-button size="small" fill="outline" (click)="abrirEditar(c)">
+                  <ion-icon name="create-outline" slot="start"></ion-icon>
+                  Editar
+                </ion-button>
+                <ion-button size="small" color="danger" fill="clear" (click)="eliminar(c)">
+                  <ion-icon name="trash-outline" slot="start"></ion-icon>
+                  Eliminar
+                </ion-button>
+              </div>
+            </footer>
+          </article>
+        }
+      </div>
+
+      <app-cliente-form-modal
+        [isOpen]="modalOpen()"
+        [editing]="editing()"
+        (closed)="cerrarModal()"
+        (saved)="cerrarModal()">
+      </app-cliente-form-modal>
+
+      <app-recurring-order-form-modal
+        [isOpen]="recurringOpen()"
+        [customer]="recurringCustomer()"
+        (closed)="cerrarRecurrente()"
+        (saved)="cerrarRecurrente()">
+      </app-recurring-order-form-modal>
+    </ion-content>

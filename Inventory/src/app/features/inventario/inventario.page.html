@@ -1,0 +1,168 @@
+    <ion-header>
+      <ion-toolbar>
+        <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+        <ion-title>Inventario</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content>
+      <app-page-header
+        title="Inventario"
+        subtitle="Stock actual, alertas y acciones recomendadas">
+        @if (tenant.canMoveInventory()) {
+          <ion-button (click)="entradaModalOpen.set(true)">+ Registrar entrada</ion-button>
+        }
+      </app-page-header>
+
+      <div class="kpis">
+        <app-kpi-card
+          label="Total Productos"
+          [value]="data.totalProducts()"
+          tone="primary"
+          hint="SKUs activos en catálogo">
+        </app-kpi-card>
+        <app-kpi-card
+          label="Requieren Compra"
+          [value]="data.itemsNeedingPurchase()"
+          tone="warning"
+          hint="Bajo o crítico">
+        </app-kpi-card>
+        <app-kpi-card
+          label="Unidades a Comprar"
+          [value]="(data.unitsToBuy() | number:'1.0-0') ?? '0'"
+          tone="danger"
+          hint="Hasta cubrir máximo">
+        </app-kpi-card>
+        <app-kpi-card
+          label="En Tránsito"
+          [value]="data.inTransitOrders() + ' OCs'"
+          tone="transit"
+          [hint]="data.inTransitUnits() + ' unidades'">
+        </app-kpi-card>
+      </div>
+
+      <div class="filters">
+        <ion-searchbar
+          [value]="query()"
+          (ionInput)="query.set($any($event.detail.value) ?? '')"
+          placeholder="Buscar por nombre o SKU"
+          mode="md">
+        </ion-searchbar>
+
+        <div class="filters__row">
+          <ion-segment
+            [value]="statusFilter()"
+            (ionChange)="statusFilter.set($any($event.detail.value))"
+            scrollable>
+            <ion-segment-button value="todos"><ion-label>Todos</ion-label></ion-segment-button>
+            <ion-segment-button value="critical"><ion-label>Críticos</ion-label></ion-segment-button>
+            <ion-segment-button value="low"><ion-label>Bajos</ion-label></ion-segment-button>
+            <ion-segment-button value="out"><ion-label>Agotados</ion-label></ion-segment-button>
+            <ion-segment-button value="available"><ion-label>Disponibles</ion-label></ion-segment-button>
+          </ion-segment>
+        </div>
+      </div>
+
+      <section class="block">
+        <h2 class="block__title">Insumos ({{ filteredSupplies().length }})</h2>
+        <div class="table">
+          <div class="table__head">
+            <div>Insumo</div>
+            <div class="num">Stock</div>
+            <div class="num">P. Reorden</div>
+            <div>Estado</div>
+          </div>
+          @if (filteredSupplies().length === 0) {
+            <div class="table__empty">Sin resultados con los filtros actuales.</div>
+          }
+          @for (row of filteredSupplies(); track row.id) {
+            <div class="table__row">
+              <div class="cell--main">
+                <div class="cell__name">{{ row.name }}</div>
+                <div class="cell__sub mono">{{ row.sku }}</div>
+              </div>
+              <div class="num">
+                <div class="mono">{{ fmtStock(row) }}</div>
+                @if (fmtStockEquivalent(row); as eq) {
+                  <div class="cell__sub mono">{{ eq }}</div>
+                }
+              </div>
+              <div class="num">
+                <div class="mono">{{ fmtStock(row, row.reorderPoint) }}</div>
+                @if (fmtStockEquivalent(row, row.reorderPoint); as eq) {
+                  <div class="cell__sub mono">{{ eq }}</div>
+                }
+              </div>
+              <div><app-status-badge [status]="row.status"></app-status-badge></div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="block">
+        <h2 class="block__title">
+          Productos terminados ({{ filteredProducts().length }})
+        </h2>
+        <p class="block__hint">
+          Productos disponibles para entrega: reventa, sobras de producción y devoluciones de clientes.
+        </p>
+        <div class="table table--products">
+          <div class="table__head">
+            <div>Producto</div>
+            <div class="num">Stock</div>
+            <div class="num">P. Reorden</div>
+            <div>Origen</div>
+            <div>Estado</div>
+          </div>
+          @if (filteredProducts().length === 0) {
+            <div class="table__empty">Sin productos terminados en inventario.</div>
+          }
+          @for (row of filteredProducts(); track row.id) {
+            <div class="table__row">
+              <div class="cell--main">
+                <div class="cell__name">{{ row.name }}</div>
+                <div class="cell__sub mono">{{ row.sku }}</div>
+              </div>
+              <div class="num mono">{{ row.quantity | number:'1.0-0' }} {{ row.unit }}</div>
+              <div class="num mono">
+                @if (row.reorderPoint != null) {
+                  {{ row.reorderPoint | number:'1.0-0' }} {{ row.unit }}
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </div>
+              <div>
+                @if (pendingMermaForProduct(row.productId) > 0) {
+                  <a routerLink="/mermas" class="origin-badge origin-badge--pending"
+                    title="Hay unidades devueltas pendientes de revisar en Mermas">
+                    <ion-icon name="arrow-undo-outline"></ion-icon>
+                    {{ pendingMermaForProduct(row.productId) }} en revisión
+                  </a>
+                } @else if (returnsForProduct(row.productId) > 0) {
+                  <span class="origin-badge origin-badge--return"
+                    title="Unidades reintegradas desde la pantalla de Mermas (30 días)">
+                    <ion-icon name="arrow-undo-outline"></ion-icon>
+                    {{ returnsForProduct(row.productId) }} reintegrado(s)
+                  </span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </div>
+              <div><app-status-badge [status]="row.status"></app-status-badge></div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <div class="cta-block">
+        <a routerLink="/alertas" class="cta-block__link">
+          Ver todas las alertas activas →
+        </a>
+      </div>
+
+      <app-entrada-form-modal
+        [isOpen]="entradaModalOpen()"
+        (closed)="entradaModalOpen.set(false)"
+        (saved)="entradaModalOpen.set(false)">
+      </app-entrada-form-modal>
+    </ion-content>

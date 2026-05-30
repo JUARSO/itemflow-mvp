@@ -1,0 +1,10 @@
+    .chart__canvas { position: relative; width: 100%; }
+    canvas { width: 100% !important; }
+    .empty {
+      padding: var(--ui-sp-4);
+      text-align: center;
+      color: var(--ui-text-muted);
+      font-size: var(--ui-fs-sm);
+      background: var(--ui-surface-2);
+      border-radius: 4px;
+    }
