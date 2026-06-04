@@ -17,39 +17,93 @@
   color: var(--ui-text-muted);
 }
 
-/* Catálogo */
+/* Catálogo — recuadros grandes y táctiles (POS) */
 .catalog__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--ui-sp-2);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--ui-sp-3);
 }
 .prod {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: space-between;
+  gap: var(--ui-sp-2);
+  min-height: 128px;
   text-align: left;
-  padding: var(--ui-sp-3);
+  padding: var(--ui-sp-4);
   background: var(--ui-surface);
   border: var(--ui-border-w-md) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
   box-shadow: var(--ui-shadow-sm);
   cursor: pointer;
   transition: box-shadow 120ms ease, transform 120ms ease;
 }
-.prod:hover:not([disabled]) { box-shadow: var(--ui-shadow-md); }
-.prod:active:not([disabled]) { transform: scale(0.98); }
-.prod[disabled] { opacity: 0.5; cursor: not-allowed; }
-.prod__name { font-weight: var(--ui-fw-bold); color: var(--ui-text); }
-.prod__price { font-size: var(--ui-fs-sm); color: var(--ui-text-muted); }
-.prod__stock {
-  font-size: var(--ui-fs-xs);
+.prod--vendido { border-color: var(--ui-success); }
+
+/* Control de venta del día */
+.venta-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--ui-sp-4) var(--ui-sp-3);
+}
+.vf {
+  padding: 6px 12px;
+  font-family: var(--ui-font-sans);
+  font-size: var(--ui-fs-sm);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  cursor: pointer;
+}
+.vf--on { background: var(--ui-primary); color: var(--ui-primary-contrast); border-color: var(--ui-border); }
+.vf--sin.vf--on { background: var(--ui-warning); }
+.vf--vendidos.vf--on { background: var(--ui-success); }
+
+.prod__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   align-self: flex-start;
-  margin-top: 4px;
-  padding: 1px 8px;
+  padding: 2px 8px;
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-2);
+  border-radius: var(--ui-radius-pill);
+}
+.prod__badge--on { color: var(--ui-success); background: var(--ui-success-tint); }
+.prod__badge ion-icon { font-size: 14px; }
+.venta-vacio { padding: var(--ui-sp-4); text-align: center; color: var(--ui-text-muted); font-size: var(--ui-fs-sm); }
+.prod:hover:not([disabled]) { box-shadow: var(--ui-shadow-md); transform: translateY(-2px); }
+.prod:active:not([disabled]) { transform: scale(0.97); box-shadow: var(--ui-shadow-sm); }
+.prod[disabled] { opacity: 0.45; cursor: not-allowed; }
+.prod__name {
+  font-family: var(--ui-font-display);
+  font-weight: var(--ui-fw-black);
+  font-size: var(--ui-fs-lg);
+  line-height: var(--ui-lh-tight);
+  color: var(--ui-text);
+}
+.prod__price { font-size: var(--ui-fs-md); font-weight: var(--ui-fw-bold); color: var(--ui-text); }
+.prod__stock {
+  font-size: var(--ui-fs-sm);
+  font-weight: var(--ui-fw-bold);
+  align-self: flex-start;
+  padding: 3px 12px;
   border-radius: var(--ui-radius-pill, 9999px);
   background: var(--ui-success-tint);
   color: var(--ui-success);
 }
 .prod__stock--low { background: var(--ui-danger-tint); color: var(--ui-danger); }
+
+@media (max-width: 480px) {
+  .catalog__grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--ui-sp-2); }
+  .prod { min-height: 108px; padding: var(--ui-sp-3); }
+  .prod__name { font-size: var(--ui-fs-md); }
+  .prod__price { font-size: var(--ui-fs-sm); }
+}
 
 /* Ticket */
 .ticket {
@@ -86,6 +140,61 @@
 .tline__rm { background: none; border: none; color: var(--ui-danger); cursor: pointer; font-weight: var(--ui-fw-bold); }
 
 .ticket__foot { border-top: var(--ui-border-w-sm) solid var(--ui-border); padding-top: var(--ui-sp-3); margin-top: var(--ui-sp-2); }
+.ticket__pay { margin-bottom: var(--ui-sp-3); }
+.ticket__pay-label {
+  display: block;
+  font-size: var(--ui-fs-xs);
+  font-weight: var(--ui-fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ui-text-muted);
+  margin-bottom: 6px;
+}
+.paygrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.compgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.ticket__cliente { margin-bottom: var(--ui-sp-3); }
+.cliente-row { display: flex; gap: 6px; align-items: center; }
+.cliente-sel {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  background: var(--ui-surface);
+  font-family: var(--ui-font-sans);
+  font-size: var(--ui-fs-sm);
+  color: var(--ui-text);
+}
+.cliente-hint { margin: 6px 0 0; font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
+.paybtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px;
+  font-family: var(--ui-font-sans);
+  font-size: var(--ui-fs-sm);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  cursor: pointer;
+}
+.paybtn ion-icon { font-size: 18px; }
+.paybtn:hover:not(.paybtn--on) { background: var(--ui-surface-2); }
+.paybtn--on {
+  background: var(--ui-primary);
+  color: var(--ui-primary-contrast);
+  border-color: var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+}
 .ticket__total {
   display: flex;
   justify-content: space-between;
@@ -95,3 +204,6 @@
   margin-bottom: var(--ui-sp-3);
 }
 .ticket__actions { display: flex; gap: var(--ui-sp-2); justify-content: flex-end; }
+
+.vf:hover:not(.vf--on) { background: var(--ui-surface-2); }
+.tline__rm:hover { color: var(--ui-danger); }

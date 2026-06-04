@@ -160,7 +160,7 @@
     .summary__label { color: rgba(255,255,255,0.8); }
     .summary__value { font-size: var(--ui-fs-lg); }
     .summary__value--danger { color: var(--ui-warning); }
-    .summary__value--ok { color: #8eff8e; }
+    .summary__value--ok { color: var(--ui-success); }
 
     .btn {
       padding: 12px;

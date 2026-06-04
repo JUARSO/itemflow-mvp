@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { IonButton } from '@ionic/angular/standalone';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 type MovKind = 'entry' | 'exit' | 'adjustment';
 type ItemKind = 'supply' | 'product';
@@ -34,7 +35,7 @@ const REASONS_BY_KIND: Record<MovKind, ReasonOption[]> = {
   selector: 'app-ajuste-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DecimalPipe, IonButton, FormModalComponent, FormFieldComponent],
+  imports: [ReactiveFormsModule, DecimalPipe, IonButton, IonIcon, FormModalComponent, FormFieldComponent, UnitShortPipe],
   templateUrl: './ajuste-form-modal.component.html',
   styleUrls: ['./ajuste-form-modal.component.scss'],
 })

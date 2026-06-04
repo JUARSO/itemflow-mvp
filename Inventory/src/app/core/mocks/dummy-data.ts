@@ -5,18 +5,25 @@ import {
   ReturnedLot, Urna, UrnaLote,
 } from '../models';
 
+/** Tenant demo sembrado por defecto (datos de ejemplo, sin marca de cliente). */
+export const DEFAULT_TENANT_ID = 'tenant-demo';
+
 export const MOCK_COMPANY: Company = {
-  id: 'tenant-noble',
-  name: 'NOBLE',
-  adminEmail: 'hola@noble.cr',
+  id: DEFAULT_TENANT_ID,
+  slug: 'demo',
+  name: 'Empresa Demo',
+  adminEmail: 'admin@demo.cr',
   currency: 'CRC',
   timezone: 'America/Costa_Rica',
+  active: true,
+  createdAt: '2025-01-01T00:00:00.000Z',
+  subscription: { planId: 'business', status: 'active' },
 };
 
 export const MOCK_MEMBERS: Member[] = [
-  { uid: 'u-admin', email: 'admin@noble.cr', displayName: 'María González', role: 'admin', active: true },
-  { uid: 'u-produccion', email: 'produccion@noble.cr', displayName: 'Diego Soto', role: 'produccion', active: true },
-  { uid: 'u-ventas', email: 'ventas@noble.cr', displayName: 'Sofía Rojas', role: 'ventas', active: true },
+  { uid: 'u-admin', email: 'admin@demo.cr', displayName: 'María González', role: 'admin', active: true, tenantId: DEFAULT_TENANT_ID },
+  { uid: 'u-produccion', email: 'produccion@demo.cr', displayName: 'Diego Soto', role: 'produccion', active: true, tenantId: DEFAULT_TENANT_ID },
+  { uid: 'u-ventas', email: 'ventas@demo.cr', displayName: 'Sofía Rojas', role: 'ventas', active: true, tenantId: DEFAULT_TENANT_ID },
 ];
 
 export const MOCK_SUPPLIES: Supply[] = [

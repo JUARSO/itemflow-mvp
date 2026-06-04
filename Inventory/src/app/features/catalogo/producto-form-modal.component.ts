@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { IonButton } from '@ionic/angular/standalone';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { Product, Unit } from '../../core/models';
@@ -12,7 +13,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
   selector: 'app-producto-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, IonButton, FormModalComponent, FormFieldComponent],
+  imports: [DecimalPipe, ReactiveFormsModule, IonButton, IonIcon, FormModalComponent, FormFieldComponent],
   templateUrl: './producto-form-modal.component.html',
   styleUrls: ['./producto-form-modal.component.scss'],
 })
@@ -36,7 +37,7 @@ export class ProductoFormModalComponent {
     category: this.fb.control(''),
     unit: this.fb.control<Unit>('unidad', { nonNullable: true, validators: [Validators.required] }),
     buyPrice: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
-    sellPrice: this.fb.control(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
+    otherCost: this.fb.control(0, { nonNullable: true, validators: [Validators.min(0)] }),
     leadTime: this.fb.control(1, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
     hasRecipe: this.fb.control(false, { nonNullable: true }),
     reorderPoint: this.fb.control<number | null>(null),
@@ -74,6 +75,13 @@ export class ProductoFormModalComponent {
     return `Σ de ${items} insumo${items === 1 ? '' : 's'} ÷ rinde ${recipe?.yieldQty} = costo unitario`;
   });
 
+  /** Costo total mostrado en el form: materiales (compra/receta) + otros. */
+  costoTotal(): number {
+    const mat = Number(this.form.controls.buyPrice.value) || 0;
+    const otros = Number(this.form.controls.otherCost.value) || 0;
+    return mat + otros;
+  }
+
   onHasRecipeChange() {
     const newVal = this.form.controls.hasRecipe.value;
     this._hasRecipeSignal.set(newVal);
@@ -99,7 +107,7 @@ export class ProductoFormModalComponent {
           category: p.category ?? '',
           unit: p.unit,
           buyPrice: p.buyPrice,
-          sellPrice: p.sellPrice,
+          otherCost: p.otherCost ?? 0,
           leadTime: p.leadTime,
           hasRecipe: p.hasRecipe,
           reorderPoint: p.reorderPoint ?? null,
@@ -116,7 +124,7 @@ export class ProductoFormModalComponent {
           category: '',
           unit: 'unidad',
           buyPrice: 0,
-          sellPrice: 0,
+          otherCost: 0,
           leadTime: 1,
           hasRecipe: false,
           reorderPoint: null,
@@ -157,7 +165,10 @@ export class ProductoFormModalComponent {
       category: v.category?.trim() || undefined,
       unit: v.unit,
       buyPrice: finalBuyPrice,
-      sellPrice: Number(v.sellPrice),
+      otherCost: Number(v.otherCost) || 0,
+      // El precio de venta se maneja en Ventas (catálogo de ventas). Acá solo se preserva
+      // la semilla existente al editar; los nuevos productos arrancan sin precio (0).
+      sellPrice: editing?.sellPrice ?? 0,
       leadTime: Number(v.leadTime),
       hasRecipe: v.hasRecipe,
       reorderPoint: rop,

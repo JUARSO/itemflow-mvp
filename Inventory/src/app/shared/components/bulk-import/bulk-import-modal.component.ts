@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
-import { IonButton } from '@ionic/angular/standalone';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../form-modal/form-modal.component';
 import { ToastService } from '../toast/toast.service';
 import { parseCsv, rowsToObjects, buildCsv, downloadText, readFileAsText } from '../../utils/csv';
@@ -38,7 +38,7 @@ type State = 'empty' | 'preview';
   selector: 'app-bulk-import-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonButton, FormModalComponent],
+  imports: [IonButton, IonIcon, FormModalComponent],
   templateUrl: './bulk-import-modal.component.html',
   styleUrls: ['./bulk-import-modal.component.scss'],
 })

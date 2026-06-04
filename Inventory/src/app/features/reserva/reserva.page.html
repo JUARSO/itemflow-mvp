@@ -1,0 +1,73 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Reserva</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Reserva"
+    subtitle="Control informativo de productos reservados. No descuenta inventario; puedes editar o eliminar libremente.">
+  </app-page-header>
+
+  <div class="kpis">
+    <app-kpi-card label="Productos en reserva" [value]="reservas().length" tone="primary"></app-kpi-card>
+    <app-kpi-card label="Unidades reservadas" [value]="totalUnidades()" tone="transit"></app-kpi-card>
+  </div>
+
+  <app-search-bar [(query)]="query" placeholder="Buscar en reserva" />
+
+  @if (tenant.canFulfillAlmacenRequests()) {
+    <div class="add">
+      <select class="add__select" [value]="nuevoProducto()" (change)="nuevoProducto.set($any($event.target).value)">
+        <option value="">Producto…</option>
+        @for (p of productos(); track p.id) {
+          <option [value]="p.id">{{ p.name }}</option>
+        }
+      </select>
+      <input type="number" min="1" class="add__qty" [value]="nuevaCantidad()"
+        (input)="nuevaCantidad.set(+$any($event.target).value)" placeholder="Cant." />
+      <input type="text" class="add__note" [value]="nuevaNota()"
+        (input)="nuevaNota.set($any($event.target).value)" placeholder="Nota (opcional)" />
+      <ion-button (click)="agregar()">
+        <ion-icon name="add-outline" slot="start"></ion-icon>
+        Agregar
+      </ion-button>
+    </div>
+  }
+
+  <div class="list">
+    @if (reservas().length === 0) {
+      <app-empty-state icon="bookmark-outline" title="Sin productos en reserva"
+        body="Agrega productos para llevar el control de lo reservado. No afecta el inventario."></app-empty-state>
+    }
+    @for (r of reservasFiltradas(); track r.id) {
+      <article class="res">
+        <div class="res__info">
+          <div class="res__name">{{ r.productName }}</div>
+          <div class="res__meta muted">{{ r.createdAt | date:'dd-MM-yyyy HH:mm' }} · {{ r.createdBy }}</div>
+          @if (tenant.canFulfillAlmacenRequests()) {
+            <input type="text" class="res__note" [value]="r.note ?? ''"
+              (change)="editarNota(r, $any($event.target).value)" placeholder="Nota…" />
+          } @else if (r.note) {
+            <div class="res__note-ro muted">{{ r.note }}</div>
+          }
+        </div>
+        <div class="res__qty">
+          @if (tenant.canFulfillAlmacenRequests()) {
+            <input type="number" min="0" class="res__qtyinput mono"
+              [value]="r.qty" (input)="editarQty(r, +$any($event.target).value)" />
+          } @else {
+            <span class="mono">{{ r.qty }}</span>
+          }
+        </div>
+        @if (tenant.canFulfillAlmacenRequests()) {
+          <button type="button" class="res__rm" title="Eliminar" (click)="eliminar(r)">
+            <ion-icon name="trash-outline"></ion-icon>
+          </button>
+        }
+      </article>
+    }
+  </div>
+</ion-content>

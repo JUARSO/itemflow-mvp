@@ -1,126 +1,73 @@
 <ion-header>
   <ion-toolbar>
     <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
-    <ion-title>Pedir a producción</ion-title>
+    <ion-title>Gestión de productos</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
   <app-page-header
-    title="Pedir a producción"
-    subtitle="Planifica por día qué necesitas que produzcan. Cada día es una tarjeta.">
+    title="Gestión de productos"
+    subtitle="Define qué productos pedir a producción cada semana: configúralo una vez y se aplica todas las semanas.">
   </app-page-header>
 
-  <div class="bar">
-    <div class="bar__field">
-      <label class="bar__label" for="pp-desde">Desde</label>
-      <input id="pp-desde" type="date" class="bar__date" [value]="desde()"
-        [max]="hasta()" (change)="desde.set($any($event.target).value)" />
-    </div>
-    <div class="bar__field">
-      <label class="bar__label" for="pp-hasta">Hasta</label>
-      <input id="pp-hasta" type="date" class="bar__date" [value]="hasta()"
-        [min]="desde()" (change)="hasta.set($any($event.target).value)" />
-    </div>
+  <div class="banner">
+    <ion-icon name="information-circle-outline" aria-hidden="true"></ion-icon>
+    <span>
+      Esta es tu lista por día de la semana. Producción ve la lista de cada día
+      <strong>automáticamente</strong>. Al editar un día, cambia para todas las semanas.
+      Se muestran los próximos 7 días desde hoy.
+    </span>
   </div>
 
-  @if (hasClipboard()) {
-    <div class="clipbar">
-      <ion-icon name="copy-outline"></ion-icon>
-      <span>Copiado: <strong>{{ clipboardLabel() }}</strong>. Toca <em>Pegar</em> en otra tarjeta.</span>
-      <button type="button" class="clipbar__x" (click)="cancelarCopia()">✕</button>
-    </div>
-  }
-
-  @if (dias().length === 0) {
-    <app-empty-state icon="📅" title="Rango inválido"
-      body="Elige un rango de fechas válido (Hasta no puede ser antes de Desde).">
-    </app-empty-state>
-  } @else {
-    <div class="days">
-      @for (d of dias(); track dayKey(d)) {
-        <article class="day" [class.day--has]="hasItems(d)" [class.day--empty]="!hasItems(d)">
-          <header class="day__head">
-            <div class="day__when">
-              <span class="day__name">{{ weekdayLabel(d) }}</span>
-              <span class="day__date mono">{{ dateLabel(d) }}</span>
-            </div>
-            <div class="day__tools">
-              @if (hasItems(d)) {
-                <span class="day__count">{{ itemsOf(d).length }}</span>
-                <button type="button" class="iconbtn" title="Copiar esta tarjeta" (click)="copiar(d)">
-                  <ion-icon name="copy-outline"></ion-icon>
-                </button>
-              }
-              @if (hasClipboard()) {
-                <button type="button" class="iconbtn iconbtn--accent" title="Pegar aquí" (click)="pegar(d)">
-                  <ion-icon name="clipboard-outline"></ion-icon>
-                </button>
-              }
-            </div>
-          </header>
-
-          <div class="day__items">
-            @if (itemsOf(d).length === 0) {
-              <p class="day__empty-msg">
-                <ion-icon name="alert-circle-outline"></ion-icon>
-                Agrega al menos un producto
-              </p>
-            }
-            @for (it of itemsOf(d); track it.productId) {
-              <div class="day__item">
-                <span class="day__item-name">{{ productName(it.productId) }}</span>
-                <input type="number" min="0" class="day__item-qtyinput mono"
-                  [value]="it.qty"
-                  (input)="editarQty(d, it.productId, +$any($event.target).value)" />
-                <button type="button" class="day__item-rm" title="Quitar" (click)="quitar(d, it.productId)">✕</button>
-              </div>
-            }
+  <div class="days">
+    @for (d of dias(); track d.date.getTime()) {
+      <article class="day" [class.day--hoy]="esHoy(d.date)">
+        <header class="day__head">
+          <div class="day__title">
+            {{ weekdayLabel(d.weekday) }}
+            @if (esHoy(d.date)) { <span class="day__hoy">HOY</span> }
           </div>
+          <span class="day__date mono">{{ dateLabel(d.date) }}</span>
+        </header>
 
-          @if (tenant.canManageUrnas()) {
-            <div class="day__add">
-              <select class="day__select"
-                [value]="draftProduct()[dayKey(d)] || ''"
-                (change)="setDraftProduct(dayKey(d), $any($event.target).value)">
-                <option value="">Producto…</option>
-                @for (p of productos(); track p.id) {
-                  <option [value]="p.id">{{ p.name }}</option>
-                }
-              </select>
-              <input type="number" min="1" class="day__qty"
-                [value]="draftQty()[dayKey(d)] || 1"
-                (input)="setDraftQty(dayKey(d), +$any($event.target).value)" />
-              <ion-button size="small" (click)="agregar(d)">
-                <ion-icon name="add-outline" slot="icon-only"></ion-icon>
-              </ion-button>
+        <div class="day__items">
+          @if (!hasItems(d.weekday)) {
+            <p class="day__empty">Sin productos para este día.</p>
+          }
+          @for (it of itemsOf(d.weekday); track it.productId) {
+            <div class="day__item">
+              <span class="day__item-name">{{ productName(it.productId) }}</span>
+              <input type="number" min="0" class="day__item-qty mono"
+                [value]="it.qty"
+                (input)="editarQty(d.weekday, it.productId, +$any($event.target).value)" />
+              <button type="button" class="day__item-rm" title="Quitar"
+                (click)="quitar(d.weekday, it.productId)">
+                <ion-icon name="close-outline" aria-hidden="true"></ion-icon>
+              </button>
             </div>
           }
-        </article>
-      }
-    </div>
-  }
-</ion-content>
+        </div>
 
-@if (dias().length > 0 && tenant.canManageUrnas()) {
-  <ion-toolbar class="footbar">
-    <div class="footbar__inner">
-      <span class="footbar__summary">
-        @if (todasListas()) {
-          <ion-icon name="checkmark-circle-outline" class="ok"></ion-icon>
-          {{ diasConItems() }} día(s) · {{ totalUnidades() }} unidad(es) — listo para enviar
-        } @else {
-          <ion-icon name="alert-circle-outline" class="warn"></ion-icon>
-          Faltan productos en <strong>{{ diasFaltantes() }}</strong> de {{ dias().length }} tarjeta(s)
+        <div class="day__add">
+          <select class="day__sel"
+            [value]="draftProduct()[d.weekday] || ''"
+            (change)="setDraftProduct(d.weekday, $any($event.target).value)">
+            <option value="">— Producto —</option>
+            @for (p of productos(); track p.id) {
+              <option [value]="p.id">{{ p.name }}</option>
+            }
+          </select>
+          <input type="number" min="1" class="day__qty mono"
+            [value]="draftQty()[d.weekday] || 1"
+            (input)="setDraftQty(d.weekday, +$any($event.target).value)" />
+          <ion-button size="small" (click)="agregar(d.weekday)">+ Agregar</ion-button>
+        </div>
+
+        @if (hasItems(d.weekday)) {
+          <div class="day__foot">Total: <strong class="mono">{{ totalDia(d.weekday) }}</strong> u</div>
         }
-      </span>
-      <div class="footbar__actions">
-        <ion-button fill="clear" class="ghost" [disabled]="diasConItems() === 0" (click)="limpiar()">Limpiar</ion-button>
-        <ion-button [disabled]="!todasListas()" (click)="enviar()">
-          <ion-icon name="receipt-outline" slot="start"></ion-icon>
-          Enviar a producción
-        </ion-button>
-      </div>
-    </div>
-  </ion-toolbar>
-}
+      </article>
+    }
+  </div>
+</ion-content>

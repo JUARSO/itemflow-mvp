@@ -15,9 +15,11 @@
         }
       </app-page-header>
 
+      <app-search-bar [(query)]="query" placeholder="Buscar receta por producto" />
+
       @if (data.recipes().length === 0) {
         <app-empty-state
-          icon="📖"
+          icon="book-outline"
           title="No hay recetas configuradas"
           body="Define cuántos insumos consume cada producto terminado. Al vender, la receta descuenta los insumos automáticamente."
           ctaLabel="Crear primera receta"
@@ -25,7 +27,7 @@
         </app-empty-state>
       } @else {
         <div class="grid">
-          @for (recipe of data.recipes(); track recipe.id) {
+          @for (recipe of recipesFiltradas(); track recipe.id) {
             <article class="card">
               <header class="card__head">
                 <div class="card__head-main">
@@ -54,7 +56,11 @@
                 @for (it of recipe.items; track $index) {
                   <div class="item-row">
                     <span class="item-row__name">{{ it.itemName }}</span>
-                    <span class="item-row__qty mono">{{ it.qty | number:'1.0-3' }} {{ it.unit }}</span>
+                    <span class="item-row__qty mono">{{ it.qty | number:'1.0-3' }} {{ it.unit | unitShort }}</span>
+                    <span class="item-row__cost mono">
+                      ₡{{ costoItem(it) | number:'1.0-0' }}
+                      <span class="item-row__pct">{{ costoItemPct(it, recipe.id) }}%</span>
+                    </span>
                   </div>
                 }
               </div>

@@ -87,7 +87,7 @@ export class AjustesPage {
     return t === 'in' ? 'Entrada' : t === 'out' ? 'Salida' : 'Ajuste';
   }
   iconFor(t: string): string {
-    return t === 'in' ? '↑' : t === 'out' ? '↓' : '⚙';
+    return t === 'in' ? '↑' : t === 'out' ? '↓' : '±';
   }
   signFor(t: string): string {
     return t === 'in' ? '+' : t === 'out' ? '-' : '±';

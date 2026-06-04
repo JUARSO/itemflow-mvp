@@ -9,6 +9,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { ProveedorFormModalComponent } from './proveedor-form-modal.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { Supplier } from '../../core/models';
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
@@ -27,6 +28,7 @@ const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonBadge,
     PageHeaderComponent, KpiCardComponent, ProveedorFormModalComponent,
+    SearchBarComponent,
   ],
   templateUrl: './proveedores.page.html',
   styleUrls: ['./proveedores.page.scss'],
@@ -37,6 +39,19 @@ export class ProveedoresPage {
 
   readonly modalOpen = signal(false);
   readonly editing = signal<Supplier | null>(null);
+
+  readonly query = signal('');
+  readonly suppliersFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.data.suppliers();
+    if (!q) return list;
+    return list.filter(x =>
+      x.name.toLowerCase().includes(q) ||
+      (x.contactPerson ?? '').toLowerCase().includes(q) ||
+      (x.email ?? '').toLowerCase().includes(q) ||
+      (x.phone ?? '').toLowerCase().includes(q)
+    );
+  });
 
   protected readonly weekDays = [1, 2, 3, 4, 5, 6, 0];
 

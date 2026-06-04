@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonButton,
+  IonButton, IonIcon,
 } from '@ionic/angular/standalone';
 import { DataService } from '../../core/services/data.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ProjectionChartComponent, ProjectionMarker } from '../predicciones/projection-chart.component';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 type CatalogItemKind = 'supply' | 'product';
 interface CatalogItem { kind: CatalogItemKind; id: string; name: string; sku: string; unit: string; }
@@ -26,8 +27,8 @@ interface CatalogItem { kind: CatalogItemKind; id: string; name: string; sku: st
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DatePipe, DecimalPipe, FormsModule, RouterLink,
-    IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonButton,
-    PageHeaderComponent, ProjectionChartComponent,
+    IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonButton, IonIcon,
+    PageHeaderComponent, ProjectionChartComponent, UnitShortPipe,
   ],
   templateUrl: './burn-down.page.html',
   styleUrls: ['./burn-down.page.scss'],
@@ -95,7 +96,7 @@ export class BurnDownPage {
       markers.push({
         day: s.dayToOrder,
         value: s.trayectoria[s.dayToOrder] ?? 0,
-        label: '📅 Ordenar',
+        label: 'Ordenar',
       });
     }
     if (s.dayCrossesReorder !== null && s.dayCrossesReorder <= this.horizon) {
@@ -109,7 +110,7 @@ export class BurnDownPage {
       markers.push({
         day: s.dayHitsZero,
         value: 0,
-        label: '🚨 Stock 0',
+        label: 'Stock 0',
       });
     }
     return markers;

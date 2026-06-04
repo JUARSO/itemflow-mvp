@@ -1,5 +1,5 @@
     <div class="empty">
-      <div class="empty__icon">{{ icon() }}</div>
+      <ion-icon class="empty__icon" [name]="icon()" aria-hidden="true"></ion-icon>
       <h2 class="empty__title">{{ title() }}</h2>
       <p class="empty__body">{{ body() }}</p>
       @if (ctaLabel()) {

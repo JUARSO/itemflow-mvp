@@ -8,7 +8,7 @@
           <select formControlName="supplyId" (change)="onSupplyChange()">
             <option value="">— Selecciona insumo —</option>
             @for (s of data.activeSupplies(); track s.id) {
-              <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+              <option [value]="s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
             }
           </select>
         </app-form-field>

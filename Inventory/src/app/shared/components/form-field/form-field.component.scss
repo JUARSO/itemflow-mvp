@@ -49,6 +49,8 @@
     :host ::ng-deep input:focus,
     :host ::ng-deep textarea:focus,
     :host ::ng-deep select:focus {
+      outline: none;
+      border-color: var(--ui-primary);
       box-shadow: var(--ui-shadow-sm);
     }
     :host ::ng-deep input.ng-invalid.ng-touched,

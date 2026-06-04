@@ -48,6 +48,12 @@
                 <div class="card__value mono">{{ presentationOf(item.supply, item.supply.reorderPoint) }}</div>
               </div>
               <div class="card__cell">
+                <div class="card__label">Cobertura</div>
+                <div class="card__value mono cov" [class]="'cov ' + coberturaInfo(item.cobertura).clase">
+                  {{ coberturaInfo(item.cobertura).texto }}
+                </div>
+              </div>
+              <div class="card__cell">
                 <div class="card__label">Mín / Máx</div>
                 <div class="card__value mono">
                   {{ presentationOf(item.supply, item.supply.minStock, true) }}
@@ -88,7 +94,7 @@
               </div>
               @if (item.supply.presentation) {
                 <div class="card__hint">
-                  Equivale a {{ item.quantity | number:'1.0-2' }} {{ item.supply.unit }}
+                  Equivale a {{ item.quantity | number:'1.0-2' }} {{ item.supply.unit | unitShort }}
                 </div>
               }
             </div>

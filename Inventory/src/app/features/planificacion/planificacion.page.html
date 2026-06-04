@@ -8,7 +8,7 @@
     <ion-content>
       <app-page-header
         title="Planificación de producción"
-        subtitle="Tareas activas agregadas por producto y fecha de entrega. Si varios clientes piden el mismo producto el mismo día, se fabrica en un solo lote.">
+        subtitle="Se actualiza sola: combina los pedidos de clientes con tu plan semanal recurrente, agregado por producto y fecha. Mismo producto el mismo día = un solo lote.">
         <ion-button fill="outline" routerLink="/produccion">Ver pedidos</ion-button>
       </app-page-header>
 
@@ -22,6 +22,44 @@
         <app-kpi-card label="Atrasadas" [value]="overdueTasks()" tone="danger"
           [hint]="overdueTasks() > 0 ? 'inicio sugerido en el pasado' : 'al día'"></app-kpi-card>
       </div>
+
+      <!-- Cobertura de insumos: ¿alcanza para la demanda (pedidos + plan)? -->
+      <section class="cobertura">
+        <div class="cobertura__head">
+          <span class="cobertura__title">Cobertura de insumos para la demanda</span>
+          @if (data.insumosFaltantes().length > 0) {
+            <ion-button size="small" fill="outline" routerLink="/pre-compras">
+              <ion-icon name="cart-outline" slot="start"></ion-icon> Comprar
+            </ion-button>
+          }
+        </div>
+        @if (data.coberturaInsumos().length === 0) {
+          <p class="cobertura__empty">No hay demanda de producción todavía (pedidos o plan semanal).</p>
+        } @else if (data.insumosFaltantes().length === 0) {
+          <p class="cobertura__ok">
+            <ion-icon name="checkmark-circle-outline" aria-hidden="true"></ion-icon>
+            Tienes insumos suficientes para completar toda la demanda actual.
+          </p>
+        } @else {
+          <p class="cobertura__warn">
+            <ion-icon name="warning-outline" aria-hidden="true"></ion-icon>
+            Faltan insumos para completar la demanda. Compra antes de producir:
+          </p>
+          <div class="cob-table">
+            <div class="cob-row cob-row--head">
+              <span>Insumo</span><span class="num">Requerido</span><span class="num">Disponible</span><span class="num">Faltante</span>
+            </div>
+            @for (c of data.insumosFaltantes(); track c.supplyId) {
+              <div class="cob-row">
+                <span class="cob-name">{{ c.name }}</span>
+                <span class="num mono">{{ c.requerido | number:'1.0-2' }} {{ c.unit | unitShort }}</span>
+                <span class="num mono">{{ c.disponible | number:'1.0-2' }}</span>
+                <span class="num mono cob-falt">{{ c.faltante | number:'1.0-2' }} {{ c.unit | unitShort }}</span>
+              </div>
+            }
+          </div>
+        }
+      </section>
 
       @if (totalTasks() === 0) {
         <div class="empty">
@@ -50,7 +88,7 @@
                       <ul>
                         @for (t of b.starting; track t.key) {
                           <li [class.task--overdue]="t.overdue">
-                            <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit }}
+                            <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit | unitShort }}
                             de <strong>{{ t.productName }}</strong>
                             · entrega <span class="mono">{{ t.deliveryDate | date:'dd-MM' }}</span>
                             @if (t.sources.length > 1) {
@@ -76,7 +114,7 @@
                       <ul>
                         @for (t of b.delivering; track t.key) {
                           <li>
-                            <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit }}
+                            <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit | unitShort }}
                             de <strong>{{ t.productName }}</strong>
                             @if (t.sources.length > 1) {
                               <span class="lot-badge">{{ t.sources.length }} pedidos</span>

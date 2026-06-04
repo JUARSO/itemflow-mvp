@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { IonContent, IonButton, NavController } from '@ionic/angular/standalone';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -8,7 +9,7 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ReactiveFormsModule,
+    ReactiveFormsModule, RouterLink,
     IonContent, IonButton,
   ],
   templateUrl: './login.page.html',
@@ -23,7 +24,7 @@ export class LoginPage {
   readonly error = signal<string | null>(null);
 
   readonly form = this.fb.group({
-    email: this.fb.control('admin@noble.cr', { nonNullable: true, validators: [Validators.required, Validators.email] }),
+    email: this.fb.control('admin@demo.cr', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     password: this.fb.control('demo1234', { nonNullable: true, validators: [Validators.required, Validators.minLength(4)] }),
   });
 

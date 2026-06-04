@@ -18,7 +18,7 @@
             </label>
             <label class="seg__opt" [class.seg__opt--active]="kind() === 'adjustment'">
               <input type="radio" formControlName="kind" value="adjustment" (change)="onKindChange('adjustment')" />
-              <span>⚙ Ajuste de conteo</span>
+              <span><ion-icon name="settings-outline" aria-hidden="true"></ion-icon> Ajuste de conteo</span>
               <small>Diferencia conteo físico</small>
             </label>
           </div>
@@ -41,7 +41,7 @@
           <select formControlName="itemId" (change)="onItemChange()">
             <option value="">— Selecciona —</option>
             @for (it of items(); track it.id) {
-              <option [value]="it.id">{{ it.name }} ({{ it.unit }})</option>
+              <option [value]="it.id">{{ it.name }} ({{ it.unit | unitShort }})</option>
             }
           </select>
         </app-form-field>

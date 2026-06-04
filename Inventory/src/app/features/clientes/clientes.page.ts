@@ -9,6 +9,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { ClienteFormModalComponent } from './cliente-form-modal.component';
 import { RecurringOrderFormModalComponent } from './recurring-order-form-modal.component';
 import { Customer, CustomerOrder, RecurringOrder } from '../../core/models';
@@ -23,7 +24,7 @@ const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
     DatePipe, DecimalPipe,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonBadge,
-    PageHeaderComponent, KpiCardComponent, ClienteFormModalComponent,
+    PageHeaderComponent, KpiCardComponent, SearchBarComponent, ClienteFormModalComponent,
     RecurringOrderFormModalComponent,
   ],
   templateUrl: './clientes.page.html',
@@ -39,11 +40,29 @@ export class ClientesPage {
   /** ID del cliente cuyo catálogo permitido está expandido (uno a la vez). */
   readonly expanded = signal<string | null>(null);
 
+  /** Búsqueda por nombre, contacto, email o teléfono. */
+  readonly query = signal('');
+  readonly clientesVisibles = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.data.customers();
+    if (!q) return list;
+    return list.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.contactPerson ?? '').toLowerCase().includes(q) ||
+      (c.email ?? '').toLowerCase().includes(q) ||
+      (c.phone ?? '').toLowerCase().includes(q));
+  });
+
   // ----- Pedido recurrente -----
   readonly recurringOpen = signal(false);
   readonly recurringCustomer = signal<Customer | null>(null);
 
   // ----- Pedidos del cliente: pendientes + último -----
+
+  /** Etiqueta corta del tipo de identificación fiscal. */
+  tipoIdLabel(t: string): string {
+    return ({ '01': 'Física', '02': 'Jurídica', '03': 'DIMEX', '04': 'NITE' } as Record<string, string>)[t] ?? t;
+  }
 
   /** Pedidos en proceso del cliente (no despachados ni cancelados), recientes primero. */
   pendientesDe(c: Customer): CustomerOrder[] {

@@ -12,6 +12,7 @@ import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.comp
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { OcFormModalComponent } from './oc-form-modal.component';
 import { NotificarProveedorModalComponent } from './notificar-proveedor-modal.component';
 import { PurchaseOrder, POStatus } from '../../core/models';
@@ -28,7 +29,7 @@ type ConfirmAction = 'receive' | 'cancel' | 'delete';
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonSegment, IonSegmentButton, IonLabel, IonBadge, IonIcon,
     PageHeaderComponent, KpiCardComponent, EmptyStateComponent, ConfirmDialogComponent,
-    OcFormModalComponent, NotificarProveedorModalComponent,
+    OcFormModalComponent, NotificarProveedorModalComponent, SearchBarComponent,
   ],
   templateUrl: './ordenes-compra.page.html',
   styleUrls: ['./ordenes-compra.page.scss'],
@@ -40,6 +41,7 @@ export class OrdenesCompraPage {
   private readonly toast = inject(ToastService);
 
   readonly filter = signal<Filter>('todas');
+  readonly query = signal('');
   /** Rango de fechas (formato 'yyyy-MM-dd' de los inputs nativos), sobre createdAt. */
   readonly dateFrom = signal('');
   readonly dateTo = signal('');
@@ -53,14 +55,29 @@ export class OrdenesCompraPage {
 
   readonly visibles = computed(() => {
     const f = this.filter();
+    const q = this.query().trim().toLowerCase();
     const from = this.parseFrom(this.dateFrom());
     const to = this.parseTo(this.dateTo());
     let all = [...this.data.purchaseOrders()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     if (f !== 'todas') all = all.filter(po => po.status === f);
     if (from !== null) all = all.filter(po => po.createdAt.getTime() >= from);
     if (to !== null) all = all.filter(po => po.createdAt.getTime() <= to);
+    if (q) all = all.filter(po =>
+      (po.code ?? '').toLowerCase().includes(q) ||
+      (po.supplier ?? '').toLowerCase().includes(q) ||
+      this.statusLabel(po.status).toLowerCase().includes(q)
+    );
     return all;
   });
+
+  statusLabel(s: POStatus): string {
+    switch (s) {
+      case 'pending': return 'Pendiente';
+      case 'received': return 'Recibida';
+      case 'cancelled': return 'Cancelada';
+      default: return s;
+    }
+  }
 
   /** 'yyyy-MM-dd' → inicio del día local (ms). null si vacío. */
   private parseFrom(v: string): number | null {
@@ -115,6 +132,17 @@ export class OrdenesCompraPage {
   });
 
   isOverdue(d: Date): boolean { return d.getTime() < Date.now(); }
+
+  /** Estado de entrega de una OC pendiente según su fecha esperada. */
+  entregaEstado(d: Date): { label: string; color: string } {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const dd = new Date(d); dd.setHours(0, 0, 0, 0);
+    const dias = Math.round((dd.getTime() - hoy.getTime()) / 86_400_000);
+    if (dias < 0) return { label: `Atrasada ${-dias}d`, color: 'danger' };
+    if (dias === 0) return { label: 'Llega hoy', color: 'warning' };
+    if (dias === 1) return { label: 'Llega mañana', color: 'transit' };
+    return { label: `En ${dias} días`, color: 'transit' };
+  }
 
   pedirAccion(po: PurchaseOrder, accion: ConfirmAction) {
     this.poAccion.set(po);

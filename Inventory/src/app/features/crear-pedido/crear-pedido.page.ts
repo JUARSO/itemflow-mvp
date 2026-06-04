@@ -10,6 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { Product } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const DAY_LABELS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'] as const;
 
@@ -32,7 +33,7 @@ interface CartLine { productId: string; qty: number; }
     DecimalPipe, RouterLink,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonBadge,
-    PageHeaderComponent,
+    PageHeaderComponent, UnitShortPipe,
   ],
   templateUrl: './crear-pedido.page.html',
   styleUrls: ['./crear-pedido.page.scss'],

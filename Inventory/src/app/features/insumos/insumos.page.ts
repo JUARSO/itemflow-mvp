@@ -15,6 +15,7 @@ import { InsumoFormModalComponent } from './insumo-form-modal.component';
 import { BulkImportModalComponent, BulkImportConfig } from '../../shared/components/bulk-import/bulk-import-modal.component';
 import { Supply, StockStatus, Unit } from '../../core/models';
 import { UNITS } from '../../core/units';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const VALID_UNITS = new Set<string>(UNITS.map(u => u.value));
 
@@ -28,6 +29,7 @@ const VALID_UNITS = new Set<string>(UNITS.map(u => u.value));
     IonButton, IonSearchbar, IonIcon,
     PageHeaderComponent, StatusBadgeComponent, ConfirmDialogComponent, InsumoFormModalComponent,
     BulkImportModalComponent,
+    UnitShortPipe,
   ],
   templateUrl: './insumos.page.html',
   styleUrls: ['./insumos.page.scss'],
@@ -149,9 +151,18 @@ SKU debe ser único. Debe cumplirse stock_min ≤ punto_reorden ≤ stock_max.
           quantity: stock?.quantity ?? 0,
           status: stock?.status ?? ('out' as StockStatus),
           worstStatus: stock?.status ?? ('out' as StockStatus),
+          cobertura: this.data.supplyCoverageDays(supply.id),
         };
       });
   });
+
+  /** Texto y tono de los días de cobertura. */
+  coberturaInfo(dias: number): { texto: string; clase: string } {
+    if (!isFinite(dias)) return { texto: 'sin consumo', clase: 'cov--idle' };
+    if (dias <= 3) return { texto: `${dias} días`, clase: 'cov--bad' };
+    if (dias <= 7) return { texto: `${dias} días`, clase: 'cov--warn' };
+    return { texto: `${dias} días`, clase: 'cov--ok' };
+  }
 
   readonly confirmMessage = computed(() => {
     const s = this.insumoAEliminar();

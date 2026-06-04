@@ -18,7 +18,7 @@
   </app-page-header>
 
   @if (!almacen()) {
-    <app-empty-state icon="🏪" title="Sin almacén"
+    <app-empty-state icon="storefront-outline" title="Sin almacén"
       body="No hay almacén de ventas configurado."></app-empty-state>
   } @else {
     <div class="kpis">
@@ -28,11 +28,13 @@
       <app-kpi-card label="Productos distintos" [value]="stockLines().length" tone="primary"></app-kpi-card>
     </div>
 
+    <app-search-bar [(query)]="query" placeholder="Buscar producto o lote" />
+
     <!-- Seguimiento de pedidos a producción + validación de entrega -->
     <div class="section-title">Mis pedidos a producción</div>
     <div class="list">
       @if (solicitudes().length === 0) {
-        <app-empty-state icon="📋" title="Sin pedidos"
+        <app-empty-state icon="clipboard-outline" title="Sin pedidos"
           body="Cuando pidas a producción, aquí verás si los tomaron y podrás validar la entrega.">
         </app-empty-state>
       }
@@ -46,7 +48,7 @@
               <div class="req__code mono">
                 {{ o.code }}
                 @if (fueTomado(o) && !o.deliveredToUrnaAt) {
-                  <span class="taken-chip">✓ tomado por producción</span>
+                  <span class="taken-chip"><ion-icon name="checkmark-outline" aria-hidden="true"></ion-icon> tomado por producción</span>
                 }
               </div>
               <div class="req__sub muted">
@@ -95,11 +97,11 @@
     <div class="section-title">Stock disponible</div>
     <div class="list">
       @if (stockLines().length === 0) {
-        <app-empty-state icon="📦" title="Almacén vacío"
+        <app-empty-state icon="cube-outline" title="Almacén vacío"
           body="Aún no has recibido productos. Valida la entrega de un pedido completado.">
         </app-empty-state>
       }
-      @for (line of stockLines(); track line.productId) {
+      @for (line of stockLinesFiltrados(); track line.productId) {
         <article class="row">
           <div class="row__info">
             <div class="row__name">{{ line.product?.name ?? line.productId }}</div>
@@ -116,7 +118,7 @@
       @if (lotes().length === 0) {
         <p class="muted empty-line">Sin lotes. Cada entrega validada crea un lote con su fecha.</p>
       }
-      @for (lote of lotes(); track lote.id) {
+      @for (lote of lotesFiltrados(); track lote.id) {
         <article class="lote">
           <div class="lote__head">
             <span class="lote__code mono">{{ lote.code }}</span>

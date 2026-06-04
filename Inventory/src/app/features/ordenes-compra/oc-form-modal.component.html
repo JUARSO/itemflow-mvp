@@ -58,21 +58,21 @@
                   @if (supplierItemRefs().length > 0) {
                     <optgroup [label]="'Asignados a ' + (selectedSupplier()?.name ?? '')">
                       @for (s of supplierSupplies(); track s.id) {
-                        <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit }})</option>
+                        <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
                       }
                       @for (p of supplierProducts(); track p.id) {
-                        <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit }}) · reventa</option>
+                        <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }}) · reventa</option>
                       }
                     </optgroup>
                   }
                   <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros insumos' : 'Insumos'">
                     @for (s of nonSupplierSupplies(); track s.id) {
-                      <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit }})</option>
+                      <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
                     }
                   </optgroup>
                   <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros productos de reventa' : 'Productos de reventa'">
                     @for (p of nonSupplierProducts(); track p.id) {
-                      <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit }})</option>
+                      <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }})</option>
                     }
                   </optgroup>
                 </select>

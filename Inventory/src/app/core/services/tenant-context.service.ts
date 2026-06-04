@@ -1,29 +1,51 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject } from '@angular/core';
 import { AuthService } from './auth.service';
+import { TenantService } from './tenant.service';
+import { DataService } from './data.service';
 import { MOCK_COMPANY } from '../mocks/dummy-data';
 
 /**
- * Contexto del tenant + helpers de permisos por feature.
+ * Contexto del tenant ACTUAL + helpers de permisos por feature.
+ *
+ * El tenant ya no está cableado: deriva del usuario autenticado. Al cambiar de
+ * tenant (login/registro), se carga su dataset aislado en `DataService`.
  *
  * Modelo de roles (3 roles):
  *  - admin: TODO + análisis + paneles + miembros + branding.
- *  - produccion: de catálogo hacia abajo — catálogo, recetas, inventario,
- *    insumos, mermas, ajustes, proveedores, pre-compras, OCs, planificación,
- *    análisis y alertas. NO toca clientes/pedidos ni paneles administrativos.
- *  - ventas: la parte de clientes — clientes, crear pedido y cola de pedidos
- *    (recibidos/aceptados/completados).
+ *  - produccion: de catálogo hacia abajo (catálogo, inventario, compras…).
+ *  - ventas: la parte de clientes (clientes, pedidos, punto de venta).
  */
 @Injectable({ providedIn: 'root' })
 export class TenantContextService {
   private readonly auth = inject(AuthService);
+  private readonly tenants = inject(TenantService);
+  private readonly data = inject(DataService);
 
-  readonly company = signal(MOCK_COMPANY);
-  readonly tenantId = computed(() => MOCK_COMPANY.id);
+  /** Tenant actual (deriva del usuario); cae al demo si aún no hay sesión. */
+  readonly company = computed(() => this.tenants.byId(this.auth.tenantId()) ?? MOCK_COMPANY);
+  readonly tenantId = this.auth.tenantId;
+
+  /** Suscripción y plan del tenant actual. */
+  readonly subscription = computed(() => this.company().subscription);
+  readonly plan = computed(() => this.tenants.planById(this.subscription().planId));
+  /** ¿La suscripción permite operar (activa o en prueba vigente)? */
+  readonly isSubscriptionActive = computed(() => this.tenants.isUsable(this.company()));
+
   readonly isReady = computed(() => this.auth.isAuthenticated());
   readonly role = this.auth.role;
   readonly isAdmin = this.auth.isAdmin;
   readonly isProduccion = this.auth.isProduccion;
   readonly isVentas = this.auth.isVentas;
+
+  constructor() {
+    // Cuando cambia el tenant del usuario, cargar su dataset aislado. Sembramos
+    // al usuario actual como primer miembro si la organización es nueva/vacía.
+    effect(() => {
+      const id = this.auth.tenantId();
+      const u = this.auth.user();
+      this.data.loadTenant(id, u ? [u] : []);
+    });
+  }
 
   // ===== Permisos por feature =====
   // CATÁLOGO HACIA ABAJO (admin + produccion): catálogo, recetas, inventario,
@@ -95,4 +117,11 @@ export class TenantContextService {
 
   /** Ve paneles administrativos (control de pedidos, inventario, contable). */
   readonly canViewAdminPanels = computed(() => this.auth.isAdmin());
+
+  /**
+   * Define PRECIOS FINALES (al consumidor / ventanilla y por cliente).
+   * SOLO el administrador. Producción define el precio base; Ventas solo vende
+   * al precio final que fijó el administrador.
+   */
+  readonly canSetFinalPrices = computed(() => this.auth.isAdmin());
 }

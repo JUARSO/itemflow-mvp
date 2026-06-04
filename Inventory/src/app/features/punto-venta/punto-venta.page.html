@@ -12,7 +12,7 @@
   </app-page-header>
 
   @if (!almacenId()) {
-    <app-empty-state icon="🏪" title="Sin almacén"
+    <app-empty-state icon="storefront-outline" title="Sin almacén"
       body="No hay almacén de ventas configurado."></app-empty-state>
   } @else {
     <div class="pos">
@@ -20,15 +20,34 @@
       <section class="catalog">
         <div class="section-title">Disponible en almacén</div>
         @if (stock().length === 0) {
-          <app-empty-state icon="📦" title="Almacén vacío"
+          <app-empty-state icon="cube-outline" title="Almacén vacío"
             body="Pide reposición a producción y recíbela para tener stock que vender.">
           </app-empty-state>
+        } @else {
+          <app-search-bar [(query)]="query" placeholder="Buscar producto" />
+          <!-- Control de venta del día -->
+          <div class="venta-filtros">
+            <button type="button" class="vf" [class.vf--on]="ventaFiltro() === 'todos'"
+              (click)="ventaFiltro.set('todos')">Todos ({{ resumenVenta().total }})</button>
+            <button type="button" class="vf vf--sin" [class.vf--on]="ventaFiltro() === 'sin'"
+              (click)="ventaFiltro.set('sin')">Sin vender ({{ resumenVenta().sinVender }})</button>
+            <button type="button" class="vf vf--vendidos" [class.vf--on]="ventaFiltro() === 'vendidos'"
+              (click)="ventaFiltro.set('vendidos')">Vendidos hoy ({{ resumenVenta().vendidos }})</button>
+          </div>
         }
         <div class="catalog__grid">
-          @for (s of stock(); track s.productId) {
-            <button type="button" class="prod"
+          @for (s of stockFiltrado(); track s.productId) {
+            <button type="button" class="prod" [class.prod--vendido]="s.vendido"
               [disabled]="s.enCarrito >= s.quantity"
               (click)="agregar(s.productId)">
+              <span class="prod__badge" [class.prod__badge--on]="s.vendido">
+                @if (s.vendido) {
+                  <ion-icon name="checkmark-circle-outline" aria-hidden="true"></ion-icon>
+                  {{ s.vendidoHoy }} vendido{{ s.vendidoHoy === 1 ? '' : 's' }} hoy
+                } @else {
+                  Sin vender hoy
+                }
+              </span>
               <span class="prod__name">{{ s.productName }}</span>
               <span class="prod__price mono">₡{{ s.price | number:'1.0-0' }}</span>
               <span class="prod__stock mono" [class.prod__stock--low]="s.quantity - s.enCarrito <= 0">
@@ -37,6 +56,9 @@
             </button>
           }
         </div>
+        @if (stockFiltrado().length === 0 && stock().length > 0) {
+          <p class="venta-vacio">No hay productos en este filtro.</p>
+        }
       </section>
 
       <!-- Ticket -->
@@ -55,12 +77,66 @@
               <input type="number" min="0" class="tline__qty"
                 [value]="l.qty" (input)="setQty(l.productId, +$any($event.target).value)" />
               <div class="tline__total mono">₡{{ l.lineTotal | number:'1.0-0' }}</div>
-              <button type="button" class="tline__rm" (click)="quitar(l.productId)">✕</button>
+              <button type="button" class="tline__rm" (click)="quitar(l.productId)"><ion-icon name="close-outline" aria-hidden="true"></ion-icon></button>
             </div>
           }
         </div>
 
         <div class="ticket__foot">
+          <!-- Tipo de comprobante -->
+          <div class="ticket__pay">
+            <span class="ticket__pay-label">Comprobante</span>
+            <div class="compgrid">
+              <button type="button" class="paybtn"
+                [class.paybtn--on]="comprobante() === 'tiquete'"
+                (click)="setComprobante('tiquete')">
+                <ion-icon name="receipt-outline" aria-hidden="true"></ion-icon>
+                <span>Tiquete</span>
+              </button>
+              <button type="button" class="paybtn"
+                [class.paybtn--on]="comprobante() === 'factura'"
+                (click)="setComprobante('factura')">
+                <ion-icon name="document-text-outline" aria-hidden="true"></ion-icon>
+                <span>Factura electrónica</span>
+              </button>
+            </div>
+          </div>
+
+          @if (comprobante() === 'factura') {
+            <div class="ticket__cliente">
+              <span class="ticket__pay-label">Cliente (receptor)</span>
+              <div class="cliente-row">
+                <select class="cliente-sel" [value]="customerId()"
+                  (change)="customerId.set($any($event.target).value)">
+                  <option value="">— Selecciona un cliente —</option>
+                  @for (c of clientesFE(); track c.id) {
+                    <option [value]="c.id">{{ c.nombre }} · {{ c.fiscal.identificacion }}</option>
+                  }
+                </select>
+                <ion-button fill="outline" size="small" (click)="clienteModalOpen.set(true)">
+                  + Nuevo
+                </ion-button>
+              </div>
+              @if (clientesFE().length === 0) {
+                <p class="cliente-hint">No hay clientes con datos fiscales. Crea uno con “+ Nuevo”.</p>
+              }
+            </div>
+          }
+
+          <div class="ticket__pay">
+            <span class="ticket__pay-label">Método de pago</span>
+            <div class="paygrid">
+              @for (m of paymentMethods; track m.id) {
+                <button type="button" class="paybtn"
+                  [class.paybtn--on]="paymentMethod() === m.id"
+                  (click)="paymentMethod.set(m.id)">
+                  <ion-icon [name]="m.icon" aria-hidden="true"></ion-icon>
+                  <span>{{ m.label }}</span>
+                </button>
+              }
+            </div>
+          </div>
+
           <div class="ticket__total">
             <span>Total</span>
             <span class="mono">₡{{ total() | number:'1.0-0' }}</span>
@@ -78,4 +154,11 @@
       </aside>
     </div>
   }
+
+  <app-pos-cliente-form-modal
+    [isOpen]="clienteModalOpen()"
+    [editing]="null"
+    (closed)="clienteModalOpen.set(false)"
+    (saved)="onClienteCreado($event)">
+  </app-pos-cliente-form-modal>
 </ion-content>

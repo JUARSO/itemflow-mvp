@@ -12,6 +12,8 @@
         <ion-button (click)="abrirNuevo()">+ Nuevo proveedor</ion-button>
       </app-page-header>
 
+      <app-search-bar [(query)]="query" placeholder="Buscar proveedor por nombre o contacto" />
+
       <div class="kpis">
         <app-kpi-card label="Proveedores activos"
           [value]="data.activeSuppliers().length" tone="success"></app-kpi-card>
@@ -31,7 +33,7 @@
       }
 
       <div class="cards">
-        @for (s of data.suppliers(); track s.id) {
+        @for (s of suppliersFiltrados(); track s.id) {
           <article class="card" [class.card--inactive]="!s.active">
             <header class="card__head">
               <div>

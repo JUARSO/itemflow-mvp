@@ -140,7 +140,7 @@
     .field input:focus {
       outline: none;
       border-color: var(--ui-primary);
-      box-shadow: 0 0 0 3px rgba(63, 120, 114, 0.18);
+      box-shadow: 0 0 0 3px rgba(41, 46, 38, 0.18);
     }
 
     .theme-selector {
@@ -187,7 +187,7 @@
     .field select:focus {
       outline: none;
       border-color: var(--ui-primary);
-      box-shadow: 0 0 0 3px rgba(63, 120, 114, 0.18);
+      box-shadow: 0 0 0 3px rgba(41, 46, 38, 0.18);
     }
 
     .upload-row {
@@ -230,3 +230,6 @@
       min-height: 40px;
     }
     .file-btn:hover { box-shadow: var(--ui-shadow-md); }
+
+.link-btn:hover { color: var(--ui-primary-shade); }
+.link-btn--danger:hover { color: var(--ui-danger); }

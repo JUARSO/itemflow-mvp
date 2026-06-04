@@ -12,9 +12,11 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { RecetaFormModalComponent } from './receta-form-modal.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { BulkImportModalComponent, BulkImportConfig } from '../../shared/components/bulk-import/bulk-import-modal.component';
 import { Recipe, RecipeItem } from '../../core/models';
 import { printFichaTecnica } from '../../shared/utils/ficha-tecnica';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 @Component({
   selector: 'app-recetas',
@@ -25,7 +27,8 @@ import { printFichaTecnica } from '../../shared/utils/ficha-tecnica';
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton,
     PageHeaderComponent, EmptyStateComponent, ConfirmDialogComponent, RecetaFormModalComponent,
-    BulkImportModalComponent,
+    BulkImportModalComponent, SearchBarComponent,
+    UnitShortPipe,
   ],
   templateUrl: './recetas.page.html',
   styleUrls: ['./recetas.page.scss'],
@@ -41,6 +44,14 @@ export class RecetasPage {
   readonly confirmOpen = signal(false);
   readonly recetaAEliminar = signal<Recipe | null>(null);
   readonly bulkOpen = signal(false);
+
+  readonly query = signal('');
+  readonly recipesFiltradas = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.data.recipes();
+    if (!q) return list;
+    return list.filter(x => x.productName.toLowerCase().includes(q));
+  });
 
   readonly bulkConfig: BulkImportConfig<Recipe> = {
     entityLabel: 'receta',
@@ -168,6 +179,25 @@ El producto destino y los componentes deben existir previamente. No se permite a
   /** Costo por cada unidad producida (delega al helper del service). */
   costoPorUnidad(productId: string): number {
     return this.data.computeRecipeCost(productId) ?? 0;
+  }
+
+  /** Costo que aporta un ítem (insumo o subproducto) a una corrida completa. */
+  costoItem(it: { supplyId?: string; productId?: string; qty: number }): number {
+    if (it.supplyId) {
+      const sup = this.data.supplyById(it.supplyId);
+      return (sup?.cost ?? 0) * it.qty;
+    }
+    if (it.productId) {
+      return this.data.effectiveProductCost(it.productId) * it.qty;
+    }
+    return 0;
+  }
+
+  /** Porcentaje que representa un ítem sobre el costo total de la corrida. */
+  costoItemPct(it: { supplyId?: string; productId?: string; qty: number }, recipeId: string): number {
+    const total = this.costoReceta(recipeId);
+    if (total <= 0) return 0;
+    return Math.round((this.costoItem(it) / total) * 100);
   }
 
   /** Abre la ficha técnica en una ventana e invoca imprimir → Guardar como PDF. */

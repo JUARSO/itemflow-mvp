@@ -1,0 +1,10 @@
+:host {
+  display: block;
+  padding: 0 var(--ui-sp-4) var(--ui-sp-3);
+}
+ion-searchbar {
+  --background: var(--ui-surface);
+  --box-shadow: none;
+  --border-radius: 0;
+  padding: 0;
+}

@@ -29,6 +29,11 @@ export const routes: Routes = [
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login.page').then(m => m.LoginPage),
   },
+  {
+    path: 'auth/register',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/auth/register.page').then(m => m.RegisterPage),
+  },
 
   // ===== App principal con shell =====
   {
@@ -58,6 +63,11 @@ export const routes: Routes = [
         path: 'punto-venta',
         canActivate: [ventasAccess],
         loadComponent: () => import('./features/punto-venta/punto-venta.page').then(m => m.PuntoVentaPage),
+      },
+      {
+        path: 'clientes-pos',
+        canActivate: [ventasAccess],
+        loadComponent: () => import('./features/clientes-pos/clientes-pos.page').then(m => m.ClientesPosPage),
       },
       {
         path: 'catalogo-ventas',
@@ -102,6 +112,11 @@ export const routes: Routes = [
         path: 'pedidos-almacen',
         canActivate: [produccionAccess],
         loadComponent: () => import('./features/pedidos-almacen/pedidos-almacen.page').then(m => m.PedidosAlmacenPage),
+      },
+      {
+        path: 'reserva',
+        canActivate: [produccionAccess],
+        loadComponent: () => import('./features/reserva/reserva.page').then(m => m.ReservaPage),
       },
       {
         path: 'catalogo',

@@ -2,7 +2,7 @@
       Menú hamburguesa en TODOS los tamaños.
       ion-split-pane con [disabled]="true" mantiene la estructura de layout
       Ionic (toolbar arriba, tab-bar bottom, contenido scrolleable) pero NUNCA
-      activa el modo persistente — el menú siempre es overlay y se abre con ☰.
+      activa el modo persistente — el menú siempre es overlay y se abre con el botón de menú.
     -->
     <ion-split-pane contentId="main-content" [disabled]="true">
       <ion-menu contentId="main-content" type="overlay">
@@ -23,42 +23,29 @@
             </div>
           </div>
 
-          <!-- 1. VENTAS: clientes, solicitudes y urnas (admin + ventas) -->
+          <!-- ===== VENTAS (admin + ventas) ===== -->
           @if (auth.isAdmin() || auth.isVentas()) {
-            <!-- 1a. PUNTO DE VENTA (venta local desde el almacén) -->
+            <!-- Punto de venta: el corazón de la operación diaria -->
             <div class="menu-section">Punto de venta</div>
             <a routerLink="/punto-venta" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="cart-outline"></ion-icon>
               <span class="menu-item__label">Punto de venta</span>
             </a>
-            <a routerLink="/reporte-ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="bar-chart-outline"></ion-icon>
-              <span class="menu-item__label">Ventas del día</span>
-            </a>
-            <a routerLink="/pedir-produccion" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="receipt-outline"></ion-icon>
-              <span class="menu-item__label">Pedir a producción</span>
-            </a>
-            <a routerLink="/inventario-ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
-              <span class="menu-item__label">Inventario</span>
-              @if (data.almacenRecepcionesPendientes() > 0) {
-                <ion-badge color="transit" class="menu-item__badge">
-                  {{ data.almacenRecepcionesPendientes() }}
-                </ion-badge>
-              }
-            </a>
             <a routerLink="/catalogo-ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="pricetags-outline"></ion-icon>
               <span class="menu-item__label">Catálogo de ventas</span>
             </a>
-            <a routerLink="/merma-urnas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
-              <ion-icon class="menu-item__icon" name="arrow-undo-outline"></ion-icon>
-              <span class="menu-item__label">Merma (cierre de día)</span>
+            <a routerLink="/clientes-pos" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="people-outline"></ion-icon>
+              <span class="menu-item__label">Clientes de factura</span>
+            </a>
+            <a routerLink="/reporte-ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="bar-chart-outline"></ion-icon>
+              <span class="menu-item__label">Ventas del día</span>
             </a>
 
-            <!-- 1b. VENTAS EXTERNAS (pedidos de clientes) -->
-            <div class="menu-section">Ventas externas</div>
+            <!-- Pedidos de clientes: ciclo completo del pedido externo -->
+            <div class="menu-section">Pedidos de clientes</div>
             <a routerLink="/clientes" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="person-outline"></ion-icon>
               <span class="menu-item__label">Clientes</span>
@@ -94,9 +81,29 @@
                 </ion-badge>
               }
             </a>
+
+            <!-- Abastecimiento: reponer lo que se vende -->
+            <div class="menu-section">Abastecimiento</div>
+            <a routerLink="/pedir-produccion" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
+              <span class="menu-item__label">Gestión de productos</span>
+            </a>
+            <a routerLink="/inventario-ventas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="cube-outline"></ion-icon>
+              <span class="menu-item__label">Inventario</span>
+              @if (data.almacenRecepcionesPendientes() > 0) {
+                <ion-badge color="transit" class="menu-item__badge">
+                  {{ data.almacenRecepcionesPendientes() }}
+                </ion-badge>
+              }
+            </a>
+            <a routerLink="/merma-urnas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="arrow-undo-outline"></ion-icon>
+              <span class="menu-item__label">Merma (cierre de día)</span>
+            </a>
           }
 
-          <!-- 2. PRODUCCIÓN: cola de producción + planificación (admin + produccion) -->
+          <!-- ===== PRODUCCIÓN: qué produzco (admin + produccion) ===== -->
           @if (auth.isAdmin() || auth.isProduccion()) {
             <div class="menu-section">Producción</div>
             <a routerLink="/pedidos-almacen" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
@@ -112,9 +119,13 @@
               <ion-icon class="menu-item__icon" name="calendar-outline"></ion-icon>
               <span class="menu-item__label">Planificación</span>
             </a>
+            <a routerLink="/reserva" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
+              <ion-icon class="menu-item__icon" name="bookmark-outline"></ion-icon>
+              <span class="menu-item__label">Reserva</span>
+            </a>
           }
 
-          <!-- 3. CATÁLOGO (admin + produccion) -->
+          <!-- Catálogo: definición de productos y recetas (admin + produccion) -->
           @if (auth.isAdmin() || auth.isProduccion()) {
             <div class="menu-section">Catálogo</div>
             <a routerLink="/catalogo" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
@@ -173,9 +184,9 @@
             </a>
           }
 
-          <!-- 5. ANÁLISIS (admin + produccion) -->
+          <!-- Análisis y alertas (admin + produccion) -->
           @if (auth.isAdmin() || auth.isProduccion()) {
-            <div class="menu-section">Análisis</div>
+            <div class="menu-section">Análisis y alertas</div>
             <a routerLink="/predicciones" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="trending-up-outline"></ion-icon>
               <span class="menu-item__label">Predicciones</span>
@@ -184,11 +195,6 @@
               <ion-icon class="menu-item__icon" name="trending-down-outline"></ion-icon>
               <span class="menu-item__label">Análisis de stock</span>
             </a>
-          }
-
-          <!-- 6. ALERTAS (centro de alertas: stock + pedidos + proveedores) -->
-          @if (auth.isAdmin() || auth.isProduccion()) {
-            <div class="menu-section">Alertas</div>
             <a routerLink="/alertas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
               <ion-icon class="menu-item__icon" name="notifications-outline"></ion-icon>
               <span class="menu-item__label">Alertas</span>
@@ -200,7 +206,7 @@
             </a>
           }
 
-          <!-- 7. MÁS -->
+          <!-- Cuenta -->
           <div class="menu-section">Cuenta</div>
           <a routerLink="/mas" routerLinkActive="active" class="menu-item" (click)="closeMenuOnMobile()">
             <ion-icon class="menu-item__icon" name="settings-outline"></ion-icon>

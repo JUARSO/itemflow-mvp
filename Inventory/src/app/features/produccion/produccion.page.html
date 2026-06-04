@@ -11,6 +11,8 @@
     subtitle="Pedidos de clientes por corroborar. Al aceptarlos se envían a producción.">
   </app-page-header>
 
+  <app-search-bar [(query)]="query" placeholder="Buscar pedido por código o cliente" />
+
   <div class="kpis">
     <app-kpi-card label="Por corroborar" [value]="recibidos().length" tone="warning"></app-kpi-card>
     <app-kpi-card label="Unidades" [value]="totalUnidades()" tone="primary"></app-kpi-card>
@@ -18,10 +20,10 @@
 
   <div class="list">
     @if (recibidos().length === 0) {
-      <app-empty-state icon="📥" title="Sin pedidos por corroborar"
+      <app-empty-state icon="file-tray-outline" title="Sin pedidos por corroborar"
         body="Cuando entren pedidos de clientes (portal o Crear pedido), aparecerán aquí para revisarlos."></app-empty-state>
     }
-    @for (o of recibidos(); track o.id) {
+    @for (o of recibidosFiltrados(); track o.id) {
       <article class="ped">
         <header class="ped__head">
           <div>

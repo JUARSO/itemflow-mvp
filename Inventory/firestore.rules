@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// ============================================================================
+//  Reglas de seguridad multi-tenant (Firestore) — Fase 2.
+//
+//  Modelo: cada empresa es un documento `tenants/{tenantId}` con TODOS sus datos
+//  en subcolecciones bajo él. El AISLAMIENTO real vive aquí: un usuario solo
+//  accede a su propio tenant, y el `tenantId`/`role` provienen de CUSTOM CLAIMS
+//  verificados en el token de Firebase Auth (los pone una Cloud Function al
+//  registrarse / invitar miembros) — NUNCA de datos enviados por el cliente.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn()        { return request.auth != null; }
+    function claimTenant()       { return request.auth.token.tenantId; }
+    function claimRole()         { return request.auth.token.role; }
+    function isMemberOf(tid)     { return isSignedIn() && claimTenant() == tid; }
+    function isAdminOf(tid)      { return isMemberOf(tid) && claimRole() == 'admin'; }
+
+    // Matriz de escritura por rol y colección (refinar por negocio).
+    function canWrite(tid, col) {
+      return isAdminOf(tid)
+        || (isMemberOf(tid) && claimRole() == 'produccion'
+            && col in ['products','supplies','recipes','product_stock','supply_stock',
+                       'kardex','purchase_orders','suppliers','alerts','predictions',
+                       'returned_lots','reservas'])
+        || (isMemberOf(tid) && claimRole() == 'ventas'
+            && col in ['customers','orders','pos_sales','pos_clientes','urnas',
+                       'urna_lotes','recurring_orders','consumer_prices']);
+    }
+
+    // -------- Tenant + sus datos (aislados por tenantId) --------
+    match /tenants/{tenantId} {
+      // El documento del tenant: lo leen sus miembros; lo edita solo su admin.
+      allow read:   if isMemberOf(tenantId);
+      allow update: if isAdminOf(tenantId);
+      // Alta/baja del tenant las hace el backend (Cloud Function), no el cliente.
+      allow create, delete: if false;
+
+      // Miembros del equipo: los lee el tenant, los gestiona su admin.
+      match /members/{uid} {
+        allow read:  if isMemberOf(tenantId);
+        allow write: if isAdminOf(tenantId);
+      }
+
+      // Resto de colecciones de negocio: lectura para el tenant, escritura por rol.
+      match /{collection}/{docId} {
+        allow read:  if isMemberOf(tenantId);
+        allow write: if canWrite(tenantId, collection);
+      }
+    }
+
+    // -------- Directorio global usuario → tenant (solo backend) --------
+    // Lo usa el login para resolver el tenant antes de fijar el custom claim.
+    match /users/{uid} {
+      allow read:  if isSignedIn() && request.auth.uid == uid;
+      allow write: if false; // solo Admin SDK / Cloud Functions
+    }
+
+    // Catálogo público de planes (solo lectura).
+    match /plans/{planId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // Todo lo demás, denegado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

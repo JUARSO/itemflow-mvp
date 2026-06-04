@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
@@ -11,6 +11,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { CustomerOrder } from '../../core/models';
 
 @Component({
@@ -22,6 +23,7 @@ import { CustomerOrder } from '../../core/models';
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon,
     PageHeaderComponent, KpiCardComponent, EmptyStateComponent,
+    SearchBarComponent,
   ],
   templateUrl: './despachar-pedidos.page.html',
   styleUrls: ['./despachar-pedidos.page.scss'],
@@ -32,15 +34,24 @@ export class DespacharPedidosPage {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 
+  readonly query = signal('');
+
   /** Pedidos de cliente ya producidos, esperando despacho. */
   readonly pedidos = computed(() => this.data.pedidosPorDespachar());
+
+  readonly pedidosFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.pedidos();
+    if (!q) return list;
+    return list.filter(o => (o.code ?? '').toLowerCase().includes(q) || (this.data.customerById(o.customerId ?? '')?.name ?? '').toLowerCase().includes(q));
+  });
 
   readonly totalUnidades = computed(() =>
     this.pedidos().reduce((s, o) => s + o.items.reduce((q, it) => q + it.fulfilledQty, 0), 0)
   );
 
   clienteNombre(o: CustomerOrder): string {
-    return o.customerId ? (this.data.customerById(o.customerId)?.name ?? 'Cliente') : '—';
+    return o.customerId ? (this.data.customerById(o.customerId ?? '')?.name ?? 'Cliente') : '—';
   }
 
   /** Líneas listas para despachar (lo producido). */

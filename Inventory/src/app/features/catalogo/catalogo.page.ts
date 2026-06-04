@@ -49,15 +49,17 @@ export class CatalogoPage {
     templateFilename: 'plantilla-productos.csv',
     headers: [
       'sku', 'nombre', 'descripcion', 'categoria', 'unidad',
-      'precio_compra', 'precio_venta', 'lead_time_dias', 'usa_receta',
+      'precio_compra', 'otros', 'lead_time_dias', 'usa_receta',
       'punto_reorden', 'stock_min',
     ],
     templateRows: [
-      ['PROD-XXX-001', 'Pan Especial', 'Pan artesanal con masa madre', 'Panes', 'unidad', '300', '900', '1', 'true', '', ''],
-      ['PROD-XXX-002', 'Bebida 500ml', '', 'Bebidas', 'unidad', '500', '1200', '7', 'false', '20', '5'],
+      ['PROD-XXX-001', 'Pan Especial', 'Pan artesanal con masa madre', 'Panes', 'unidad', '300', '50', '1', 'true', '', ''],
+      ['PROD-XXX-002', 'Bebida 500ml', '', 'Bebidas', 'unidad', '500', '0', '7', 'false', '20', '5'],
     ],
-    hint: `Columnas obligatorias: sku, nombre, unidad, precio_compra, precio_venta, lead_time_dias, usa_receta.
-Opcionales: descripcion, categoria, punto_reorden, stock_min.
+    hint: `Columnas obligatorias: sku, nombre, unidad, precio_compra, lead_time_dias, usa_receta.
+Opcionales: descripcion, categoria, otros, punto_reorden, stock_min.
+otros: mano de obra y otros costos (se suma al costo). Default 0.
+El precio de venta se configura en Ventas (catálogo de ventas), no en este archivo.
 Unidades válidas: ${[...VALID_UNITS].join(', ')}.
 usa_receta: true/false/1/0/sí/no — productos fabricados (true) consumen insumos según receta;
 productos de reventa (false) admiten punto_reorden y stock_min para alertas automáticas.
@@ -73,7 +75,8 @@ Debe cumplirse stock_min ≤ punto_reorden. SKU único.`,
         const nombre = (r['nombre'] ?? '').trim();
         const unidad = (r['unidad'] ?? '').trim();
         const buy = Number(r['precio_compra']);
-        const sell = Number(r['precio_venta']);
+        const otrosRaw = (r['otros'] ?? '').trim();
+        const otros = otrosRaw === '' ? 0 : Number(otrosRaw);
         const lead = Number(r['lead_time_dias']);
         const usa = (r['usa_receta'] ?? '').trim().toLowerCase();
         if (!sku) { errors.push({ row: rowNum, raw: r, message: 'SKU vacío' }); return; }
@@ -86,7 +89,7 @@ Debe cumplirse stock_min ≤ punto_reorden. SKU único.`,
         if (existing.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU ya existe en catálogo' }); return; }
         if (seen.has(sku.toLowerCase())) { errors.push({ row: rowNum, raw: r, message: 'SKU duplicado en el archivo' }); return; }
         if (!isFinite(buy) || buy < 0) { errors.push({ row: rowNum, raw: r, message: 'Precio compra inválido' }); return; }
-        if (!isFinite(sell) || sell < 0) { errors.push({ row: rowNum, raw: r, message: 'Precio venta inválido' }); return; }
+        if (!isFinite(otros) || otros < 0) { errors.push({ row: rowNum, raw: r, message: 'Otros (costo) inválido' }); return; }
         if (!isFinite(lead) || lead < 0) { errors.push({ row: rowNum, raw: r, message: 'Lead time inválido' }); return; }
         if (usa && !['true', 'false', '1', '0', 'sí', 'si', 'no'].includes(usa)) {
           { errors.push({ row: rowNum, raw: r, message: 'usa_receta debe ser true/false' }); return; }
@@ -120,7 +123,8 @@ Debe cumplirse stock_min ≤ punto_reorden. SKU único.`,
           category: (r['categoria'] ?? '').trim() || undefined,
           unit: unidad as Unit,
           buyPrice: buy,
-          sellPrice: sell,
+          otherCost: otros,
+          sellPrice: 0, // El precio de venta se fija en Ventas (catálogo de ventas).
           leadTime: lead,
           active: true,
           hasRecipe,
@@ -152,11 +156,6 @@ Debe cumplirse stock_min ≤ punto_reorden. SKU único.`,
    */
   effectiveCost(p: Product): number {
     return this.data.effectiveProductCost(p.id);
-  }
-
-  margen(sell: number, buy: number): string {
-    if (sell === 0) return '0';
-    return (((sell - buy) / sell) * 100).toFixed(0);
   }
 
   abrirNuevo() {

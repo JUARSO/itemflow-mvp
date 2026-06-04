@@ -3,8 +3,10 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { IonButton } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
-import { Customer } from '../../core/models';
+import { Customer, CustomerFiscal, TipoIdentificacion } from '../../core/models';
 import { DataService } from '../../core/services/data.service';
+import { TenantContextService } from '../../core/services/tenant-context.service';
+import { UbicacionesService } from '../../core/services/ubicaciones.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
@@ -20,6 +22,8 @@ const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'] as const;
 export class ClienteFormModalComponent {
   private readonly fb = inject(FormBuilder);
   protected readonly data = inject(DataService);
+  protected readonly tenant = inject(TenantContextService);
+  protected readonly ubic = inject(UbicacionesService);
   private readonly toast = inject(ToastService);
 
   readonly isOpen = input.required<boolean>();
@@ -36,7 +40,51 @@ export class ClienteFormModalComponent {
     phone: this.fb.control('', { nonNullable: true }),
     notes: this.fb.control('', { nonNullable: true }),
     active: this.fb.control(true, { nonNullable: true }),
+    // Datos fiscales (factura electrónica)
+    feTipo: this.fb.control<TipoIdentificacion>('02', { nonNullable: true }),
+    feIdentificacion: this.fb.control('', { nonNullable: true }),
+    feNombre: this.fb.control('', { nonNullable: true }),
+    feProvincia: this.fb.control('', { nonNullable: true }),
+    feCanton: this.fb.control('', { nonNullable: true }),
+    feDistrito: this.fb.control('', { nonNullable: true }),
+    feBarrio: this.fb.control('', { nonNullable: true }),
+    feOtrasSenas: this.fb.control('', { nonNullable: true }),
   });
+
+  protected readonly tiposId = [
+    { id: '01', label: 'Física' },
+    { id: '02', label: 'Jurídica' },
+    { id: '03', label: 'DIMEX' },
+    { id: '04', label: 'NITE' },
+  ] as const;
+
+  // Selección en cascada de ubicación (guardamos códigos de Hacienda).
+  private readonly _provincia = signal('');
+  private readonly _canton = signal('');
+  private readonly _distrito = signal('');
+  readonly provinciaSel = this._provincia.asReadonly();
+  readonly cantonSel = this._canton.asReadonly();
+  readonly distritoSel = this._distrito.asReadonly();
+
+  readonly provinciaOpts = computed(() => { this.ubic.ready(); return this.ubic.provincias(); });
+  readonly cantonOpts = computed(() => { this.ubic.ready(); return this.ubic.cantones(this._provincia()); });
+  readonly distritoOpts = computed(() => { this.ubic.ready(); return this.ubic.distritos(this._provincia(), this._canton()); });
+
+  onProvincia(codigo: string) {
+    this._provincia.set(codigo);
+    this._canton.set('');
+    this._distrito.set('');
+    this.form.patchValue({ feProvincia: codigo, feCanton: '', feDistrito: '' });
+  }
+  onCanton(codigo: string) {
+    this._canton.set(codigo);
+    this._distrito.set('');
+    this.form.patchValue({ feCanton: codigo, feDistrito: '' });
+  }
+  onDistrito(codigo: string) {
+    this._distrito.set(codigo);
+    this.form.patchValue({ feDistrito: codigo });
+  }
 
   // Selecciones como signals directos (los FormControl.value NO triggean computeds).
   private readonly _allowed = signal<string[]>([]);
@@ -51,8 +99,13 @@ export class ClienteFormModalComponent {
 
   constructor() {
     effect(() => {
+      if (this.isOpen()) void this.ubic.ensureLoaded();
       const c = this.editing();
       if (c) {
+        const f = c.fiscal;
+        this._provincia.set(f?.provincia ?? '');
+        this._canton.set(f?.canton ?? '');
+        this._distrito.set(f?.distrito ?? '');
         this.form.patchValue({
           name: c.name,
           contactPerson: c.contactPerson ?? '',
@@ -60,13 +113,28 @@ export class ClienteFormModalComponent {
           phone: c.phone ?? '',
           notes: c.notes ?? '',
           active: c.active,
+          feTipo: f?.tipoIdentificacion ?? '02',
+          feIdentificacion: f?.identificacion ?? '',
+          feNombre: f?.nombre ?? '',
+          feProvincia: f?.provincia ?? '',
+          feCanton: f?.canton ?? '',
+          feDistrito: f?.distrito ?? '',
+          feBarrio: f?.barrio ?? '',
+          feOtrasSenas: f?.otrasSenas ?? '',
         });
         this._allowed.set([...c.allowedProductIds]);
         this._prices.set({ ...(c.productPrices ?? {}) });
         this._orderDays.set([...c.window.orderDays]);
         this._deliveryDays.set([...c.window.deliveryDays]);
       } else if (this.isOpen()) {
-        this.form.reset({ name: '', contactPerson: '', email: '', phone: '', notes: '', active: true });
+        this.form.reset({
+          name: '', contactPerson: '', email: '', phone: '', notes: '', active: true,
+          feTipo: '02', feIdentificacion: '', feNombre: '',
+          feProvincia: '', feCanton: '', feDistrito: '', feBarrio: '', feOtrasSenas: '',
+        });
+        this._provincia.set('');
+        this._canton.set('');
+        this._distrito.set('');
         this._allowed.set([]);
         this._prices.set({});
         this._orderDays.set([1, 2, 3, 4, 5]);   // lun-vie por defecto
@@ -104,6 +172,23 @@ export class ClienteFormModalComponent {
     });
   }
 
+  /** Construye los datos fiscales. undefined si no se ingresó la identificación. */
+  private buildFiscal(): CustomerFiscal | undefined {
+    const v = this.form.getRawValue();
+    const id = v.feIdentificacion.trim();
+    if (!id) return undefined;
+    return {
+      tipoIdentificacion: v.feTipo,
+      identificacion: id,
+      nombre: v.feNombre.trim() || undefined,
+      provincia: v.feProvincia.trim() || undefined,
+      canton: v.feCanton.trim() || undefined,
+      distrito: v.feDistrito.trim() || undefined,
+      barrio: v.feBarrio.trim() || undefined,
+      otrasSenas: v.feOtrasSenas.trim() || undefined,
+    };
+  }
+
   /** Mapa de precios custom limitado a productos permitidos. undefined si vacío. */
   private buildProductPrices(): Record<string, number> | undefined {
     const allowed = new Set(this._allowed());
@@ -136,6 +221,7 @@ export class ClienteFormModalComponent {
           phone: v.phone || undefined,
           notes: v.notes || undefined,
           active: v.active,
+          fiscal: this.buildFiscal(),
           allowedProductIds: [...this._allowed()],
           productPrices: this.buildProductPrices(),
           window: {
@@ -152,6 +238,7 @@ export class ClienteFormModalComponent {
           phone: v.phone || undefined,
           notes: v.notes || undefined,
           active: v.active,
+          fiscal: this.buildFiscal(),
           allowedProductIds: [...this._allowed()],
           productPrices: this.buildProductPrices(),
           window: {

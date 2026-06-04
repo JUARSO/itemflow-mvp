@@ -46,6 +46,8 @@ import {
   removeOutline,
   storefrontOutline,
   pricetagsOutline,
+  lockClosedOutline,
+  bookmarkOutline,
   // Clientes / acciones de card
   trashOutline,
   copyOutline,
@@ -58,6 +60,22 @@ import {
   archiveOutline,
   arrowUndoOutline,
   chatboxEllipsesOutline,
+  // Reemplazo de emoji por iconos de librería
+  businessOutline,
+  carOutline,
+  fileTrayOutline,
+  checkmarkOutline,
+  informationCircleOutline,
+  closeCircleOutline,
+  sparklesOutline,
+  cameraOutline,
+  folderOutline,
+  star,
+  cardOutline,
+  phonePortraitOutline,
+  swapHorizontalOutline,
+  peopleOutline,
+  repeatOutline,
 } from 'ionicons/icons';
 
 /**
@@ -115,6 +133,8 @@ export function registerAppIcons(): void {
     'remove-outline': removeOutline,
     'storefront-outline': storefrontOutline,
     'pricetags-outline': pricetagsOutline,
+    'lock-closed-outline': lockClosedOutline,
+    'bookmark-outline': bookmarkOutline,
     // Clientes / acciones
     'trash-outline': trashOutline,
     'copy-outline': copyOutline,
@@ -127,5 +147,21 @@ export function registerAppIcons(): void {
     'archive-outline': archiveOutline,
     'arrow-undo-outline': arrowUndoOutline,
     'chatbox-ellipses-outline': chatboxEllipsesOutline,
+    // Reemplazo de emoji por iconos de librería
+    'business-outline': businessOutline,
+    'car-outline': carOutline,
+    'file-tray-outline': fileTrayOutline,
+    'checkmark-outline': checkmarkOutline,
+    'information-circle-outline': informationCircleOutline,
+    'close-circle-outline': closeCircleOutline,
+    'sparkles-outline': sparklesOutline,
+    'camera-outline': cameraOutline,
+    'folder-outline': folderOutline,
+    'star': star,
+    'card-outline': cardOutline,
+    'phone-portrait-outline': phonePortraitOutline,
+    'swap-horizontal-outline': swapHorizontalOutline,
+    'people-outline': peopleOutline,
+    'repeat-outline': repeatOutline,
   });
 }

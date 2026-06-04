@@ -589,3 +589,6 @@
       flex: 1;
       min-width: 200px;
     }
+
+.cart__line-actions button:hover { background: var(--ui-surface-2); }
+.logout:hover { background: rgba(255, 255, 255, 0.12); }

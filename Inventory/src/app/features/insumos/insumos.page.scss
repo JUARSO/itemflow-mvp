@@ -132,3 +132,8 @@
       padding-top: var(--ui-sp-3);
       border-top: var(--ui-border-w-sm) solid var(--ui-border);
     }
+
+.cov--bad { color: var(--ui-danger); font-weight: var(--ui-fw-black); }
+.cov--warn { color: var(--ui-warning); font-weight: var(--ui-fw-bold); }
+.cov--ok { color: var(--ui-success); }
+.cov--idle { color: var(--ui-text-muted); }

@@ -9,6 +9,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { MermaProduccionModalComponent } from './merma-produccion-modal.component';
 import { ReturnedLot, ProductionMermaReason } from '../../core/models';
 
@@ -43,6 +44,7 @@ const PROD_REASON_LABELS: Record<ProductionMermaReason, string> = {
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonIcon, IonBadge, IonSegment, IonSegmentButton, IonLabel, IonButton,
     PageHeaderComponent, KpiCardComponent, MermaProduccionModalComponent,
+    SearchBarComponent,
   ],
   templateUrl: './mermas.page.html',
   styleUrls: ['./mermas.page.scss'],
@@ -60,8 +62,24 @@ export class MermasPage {
   /** Borrador local de notas por lote: lotId → texto. */
   readonly noteDrafts = signal<Record<string, string>>({});
 
+  readonly query = signal('');
+
   readonly pendientes = computed(() => this.data.pendingReturnedLots());
   readonly historico = computed(() => this.data.processedReturnedLots());
+
+  readonly pendientesFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.pendientes();
+    if (!q) return list;
+    return list.filter(l => (l.productName ?? '').toLowerCase().includes(q) || (l.sourceOrderCode ?? '').toLowerCase().includes(q));
+  });
+
+  readonly historicoFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.historico();
+    if (!q) return list;
+    return list.filter(l => (l.productName ?? '').toLowerCase().includes(q) || (l.sourceOrderCode ?? '').toLowerCase().includes(q));
+  });
 
   readonly pendingUnits = computed(() =>
     this.pendientes().reduce((s, l) => s + l.qty, 0)

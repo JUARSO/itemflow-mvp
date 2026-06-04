@@ -9,27 +9,27 @@
         <p class="alert__message">{{ alert().message }}</p>
         @if (alert().projectedDaysUntilStockout !== undefined && alert().projectedDaysUntilStockout !== null) {
           <div class="alert__meta mono">
-            ⚠ Quiebre proyectado en {{ alert().projectedDaysUntilStockout }} días
+<ion-icon name="warning-outline" aria-hidden="true"></ion-icon> Quiebre proyectado en {{ alert().projectedDaysUntilStockout }} días
           </div>
         }
         @if (alert().leadTimeDays !== undefined && alert().leadTimeDays !== null) {
           <div class="alert__meta mono">
-            🚚 Entrega más rápida: {{ alert().leadTimeDays }} día(s)
+<ion-icon name="car-outline" aria-hidden="true"></ion-icon> Entrega más rápida: {{ alert().leadTimeDays }} día(s)
           </div>
         }
         @if (alert().expectedDate) {
           <div class="alert__meta mono">
-            📅 Entrega esperada: {{ alert().expectedDate | date:'EEE d MMM' }}
+<ion-icon name="calendar-outline" aria-hidden="true"></ion-icon> Entrega esperada: {{ alert().expectedDate | date:'EEE d MMM' }}
           </div>
         }
         @if (alert().orderedQty !== undefined && alert().receivedQty !== undefined) {
           <div class="alert__meta mono">
-            📦 Recibido: {{ alert().receivedQty }} / {{ alert().orderedQty }}
+<ion-icon name="cube-outline" aria-hidden="true"></ion-icon> Recibido: {{ alert().receivedQty }} / {{ alert().orderedQty }}
           </div>
         }
         @if (alert().excessValue) {
           <div class="alert__meta mono">
-            💰 Capital congelado: {{ alert().excessValue | number:'1.0-0' }} CLP
+<ion-icon name="cash-outline" aria-hidden="true"></ion-icon> Capital congelado: {{ alert().excessValue | number:'1.0-0' }} CLP
           </div>
         }
 

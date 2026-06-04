@@ -81,7 +81,7 @@
                       }
                     </div>
                     <div class="product__row">
-                      <span class="product__price mono">₡{{ data.priceForCustomer(selectedCustomer(), p.id) | number:'1.0-0' }} / {{ p.unit }}</span>
+                      <span class="product__price mono">₡{{ data.priceForCustomer(selectedCustomer(), p.id) | number:'1.0-0' }} / {{ p.unit | unitShort }}</span>
                       <span class="product__add">+ Agregar</span>
                     </div>
                   </button>

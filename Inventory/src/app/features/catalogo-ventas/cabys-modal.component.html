@@ -1,0 +1,63 @@
+<app-form-modal
+  [isOpen]="isOpen()"
+  [title]="'Código CABYS — ' + (product()?.name ?? '')"
+  (dismissed)="closed.emit()">
+
+  <div body>
+    <p class="cabys-hint">
+      Busca y asigna el código del Catálogo de Bienes y Servicios (CABYS) que corresponde a este producto.
+      Es el código fiscal usado en la facturación electrónica.
+    </p>
+
+    <!-- Seleccionado actual -->
+    @if (selected(); as s) {
+      <div class="cabys-selected">
+        <div class="cabys-selected__main">
+          <span class="cabys-selected__code mono">{{ s.codigo }}</span>
+          <span class="cabys-selected__desc">{{ s.descripcion || '—' }}</span>
+        </div>
+        <span class="cabys-selected__iva mono">IVA {{ (s.tasa_iva * 100) | number }}%</span>
+      </div>
+    } @else {
+      <div class="cabys-selected cabys-selected--empty">Sin código CABYS asignado.</div>
+    }
+
+    <app-search-bar [(query)]="query" placeholder="Buscar por descripción o código (mín. 2 caracteres)" />
+
+    @if (loading()) {
+      <div class="cabys-state">
+        <ion-icon name="time-outline" aria-hidden="true"></ion-icon>
+        Cargando catálogo CABYS…
+      </div>
+    } @else if (error()) {
+      <div class="cabys-state cabys-state--error">
+        <ion-icon name="warning-outline" aria-hidden="true"></ion-icon>
+        No se pudo cargar el catálogo CABYS.
+      </div>
+    } @else if (query().trim().length < 2) {
+      <div class="cabys-state">Escribe al menos 2 caracteres para buscar.</div>
+    } @else if (results().length === 0) {
+      <div class="cabys-state">Sin resultados para “{{ query() }}”.</div>
+    } @else {
+      <div class="cabys-results">
+        @for (e of results(); track e.codigo) {
+          <button type="button" class="cabys-result"
+            [class.cabys-result--on]="selected()?.codigo === e.codigo"
+            (click)="pick(e)">
+            <span class="cabys-result__code mono">{{ e.codigo }}</span>
+            <span class="cabys-result__desc">{{ e.descripcion }}</span>
+            <span class="cabys-result__iva mono">IVA {{ (e.tasa_iva * 100) | number }}%</span>
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <div footer>
+    <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+    @if (product()?.cabysCode) {
+      <ion-button fill="outline" color="danger" (click)="quitar()">Quitar</ion-button>
+    }
+    <ion-button [disabled]="!selected()" (click)="guardar()">Guardar</ion-button>
+  </div>
+</app-form-modal>

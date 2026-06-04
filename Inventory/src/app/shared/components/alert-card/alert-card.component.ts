@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe, DatePipe } from '@angular/common';
-import { IonButton } from '@ionic/angular/standalone';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { Alert } from '../../../core/models';
 
 @Component({
   selector: 'app-alert-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DecimalPipe, DatePipe, IonButton],
+  imports: [DecimalPipe, DatePipe, IonButton, IonIcon],
   templateUrl: './alert-card.component.html',
   styleUrls: ['./alert-card.component.scss'],
 })

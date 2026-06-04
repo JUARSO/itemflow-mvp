@@ -1,3 +1,40 @@
+.plan-hoy {
+  margin: 0 var(--ui-sp-4) var(--ui-sp-3);
+  padding: var(--ui-sp-3);
+  background: var(--ui-surface-2);
+  border: var(--ui-border-w-md) solid var(--ui-border-strong);
+  border-left-width: 3px;
+  border-left-color: var(--ui-primary);
+}
+.plan-hoy__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-sp-2);
+  margin-bottom: var(--ui-sp-2);
+}
+.plan-hoy__title { font-family: var(--ui-font-display); font-weight: var(--ui-fw-black); }
+.plan-hoy__total { color: var(--ui-text-muted); font-weight: var(--ui-fw-bold); }
+.plan-hoy__empty { margin: 0; font-size: var(--ui-fs-sm); color: var(--ui-text-muted); }
+.plan-hoy__items { display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-hoy__action { margin-top: var(--ui-sp-3); }
+.plan-hoy__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--ui-fs-sm);
+  font-weight: var(--ui-fw-bold);
+  color: var(--ui-success);
+}
+.plan-hoy__done ion-icon { font-size: 18px; }
+.plan-hoy__item {
+  padding: 4px 10px;
+  background: var(--ui-surface);
+  border: var(--ui-border-w-sm) solid var(--ui-border);
+  border-radius: var(--ui-radius-pill);
+  font-size: var(--ui-fs-sm);
+}
+
 .kpis {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -38,7 +75,7 @@
   background: var(--ui-surface-2);
   color: var(--ui-text-muted);
 }
-.req__dest--cliente { background: var(--ui-primary-tint); color: var(--ui-primary); }
+.req__dest--cliente { background: var(--ui-primary); color: var(--ui-primary-contrast); }
 .req__meta { font-size: var(--ui-fs-sm); margin: 4px 0 var(--ui-sp-2); }
 
 .req__items {

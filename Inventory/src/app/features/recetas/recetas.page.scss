@@ -61,14 +61,28 @@
       margin-bottom: var(--ui-sp-2);
     }
     .item-row {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: baseline;
+      gap: var(--ui-sp-3);
       padding: 6px 0;
       border-bottom: 1px dashed var(--ui-border);
       font-size: var(--ui-fs-sm);
     }
     .item-row:last-child { border-bottom: none; }
-    .item-row__qty { font-weight: var(--ui-fw-bold); }
+    .item-row__qty { font-weight: var(--ui-fw-bold); color: var(--ui-text-muted); }
+    .item-row__cost {
+      font-weight: var(--ui-fw-bold);
+      text-align: right;
+      min-width: 84px;
+    }
+    .item-row__pct {
+      display: inline-block;
+      margin-left: 4px;
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-medium);
+      color: var(--ui-text-muted);
+    }
 
     .card__notes {
       margin-top: var(--ui-sp-3);

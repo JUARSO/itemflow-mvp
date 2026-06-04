@@ -23,7 +23,7 @@ import { IonModal, IonButton } from '@ionic/angular/standalone';
 export class FormModalComponent {
   readonly isOpen = input.required<boolean>();
   readonly title = input.required<string>();
-  /** 'wide' ensancha el modal (formularios largos como la ficha técnica). */
-  readonly size = input<'default' | 'wide'>('default');
+  /** 'wide' ensancha; 'full' casi pantalla completa (paneles/dashboards). */
+  readonly size = input<'default' | 'wide' | 'full'>('default');
   readonly dismissed = output<void>();
 }

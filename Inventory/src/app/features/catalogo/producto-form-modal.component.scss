@@ -20,6 +20,25 @@
       color: var(--ui-text-muted);
       margin-bottom: var(--ui-sp-3);
     }
+    .cost-total {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--ui-sp-2) var(--ui-sp-3);
+      margin-bottom: var(--ui-sp-3);
+      background: var(--ui-surface-2);
+      border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+      border-radius: var(--ui-radius);
+    }
+    .cost-total__label {
+      font-size: var(--ui-fs-sm);
+      font-weight: var(--ui-fw-bold);
+      color: var(--ui-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .cost-total__value { font-weight: var(--ui-fw-bold); color: var(--ui-text); }
+
     /* Input readonly que muestra valor calculado: se ve grisáceo con label especial. */
     .input--computed {
       background: var(--ui-surface-2) !important;

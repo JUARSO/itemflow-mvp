@@ -1,0 +1,135 @@
+<div class="fe">
+  <div class="fe__head">
+    <h3>Facturación electrónica</h3>
+    @if (configurado()) {
+      <ion-badge color="success">Configurado</ion-badge>
+    } @else {
+      <ion-badge color="warning">Pendiente</ion-badge>
+    }
+  </div>
+  <p class="fe__hint">
+    Datos del emisor para generar comprobantes electrónicos ante Hacienda (Costa Rica).
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+
+    <!-- Identificación -->
+    <div class="fe__section">Identificación del emisor</div>
+    <label class="fld">
+      <span class="fld__label">Nombre / Razón social *</span>
+      <input type="text" formControlName="nombre" placeholder="Ej: Mi Empresa S.A." />
+    </label>
+    <div class="fe__row">
+      <label class="fld">
+        <span class="fld__label">Tipo de identificación</span>
+        <select formControlName="tipoIdentificacion">
+          @for (t of tiposId; track t.id) {
+            <option [value]="t.id">{{ t.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="fld">
+        <span class="fld__label">Número de identificación *</span>
+        <input type="text" inputmode="numeric" formControlName="identificacion" placeholder="Sin guiones" />
+      </label>
+    </div>
+    <div class="fe__row">
+      <label class="fld">
+        <span class="fld__label">Nombre comercial</span>
+        <input type="text" formControlName="nombreComercial" />
+      </label>
+      <label class="fld">
+        <span class="fld__label">Actividad económica (código)</span>
+        <input type="text" inputmode="numeric" formControlName="actividadEconomica" placeholder="Ej: 107101" />
+      </label>
+    </div>
+    <div class="fe__row">
+      <label class="fld">
+        <span class="fld__label">Sucursal</span>
+        <input type="text" inputmode="numeric" formControlName="sucursal" placeholder="001" />
+      </label>
+      <label class="fld">
+        <span class="fld__label">Terminal</span>
+        <input type="text" inputmode="numeric" formControlName="terminal" placeholder="00001" />
+      </label>
+    </div>
+
+    <!-- Ubicación -->
+    <div class="fe__section">Ubicación</div>
+    <div class="fe__row fe__row--3">
+      <label class="fld">
+        <span class="fld__label">Provincia</span>
+        <input type="text" formControlName="provincia" />
+      </label>
+      <label class="fld">
+        <span class="fld__label">Cantón</span>
+        <input type="text" formControlName="canton" />
+      </label>
+      <label class="fld">
+        <span class="fld__label">Distrito</span>
+        <input type="text" formControlName="distrito" />
+      </label>
+    </div>
+    <label class="fld">
+      <span class="fld__label">Barrio</span>
+      <input type="text" formControlName="barrio" />
+    </label>
+    <label class="fld">
+      <span class="fld__label">Otras señas (dirección exacta)</span>
+      <textarea formControlName="otrasSenas" rows="2"></textarea>
+    </label>
+
+    <!-- Contacto -->
+    <div class="fe__section">Contacto</div>
+    <div class="fe__row">
+      <label class="fld fld--tel">
+        <span class="fld__label">Teléfono</span>
+        <div class="tel">
+          <input type="text" class="tel__cod" formControlName="codigoPaisTel" />
+          <input type="text" inputmode="tel" class="tel__num" formControlName="telefono" />
+        </div>
+      </label>
+      <label class="fld">
+        <span class="fld__label">Correo electrónico *</span>
+        <input type="email" formControlName="correo" placeholder="facturas@empresa.cr" />
+      </label>
+    </div>
+
+    <!-- Hacienda / ATV -->
+    <div class="fe__section">Credenciales de Hacienda (ATV)</div>
+    <div class="fe__row">
+      <label class="fld">
+        <span class="fld__label">Usuario API Hacienda</span>
+        <input type="text" formControlName="usuarioHacienda" autocomplete="off" />
+      </label>
+      <label class="fld">
+        <span class="fld__label">Contraseña API Hacienda</span>
+        <input type="password" formControlName="passwordHacienda" autocomplete="off" />
+      </label>
+    </div>
+    <label class="fld">
+      <span class="fld__label">PIN del certificado (.p12)</span>
+      <input type="password" formControlName="certificadoPin" autocomplete="off" />
+    </label>
+
+    <label class="fld">
+      <span class="fld__label">Certificado / llave criptográfica (.p12)</span>
+      @if (certNombre()) {
+        <div class="cert">
+          <span class="cert__name"><ion-icon name="lock-closed-outline"></ion-icon> {{ certNombre() }}</span>
+          <button type="button" class="cert__rm" (click)="quitarCert()">Quitar</button>
+        </div>
+      } @else {
+        <label class="cert__drop">
+          <ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon>
+          <span>Subir archivo .p12…</span>
+          <input type="file" accept=".p12,.pfx" hidden (change)="onCertFile($event)" />
+        </label>
+      }
+    </label>
+
+    <div class="fe__actions">
+      <ion-button type="submit">Guardar datos de facturación</ion-button>
+    </div>
+  </form>
+</div>

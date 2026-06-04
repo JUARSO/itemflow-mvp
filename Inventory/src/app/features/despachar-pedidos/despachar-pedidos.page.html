@@ -16,12 +16,14 @@
     <app-kpi-card label="Unidades" [value]="totalUnidades()" tone="primary"></app-kpi-card>
   </div>
 
+  <app-search-bar [(query)]="query" placeholder="Buscar pedido por código o cliente" />
+
   <div class="list">
     @if (pedidos().length === 0) {
-      <app-empty-state icon="🚚" title="Sin pedidos por despachar"
+      <app-empty-state icon="car-outline" title="Sin pedidos por despachar"
         body="Cuando Producción termine un pedido de cliente, aparecerá aquí para despacharlo."></app-empty-state>
     }
-    @for (o of pedidos(); track o.id) {
+    @for (o of pedidosFiltrados(); track o.id) {
       <article class="ped">
         <header class="ped__head">
           <div>

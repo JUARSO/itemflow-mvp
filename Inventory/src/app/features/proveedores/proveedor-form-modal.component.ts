@@ -7,6 +7,7 @@ import {
 import { DataService } from '../../core/services/data.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { Supplier, SupplierItem } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const DAY_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'] as const;
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // lun..dom
@@ -23,6 +24,7 @@ const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // lun..dom
     CommonModule,
     IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
     IonButton, IonIcon,
+    UnitShortPipe,
   ],
   templateUrl: './proveedor-form-modal.component.html',
   styleUrls: ['./proveedor-form-modal.component.scss'],

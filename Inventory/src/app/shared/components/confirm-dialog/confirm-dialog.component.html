@@ -7,8 +7,8 @@
         <div class="confirm">
           <div class="confirm__icon" [attr.data-tone]="tone()">
             @switch (tone()) {
-              @case ('danger') { ⚠ }
-              @case ('warning') { ⚠ }
+              @case ('danger') { <ion-icon name="warning-outline" aria-hidden="true"></ion-icon> }
+              @case ('warning') { <ion-icon name="warning-outline" aria-hidden="true"></ion-icon> }
               @default { ? }
             }
           </div>

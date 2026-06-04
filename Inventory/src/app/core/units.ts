@@ -49,6 +49,23 @@ export const UNITS: readonly UnitDef[] = [
   { value: 'cm',      label: 'cm — centímetro', group: 'Longitud' },
 ] as const;
 
+/**
+ * Abreviatura CONCISA de cada unidad, para mostrar junto a cantidades en TODA
+ * la app (ej. "12 u", "50 kg", "3 saco"). Fuente única de verdad.
+ */
+const UNIT_SHORT: Record<Unit, string> = {
+  kg: 'kg', g: 'g', lb: 'lb', oz: 'oz',
+  L: 'L', ml: 'ml', gal: 'gal',
+  unidad: 'u', docena: 'dz', par: 'par', paquete: 'paq', caja: 'caja', bolsa: 'bolsa', saco: 'saco',
+  m: 'm', cm: 'cm',
+};
+
+/** Devuelve la abreviatura concisa de una unidad (ej. 'unidad' → 'u'). */
+export function unitShort(u: Unit | string | null | undefined): string {
+  if (!u) return '';
+  return UNIT_SHORT[u as Unit] ?? String(u);
+}
+
 /** Orden de grupos para renderizar `<optgroup>` consistentemente. */
 export const UNIT_GROUPS: readonly UnitGroup[] = ['Peso', 'Volumen', 'Conteo', 'Longitud'];
 

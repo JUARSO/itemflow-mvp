@@ -14,7 +14,7 @@
 /* Paper design siempre claro — NO importamos el palette dark de Ionic */
 
 /* =========================================================
-   ItemFlow — Estilos globales paper design
+   Atlas — Estilos globales paper design
    ========================================================= */
 
 * {
@@ -305,6 +305,41 @@ ion-badge {
 ion-modal {
   --border-radius: var(--ui-radius-lg);
   --box-shadow: var(--ui-shadow-xl);
+}
+
+/* ----- Tamaños del modal de la app (app-form-modal) -----
+   GLOBAL a propósito: Ionic teletransporta el modal fuera del componente al
+   presentarlo, así que el CSS encapsulado (:host ::ng-deep) no lo alcanza.
+   Aquí sí aplica siempre. */
+ion-modal.nb-modal {
+  --width: 720px;
+  --max-width: 95vw;
+  --height: auto;
+  --max-height: 94vh;
+}
+ion-modal.nb-modal--wide {
+  --width: 1100px;
+  --max-width: 96vw;
+}
+ion-modal.nb-modal--full {
+  --width: 98vw;
+  --max-width: 98vw;
+  --height: 96vh;
+  --max-height: 96vh;
+}
+ion-modal.nb-modal--full::part(content) {
+  width: 98vw;
+  max-width: 98vw;
+  height: 96vh;
+  max-height: 96vh;
+}
+@media (max-width: 600px) {
+  ion-modal.nb-modal {
+    --width: 100%;
+    --max-width: 100%;
+    --height: 100%;
+    --max-height: 100%;
+  }
 }
 
 ion-alert .alert-wrapper {

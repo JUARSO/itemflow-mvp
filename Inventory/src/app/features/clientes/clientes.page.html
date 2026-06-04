@@ -19,6 +19,10 @@
           hint="órdenes generadas desde portal"></app-kpi-card>
       </div>
 
+      @if (data.customers().length > 0) {
+        <app-search-bar [(query)]="query" placeholder="Buscar por nombre, contacto, email o teléfono" />
+      }
+
       @if (data.customers().length === 0) {
         <div class="empty">
           <h3>No hay clientes registrados</h3>
@@ -28,7 +32,7 @@
       }
 
       <div class="cards">
-        @for (c of data.customers(); track c.id) {
+        @for (c of clientesVisibles(); track c.id) {
           <article class="card" [class.card--inactive]="!c.active">
             <header class="card__head">
               <div>
@@ -48,6 +52,16 @@
                 @if (c.phone) { <span class="mono">{{ c.phone }}</span> }
               </div>
             }
+
+            <!-- Factura electrónica -->
+            <div class="card__fe">
+              @if (c.fiscal) {
+                <ion-badge color="success">Factura electrónica</ion-badge>
+                <span class="card__fe-id mono">{{ tipoIdLabel(c.fiscal.tipoIdentificacion) }} {{ c.fiscal.identificacion }}</span>
+              } @else {
+                <ion-badge color="medium">Sin datos fiscales</ion-badge>
+              }
+            </div>
 
             <!-- Acceso del portal -->
             <div class="access">
@@ -126,8 +140,8 @@
                       </div>
                       <span class="catalog__price mono">
                         ₡{{ data.priceForCustomer(c, p.id) | number:'1.0-0' }}
-                        @if (data.priceForCustomer(c, p.id) !== p.sellPrice) {
-                          <span class="catalog__custom" title="Precio personalizado (global ₡{{ p.sellPrice | number:'1.0-0' }})">★</span>
+                        @if (data.priceForCustomer(c, p.id) !== data.consumerPrice(p.id)) {
+                          <span class="catalog__custom" title="Precio personalizado (catálogo ₡{{ data.consumerPrice(p.id) | number:'1.0-0' }})"><ion-icon name="star" aria-hidden="true"></ion-icon></span>
                         }
                       </span>
                     </div>

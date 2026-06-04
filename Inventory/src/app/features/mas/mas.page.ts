@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonButton, IonBadge,
+  IonButton, IonBadge, IonIcon,
 } from '@ionic/angular/standalone';
 import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
@@ -14,6 +14,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { MiembroFormModalComponent } from './miembro-form-modal.component';
+import { FacturacionConfigComponent } from './facturacion-config.component';
 import { Member, UserRole } from '../../core/models';
 
 @Component({
@@ -23,8 +24,9 @@ import { Member, UserRole } from '../../core/models';
   imports: [
     FormsModule,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-    IonButton, IonBadge,
+    IonButton, IonBadge, IonIcon,
     PageHeaderComponent, ConfirmDialogComponent, MiembroFormModalComponent,
+    FacturacionConfigComponent,
   ],
   templateUrl: './mas.page.html',
   styleUrls: ['./mas.page.scss'],

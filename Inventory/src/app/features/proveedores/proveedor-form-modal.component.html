@@ -90,7 +90,7 @@
                           [checked]="isItemSelected('supply', s.id)"
                           (change)="toggleItem('supply', s.id)" />
                         <span>{{ s.name }}</span>
-                        <small>{{ s.unit }}</small>
+                        <small>{{ s.unit | unitShort }}</small>
                       </label>
                     }
                   </div>
@@ -107,7 +107,7 @@
                           [checked]="isItemSelected('product', p.id)"
                           (change)="toggleItem('product', p.id)" />
                         <span>{{ p.name }}</span>
-                        <small>{{ p.unit }} · reventa</small>
+                        <small>{{ p.unit | unitShort }} · reventa</small>
                       </label>
                     }
                     @if (filteredProducts().length === 0 && !itemFilter()) {

@@ -61,9 +61,9 @@
             @for (it of o.items; track it.productId) {
               <div class="items-table__row">
                 <div>{{ it.productName }}</div>
-                <div class="num mono">{{ it.qty }} {{ it.unit }}</div>
+                <div class="num mono">{{ it.qty }} {{ it.unit | unitShort }}</div>
                 <div class="num mono" [class.warn]="it.fulfilledQty < it.qty">
-                  {{ it.fulfilledQty }} {{ it.unit }}
+                  {{ it.fulfilledQty }} {{ it.unit | unitShort }}
                   @if (it.fulfilledQty < it.qty && o.status !== 'pending' && o.status !== 'cancelled') {
                     <span class="parcial">parcial</span>
                   }
@@ -100,9 +100,9 @@
                 @for (sf of a.shortfalls; track $index) {
                   <div class="shortfalls__row">
                     <div>{{ sf.itemName }} <small>({{ sf.kind === 'supply' ? 'insumo' : 'producto' }})</small></div>
-                    <div class="num mono">{{ sf.required | number:'1.0-3' }} {{ sf.unit }}</div>
-                    <div class="num mono">{{ sf.available | number:'1.0-3' }} {{ sf.unit }}</div>
-                    <div class="num mono short">{{ sf.short | number:'1.0-3' }} {{ sf.unit }}</div>
+                    <div class="num mono">{{ sf.required | number:'1.0-3' }} {{ sf.unit | unitShort }}</div>
+                    <div class="num mono">{{ sf.available | number:'1.0-3' }} {{ sf.unit | unitShort }}</div>
+                    <div class="num mono short">{{ sf.short | number:'1.0-3' }} {{ sf.unit | unitShort }}</div>
                   </div>
                 }
               </div>
@@ -115,7 +115,7 @@
               @for (r of o.reservations; track $index) {
                 <div class="reservas__row">
                   <span>{{ r.itemName }}</span>
-                  <span class="mono">{{ r.qty | number:'1.0-3' }} {{ r.unit }}</span>
+                  <span class="mono">{{ r.qty | number:'1.0-3' }} {{ r.unit | unitShort }}</span>
                 </div>
               }
             </div>

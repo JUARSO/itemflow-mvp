@@ -7,6 +7,7 @@ import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 /**
  * Modal que muestra el detalle completo de una orden de fabricación y las
@@ -16,7 +17,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
   selector: 'app-pedido-detail-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DecimalPipe, IonButton, IonIcon, FormModalComponent],
+  imports: [DatePipe, DecimalPipe, IonButton, IonIcon, FormModalComponent, UnitShortPipe],
   templateUrl: './pedido-detail-modal.component.html',
   styleUrls: ['./pedido-detail-modal.component.scss'],
 })

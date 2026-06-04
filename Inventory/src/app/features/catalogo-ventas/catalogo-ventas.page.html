@@ -14,19 +14,50 @@
   <div class="kpis">
     <app-kpi-card label="Productos" [value]="filas().length" tone="primary"></app-kpi-card>
     <app-kpi-card label="Margen promedio" [value]="margenPromedio() + '%'" tone="success"></app-kpi-card>
+    <app-kpi-card label="Sin código CABYS" [value]="sinCabys()"
+      [tone]="sinCabys() > 0 ? 'danger' : 'success'"
+      hint="productos pendientes de asignar"></app-kpi-card>
   </div>
+
+  @if (!tenant.canSetFinalPrices()) {
+    <div class="admin-note">
+      <ion-icon name="lock-closed-outline"></ion-icon>
+      Solo el administrador puede modificar los precios finales. Aquí los ves en modo lectura.
+    </div>
+  }
+
+  <app-search-bar [(query)]="query" placeholder="Buscar producto" />
 
   <div class="table">
     <div class="thead">
       <span>Producto</span>
       <span class="num">Costo (producción)</span>
-      <span class="num">Precio final</span>
+      <span class="num">Precio venta (sin IVA)</span>
+      <span class="num">Precio final con IVA</span>
       <span class="num">Margen</span>
     </div>
 
-    @for (r of filas(); track r.id) {
+    @for (r of filasFiltradas(); track r.id) {
       <article class="trow">
-        <div class="trow__name">{{ r.name }}</div>
+        <div class="trow__name">
+          <span class="trow__title">
+            {{ r.name }}
+            @if (!r.cabysCode) {
+              <span class="cabys-star" title="Sin código CABYS asignado">*</span>
+            }
+          </span>
+          <button type="button" class="cabys-chip"
+            [class.cabys-chip--missing]="!r.cabysCode"
+            (click)="openCabys(r)"
+            [title]="r.cabysDesc || 'Asignar código CABYS'">
+            <ion-icon name="pricetags-outline" aria-hidden="true"></ion-icon>
+            @if (r.cabysCode) {
+              <span class="mono">{{ r.cabysCode }}</span>
+            } @else {
+              <span>Asignar CABYS</span>
+            }
+          </button>
+        </div>
 
         <div class="trow__cost num mono">₡{{ r.costo | number:'1.0-0' }}</div>
 
@@ -34,8 +65,17 @@
           <span class="cur">₡</span>
           <input type="number" min="0" class="price-input mono"
             [value]="r.final"
-            [disabled]="!tenant.canManageUrnas()"
+            [disabled]="!tenant.canSetFinalPrices()"
             (input)="setFinal(r.id, +$any($event.target).value)" />
+        </div>
+
+        <div class="trow__iva num mono">
+          @if (r.finalConIva != null) {
+            <span class="trow__iva-price">₡{{ r.finalConIva | number:'1.0-0' }}</span>
+            <span class="trow__iva-tag">IVA {{ (r.cabysIva! * 100) | number }}%</span>
+          } @else {
+            <span class="trow__iva-na" title="Asigna un código CABYS para calcular el IVA">—</span>
+          }
         </div>
 
         <div class="trow__margin num mono"
@@ -46,4 +86,11 @@
       </article>
     }
   </div>
+
+  <app-cabys-modal
+    [isOpen]="!!cabysTarget()"
+    [product]="cabysTarget()"
+    (closed)="cabysTarget.set(null)"
+    (saved)="onCabysSaved($event)">
+  </app-cabys-modal>
 </ion-content>

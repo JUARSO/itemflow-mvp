@@ -57,6 +57,14 @@
       flex-wrap: wrap;
     }
     .card__info ion-icon { vertical-align: middle; font-size: 14px; }
+    .card__fe {
+      display: flex;
+      align-items: center;
+      gap: var(--ui-sp-2);
+      flex-wrap: wrap;
+      margin-top: var(--ui-sp-2);
+    }
+    .card__fe-id { font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
 
     .access {
       background: var(--ui-surface-2);
@@ -281,3 +289,5 @@
       color: var(--ui-danger); padding: 4px;
     }
     .muted { color: var(--ui-text-muted); }
+
+.rec__rm:hover { color: var(--ui-danger); }

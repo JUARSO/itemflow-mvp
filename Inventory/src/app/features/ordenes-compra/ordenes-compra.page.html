@@ -14,6 +14,8 @@
         }
       </app-page-header>
 
+      <app-search-bar [(query)]="query" placeholder="Buscar por código o proveedor" />
+
       <div class="kpis">
         <app-kpi-card label="Pendientes" [value]="data.inTransitOrders()" tone="transit"
           [hint]="data.inTransitUnits() + ' unidades en tránsito'"></app-kpi-card>
@@ -56,7 +58,7 @@
       <div class="list">
         @if (visibles().length === 0) {
           <app-empty-state
-            icon="📋"
+            icon="clipboard-outline"
             title="Sin órdenes en este rango"
             body="No hay órdenes de compra que coincidan con el estado y el rango de fechas seleccionados.">
           </app-empty-state>
@@ -101,9 +103,12 @@
               @if (po.status === 'pending' && po.expectedDate) {
                 <div class="po__expected">
                   Esperada: <strong class="mono">{{ po.expectedDate | date:'dd-MM-yyyy' }}</strong>
-                  @if (isOverdue(po.expectedDate)) {
-                    <ion-badge color="danger">Atrasada</ion-badge>
-                  }
+                  <ion-badge [color]="entregaEstado(po.expectedDate).color">{{ entregaEstado(po.expectedDate).label }}</ion-badge>
+                </div>
+              }
+              @if (po.status === 'received' && po.receivedAt) {
+                <div class="po__expected">
+                  Recibida: <strong class="mono">{{ po.receivedAt | date:'dd-MM-yyyy' }}</strong>
                 </div>
               }
               @if (tenant.canManagePurchaseOrders()) {

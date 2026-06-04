@@ -24,7 +24,7 @@
           <div class="product-meta">
             <span><strong>SKU:</strong> <span class="mono">{{ p.sku }}</span></span>
             <span><strong>Categoría:</strong> {{ p.category || '—' }}</span>
-            <span><strong>Unidad:</strong> {{ p.unit }}</span>
+            <span><strong>Unidad:</strong> {{ p.unit | unitShort }}</span>
           </div>
         }
         <div class="row row--3">
@@ -62,18 +62,18 @@
             @for (ctrl of items.controls; track $index) {
               <div [formGroupName]="$index" class="item">
                 <select formControlName="kind" class="item__kind" (change)="onKindChange($index)">
-                  <option value="supply">📦 Insumo</option>
-                  <option value="product">🍞 Subproducto</option>
+                  <option value="supply">Insumo</option>
+                  <option value="product">Subproducto</option>
                 </select>
                 <select formControlName="itemId" class="item__supply">
                   <option value="">— Selecciona —</option>
                   @if (kindAt($index) === 'supply') {
                     @for (s of data.activeSupplies(); track s.id) {
-                      <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+                      <option [value]="s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
                     }
                   } @else {
                     @for (p of subproductosDisponibles(); track p.id) {
-                      <option [value]="p.id">{{ p.name }} ({{ p.unit }})</option>
+                      <option [value]="p.id">{{ p.name }} ({{ p.unit | unitShort }})</option>
                     }
                   }
                 </select>
@@ -84,10 +84,18 @@
                   min="0"
                   step="0.001"
                   class="item__qty mono" />
+                <span class="item__cost mono">₡{{ itemCost($index) | number:'1.0-0' }}</span>
                 <button type="button" class="item__remove" (click)="removeItem($index)" aria-label="Eliminar">×</button>
               </div>
             }
           </div>
+
+          @if (items.controls.length > 0) {
+            <div class="items__total">
+              <span>Costo corrida: <strong class="mono">₡{{ costoTotalForm() | number:'1.0-0' }}</strong></span>
+              <span>Por unidad: <strong class="mono">₡{{ costoUnidadForm() | number:'1.0-0' }}</strong></span>
+            </div>
+          }
         </div>
 
         <!-- ===== Procedimiento ===== -->
@@ -160,7 +168,7 @@
             } @else {
               <label class="image-upload__drop">
                 <input type="file" accept="image/*" (change)="onImageSelected($event)" hidden />
-                <span>📷 Subir imagen…</span>
+                <span><ion-icon name="camera-outline" aria-hidden="true"></ion-icon> Subir imagen…</span>
               </label>
             }
           </div>

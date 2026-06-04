@@ -143,7 +143,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
-const STORAGE_KEY = 'itemflow_theme_v1';
+const STORAGE_KEY = 'atlas_theme_v1';
 const DEFAULT_THEME_ID = 'sage';
 
 @Injectable({ providedIn: 'root' })

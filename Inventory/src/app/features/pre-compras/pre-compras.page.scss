@@ -76,6 +76,10 @@
     }
 
     .pre__items { padding: var(--ui-sp-2) var(--ui-sp-4); }
+    @media (max-width: 600px) {
+      .pre__items { overflow-x: auto; }
+      .pre-item { min-width: 520px; }
+    }
     .pre-item {
       display: grid;
       grid-template-columns: 2.5fr 1fr 0.7fr 0.8fr 1fr 30px;
@@ -91,7 +95,8 @@
       letter-spacing: 0.5px; color: var(--ui-text-muted);
       font-weight: var(--ui-fw-black);
     }
-    .pre-item[data-reason="below_rop"] { background: rgba(255,0,0,0.04); }
+    .pre-item[data-reason="demand"]    { background: var(--ui-danger-tint); }
+    .pre-item[data-reason="below_rop"] { background: var(--ui-warning-tint); }
     .pre-item[data-reason="manual"]    { background: var(--ui-surface-2); }
     .pre-item__name { display: flex; flex-direction: column; gap: 2px; font-weight: var(--ui-fw-bold); }
     .pre-item__name ion-badge.mini { font-size: 9px; align-self: flex-start; }

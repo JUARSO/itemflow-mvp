@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { IonModal, IonButton } from '@ionic/angular/standalone';
+import { IonModal, IonButton, IonIcon } from '@ionic/angular/standalone';
 
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IonModal, IonButton],
+  imports: [IonModal, IonButton, IonIcon],
   templateUrl: './confirm-dialog.component.html',
   styleUrls: ['./confirm-dialog.component.scss'],
 })

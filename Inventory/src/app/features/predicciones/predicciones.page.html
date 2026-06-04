@@ -11,195 +11,59 @@
         subtitle="Decisión de compra y proyección de stock basadas en dos modelos LightGBM.">
       </app-page-header>
 
-      <div class="layout">
-        <!-- ============ ZONA IZQUIERDA: FORMULARIO ============ -->
-        <aside class="form-zone">
-
-          <!-- Cargar desde catálogo -->
-          <div class="load-bar">
-            <div class="load-bar__label">📦 Cargar desde catálogo</div>
-            <p class="load-bar__hint">
-              Selecciona un insumo o producto de reventa para autollenar el formulario
-              con su stock, política y demanda histórica.
-            </p>
-            <div class="load-bar__row">
-              <select [(ngModel)]="selectedItemRef" class="load-bar__select">
-                <option value="">— Selecciona item —</option>
-                @if (supplyItems().length > 0) {
-                  <optgroup label="Insumos">
-                    @for (it of supplyItems(); track it.id) {
-                      <option [value]="'supply:' + it.id">{{ it.name }} ({{ it.unit }})</option>
-                    }
-                  </optgroup>
-                }
-                @if (productItems().length > 0) {
-                  <optgroup label="Productos de reventa">
-                    @for (it of productItems(); track it.id) {
-                      <option [value]="'product:' + it.id">{{ it.name }} ({{ it.unit }})</option>
-                    }
-                  </optgroup>
-                }
-              </select>
-              <ion-button
-                size="small"
-                (click)="loadFromCatalog()"
-                [disabled]="!selectedItemRef">
-                Cargar datos
-              </ion-button>
-            </div>
-            @if (loadedItemLabel()) {
-              <div class="load-bar__loaded">
-                ✓ Datos cargados de: <strong>{{ loadedItemLabel() }}</strong>
+      <!-- Grilla: todos los ítems de un vistazo. Toca uno para el detalle. -->
+      <section class="pred-cards">
+        <div class="pred-cards__title">
+          Todos los ítems · ordenados por urgencia — toca una tarjeta para el análisis completo
+        </div>
+        <div class="pred-cards__grid">
+          @for (c of tarjetas(); track c.kind + c.id) {
+            <button type="button" class="pcard" [attr.data-status]="c.status"
+              [class.pcard--on]="seleccionado() === c.kind + ':' + c.id"
+              (click)="seleccionarTarjeta(c)">
+              <div class="pcard__head">
+                <span class="pcard__name">{{ c.name }}</span>
+                <span class="pcard__badge">{{ c.decisionTitle }}</span>
               </div>
-            }
-          </div>
-
-          <form [formGroup]="form" novalidate (ngSubmit)="onSubmit()">
-
-            <!-- INVENTARIO -->
-            <details class="acc" [open]="isOpen('inventario')" (toggle)="onToggle('inventario', $event)">
-              <summary class="acc__summary">
-                <span class="acc__title">Inventario</span>
-                <span class="acc__chevron">▾</span>
-              </summary>
-              <div class="acc__body">
-                <label class="field">
-                  <span class="field__label">Stock actual (u) <span class="req">*</span></span>
-                  <input type="number" formControlName="actual_stock" min="0" step="1" />
-                  @if (showError('actual_stock')) {
-                    <span class="field__error">{{ errorFor('actual_stock') }}</span>
-                  }
-                </label>
-                <label class="field">
-                  <span class="field__label">Días desde último restock <span class="req">*</span></span>
-                  <input type="number" formControlName="dias_desde_ultimo_restock" min="0" step="1" />
-                  @if (showError('dias_desde_ultimo_restock')) {
-                    <span class="field__error">{{ errorFor('dias_desde_ultimo_restock') }}</span>
-                  }
-                </label>
-              </div>
-            </details>
-
-            <!-- POLÍTICA -->
-            <details class="acc" [open]="isOpen('politica')" (toggle)="onToggle('politica', $event)">
-              <summary class="acc__summary">
-                <span class="acc__title">Política de inventario</span>
-                <span class="acc__chevron">▾</span>
-              </summary>
-              <div class="acc__body">
-                <div class="row-2">
-                  <label class="field">
-                    <span class="field__label">Stock mínimo <span class="req">*</span></span>
-                    <input type="number" formControlName="stock_min" min="0" step="1" />
-                    @if (showError('stock_min')) {
-                      <span class="field__error">{{ errorFor('stock_min') }}</span>
-                    }
-                  </label>
-                  <label class="field">
-                    <span class="field__label">Stock máximo <span class="req">*</span></span>
-                    <input type="number" formControlName="stock_max" min="0" step="1" />
-                    @if (showError('stock_max')) {
-                      <span class="field__error">{{ errorFor('stock_max') }}</span>
-                    }
-                  </label>
+              <div class="pcard__metrics">
+                <div class="pcard__metric">
+                  <span class="pcard__label">Stock</span>
+                  <span class="pcard__value mono">{{ c.stock | number:'1.0-0' }} {{ c.unit | unitShort }}</span>
                 </div>
-                <label class="field">
-                  <span class="field__label">Punto de reorden manual <span class="req">*</span></span>
-                  <input type="number" formControlName="reorder_point_manual" min="0" step="1" />
-                  <span class="field__hint mono">
-                    Mínimo teórico:
-                    @if (theoreticalMin() != null) {
-                      {{ theoreticalMin() | number:'1.0-0' }} u
-                    } @else {
-                      —
-                    }
-                  </span>
-                  @if (showError('reorder_point_manual')) {
-                    <span class="field__error">{{ errorFor('reorder_point_manual') }}</span>
-                  }
-                </label>
-              </div>
-            </details>
-
-            <!-- DEMANDA -->
-            <details class="acc" [open]="isOpen('demanda')" (toggle)="onToggle('demanda', $event)">
-              <summary class="acc__summary">
-                <span class="acc__title">Demanda histórica</span>
-                <span class="acc__chevron">▾</span>
-              </summary>
-              <div class="acc__body">
-                <label class="field">
-                  <span class="field__label">Promedio diario 7d (un/día) <span class="req">*</span></span>
-                  <input type="number" formControlName="rolling_mean_7d" min="0" step="0.01" />
-                  @if (showError('rolling_mean_7d')) {
-                    <span class="field__error">{{ errorFor('rolling_mean_7d') }}</span>
-                  }
-                </label>
-                <label class="field">
-                  <span class="field__label">Promedio diario 14d (un/día) <span class="req">*</span></span>
-                  <input type="number" formControlName="rolling_mean_14d" min="0" step="0.01" />
-                </label>
-                <label class="field">
-                  <span class="field__label">Promedio diario 30d (un/día) <span class="req">*</span></span>
-                  <input type="number" formControlName="rolling_mean_30d" min="0" step="0.01" />
-                </label>
-                <label class="field">
-                  <span class="field__label">Desv. estándar 7d (un/día) <span class="req">*</span></span>
-                  <input type="number" formControlName="rolling_std_7d" min="0" step="0.01" />
-                </label>
-              </div>
-            </details>
-
-            <!-- LOGÍSTICA -->
-            <details class="acc" [open]="isOpen('logistica')" (toggle)="onToggle('logistica', $event)">
-              <summary class="acc__summary">
-                <span class="acc__title">Logística</span>
-                <span class="acc__chevron">▾</span>
-              </summary>
-              <div class="acc__body">
-                <div class="row-2">
-                  <label class="field">
-                    <span class="field__label">Lead time prom. (días) <span class="req">*</span></span>
-                    <input type="number" formControlName="lt_avg" min="1" step="0.1" />
-                    @if (showError('lt_avg')) {
-                      <span class="field__error">{{ errorFor('lt_avg') }}</span>
-                    }
-                  </label>
-                  <label class="field">
-                    <span class="field__label">Lead time desv. est. (días) <span class="req">*</span></span>
-                    <input type="number" formControlName="lt_std" min="0" step="0.1" />
-                  </label>
+                <div class="pcard__metric">
+                  <span class="pcard__label">Cobertura</span>
+                  <span class="pcard__value mono">{{ fmtCobertura(c.diasCobertura) }}</span>
+                </div>
+                <div class="pcard__metric">
+                  <span class="pcard__label">Reorden</span>
+                  <span class="pcard__value mono">{{ c.reorderPoint | number:'1.0-0' }} {{ c.unit | unitShort }}</span>
                 </div>
               </div>
-            </details>
-
-            <div class="submit-wrap">
-              <ion-button
-                type="submit"
-                expand="block"
-                [disabled]="!canSubmit() || pred.state().loading">
-                @if (pred.state().loading) {
-                  ⏳ Procesando…
-                } @else {
-                  ⚡ Analizar con IA
+              <div class="pcard__foot">
+                <div class="pcard__urg" [attr.title]="'Urgencia ' + (c.urgencia * 100 | number:'1.0-0') + '%'">
+                  <div class="pcard__urg-bar" [style.width.%]="c.urgencia * 100"></div>
+                </div>
+                @if (c.cantidad > 0) {
+                  <span class="pcard__order">Ordenar {{ c.cantidad | number:'1.0-0' }} {{ c.unit | unitShort }}</span>
                 }
-              </ion-button>
-              @if (!canSubmit() && form.touched) {
-                <p class="submit-hint">Revisa los campos con error para habilitar el análisis.</p>
-              }
-              @if (pred.state().simulated && pred.state().result) {
-                <p class="submit-hint">⚠️ Backend no disponible — resultado generado por simulador local determinista.</p>
-              }
-            </div>
-          </form>
-        </aside>
+              </div>
+            </button>
+          }
+        </div>
+      </section>
 
-        <!-- ============ ZONA DERECHA: RESULTADOS ============ -->
-        <main class="result-zone">
+
+      <!-- ============ DETALLE EN MODAL ============ -->
+      <app-form-modal
+        [isOpen]="detalleOpen()"
+        [title]="'Análisis · ' + (loadedItemLabel() || 'ítem')"
+        size="full"
+        (dismissed)="detalleOpen.set(false)">
+        <main body class="result-zone">
 
           @if (!pred.state().result && !pred.state().loading) {
             <div class="placeholder">
-              <div class="placeholder__icon">🔮</div>
+              <div class="placeholder__icon"><ion-icon name="sparkles-outline" aria-hidden="true"></ion-icon></div>
               <h2>Complete los parámetros y presione "Analizar con IA"</h2>
               <p>Los resultados aparecerán aquí: decisión de compra, proyección de stock y consulta interactiva por día.</p>
             </div>
@@ -218,7 +82,7 @@
                 <article class="result-card" [attr.data-status]="decisionMeta().status">
                   <div class="result-card__label">Decisión de compra</div>
                   <div class="result-card__main">
-                    <span class="result-card__icon">{{ decisionMeta().icon }}</span>
+                    <ion-icon class="result-card__icon" [name]="decisionMeta().icon" aria-hidden="true"></ion-icon>
                     <span class="result-card__title">{{ decisionMeta().title }}</span>
                   </div>
                   <div class="result-card__sub">Stock cubre ~{{ r.derivados.dias_cobertura | number:'1.0-1' }} días</div>
@@ -234,9 +98,9 @@
                 <article class="result-card">
                   <div class="result-card__label">Cantidad recomendada</div>
                   <div class="result-card__bignum mono">{{ r.orden.cantidad_final | number:'1.0-0' }}</div>
-                  <div class="result-card__sub">unidades a ordenar</div>
+                  <div class="result-card__sub">{{ loadedUnit() | unitShort }} a ordenar</div>
                   @if (r.orden.cantidad_final < r.orden.cantidad_modelo) {
-                    <div class="result-card__note">Limitado por capacidad máxima ({{ r.orden.cantidad_modelo }} u sugeridas por el modelo)</div>
+                    <div class="result-card__note">Limitado por capacidad máxima ({{ r.orden.cantidad_modelo }} {{ loadedUnit() | unitShort }} sugeridas por el modelo)</div>
                   }
                 </article>
               </div>
@@ -249,11 +113,16 @@
                 </div>
                 <div class="chip">
                   <div class="chip__label">Punto de reorden</div>
-                  <div class="chip__value mono">{{ r.derivados.reorder_point | number:'1.0-0' }} u</div>
+                  <div class="chip__value mono">{{ r.derivados.reorder_point | number:'1.0-0' }} {{ loadedUnit() | unitShort }}</div>
+                  @if (loadedSupplyId()) {
+                    <button type="button" class="rop-apply" (click)="aplicarRopSugerido(r.derivados.reorder_point)">
+                      Aplicar al insumo
+                    </button>
+                  }
                 </div>
                 <div class="chip">
                   <div class="chip__label">Stock seguridad</div>
-                  <div class="chip__value mono">{{ r.derivados.safety_stock | number:'1.0-0' }} u</div>
+                  <div class="chip__value mono">{{ r.derivados.safety_stock | number:'1.0-0' }} {{ loadedUnit() | unitShort }}</div>
                 </div>
                 <div class="chip" [attr.data-status]="chipStatus('ratio', r.derivados.stock_ratio)">
                   <div class="chip__label">Stock / ROP</div>
@@ -278,6 +147,7 @@
                 [stockMax]="pred.state().request!.stock_max"
                 [reorderPoint]="r.derivados.reorder_point"
                 [recommendedRop]="recommendedRop()"
+                [unit]="loadedUnit() | unitShort"
                 [maxDay]="60">
               </app-projection-chart>
 
@@ -330,13 +200,13 @@
                 <article class="result-card" [attr.data-status]="sliderStatus()">
                   <div class="result-card__label">Stock proyectado</div>
                   <div class="result-card__bignum mono">{{ sliderStock() | number:'1.0-0' }}</div>
-                  <div class="result-card__sub">unidades en día {{ sliderDay() }}</div>
+                  <div class="result-card__sub">{{ loadedUnit() | unitShort }} en día {{ sliderDay() }}</div>
                 </article>
 
                 <article class="result-card" [attr.data-status]="sliderStatus()">
                   <div class="result-card__label">Estado</div>
                   <div class="result-card__main">
-                    <span class="result-card__icon">{{ sliderStatusIcon() }}</span>
+                    <ion-icon class="result-card__icon" [name]="sliderStatusIcon()" aria-hidden="true"></ion-icon>
                     <span class="result-card__title">{{ sliderStatusLabel() }}</span>
                   </div>
                   <div class="result-card__sub">{{ sliderStatusExplain() }}</div>
@@ -351,7 +221,7 @@
                       @for (e of eventsUntilSlider(); track e.trigger) {
                         <div class="event-row" [attr.data-status]="e.arrival <= sliderDay() ? 'recibido' : 'transito'">
                           <span class="mono">Día {{ e.trigger }} → llega día {{ e.arrival }}</span>
-                          <span class="event-row__qty mono">+{{ e.qty }} u</span>
+                          <span class="event-row__qty mono">+{{ e.qty }} {{ loadedUnit() | unitShort }}</span>
                           <span class="event-row__tag">{{ e.arrival <= sliderDay() ? 'recibido' : 'en tránsito' }}</span>
                         </div>
                       }
@@ -366,15 +236,19 @@
                 [stockMin]="pred.state().request!.stock_min"
                 [stockMax]="pred.state().request!.stock_max"
                 [reorderPoint]="r.derivados.reorder_point"
+                [unit]="loadedUnit() | unitShort"
                 [maxDay]="sliderDay()">
               </app-projection-chart>
             </section>
 
             <!-- BARRA DE ESTADO INFERIOR -->
             <div class="status-bar">
-              ✓ Análisis completado · Urgencia: <strong class="mono">{{ (r.orden.urgencia * 100) | number:'1.0-0' }}%</strong> · Cantidad recomendada: <strong class="mono">{{ r.orden.cantidad_final }} u</strong>
+<ion-icon name="checkmark-outline" aria-hidden="true"></ion-icon> Análisis completado · Urgencia: <strong class="mono">{{ (r.orden.urgencia * 100) | number:'1.0-0' }}%</strong> · Cantidad recomendada: <strong class="mono">{{ r.orden.cantidad_final }} {{ loadedUnit() | unitShort }}</strong>
             </div>
           }
         </main>
-      </div>
+        <div footer>
+          <ion-button fill="clear" class="ghost" (click)="detalleOpen.set(false)">Cerrar</ion-button>
+        </div>
+      </app-form-modal>
     </ion-content>

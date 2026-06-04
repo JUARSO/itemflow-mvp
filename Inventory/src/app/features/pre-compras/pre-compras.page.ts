@@ -11,6 +11,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 import { Supply, SuggestedPrePurchase } from '../../core/models';
 
 @Component({
@@ -18,7 +19,7 @@ import { Supply, SuggestedPrePurchase } from '../../core/models';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    DatePipe, DecimalPipe, RouterLink,
+    DatePipe, DecimalPipe, RouterLink, UnitShortPipe,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonBadge, IonIcon,
     PageHeaderComponent, KpiCardComponent, ConfirmDialogComponent,

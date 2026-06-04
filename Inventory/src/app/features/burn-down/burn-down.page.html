@@ -21,14 +21,14 @@
               @if (supplyItems().length > 0) {
                 <optgroup label="Insumos">
                   @for (it of supplyItems(); track it.id) {
-                    <option [value]="'supply:' + it.id">{{ it.name }} ({{ it.unit }})</option>
+                    <option [value]="'supply:' + it.id">{{ it.name }} ({{ it.unit | unitShort }})</option>
                   }
                 </optgroup>
               }
               @if (productItems().length > 0) {
                 <optgroup label="Productos de reventa">
                   @for (it of productItems(); track it.id) {
-                    <option [value]="'product:' + it.id">{{ it.name }} ({{ it.unit }})</option>
+                    <option [value]="'product:' + it.id">{{ it.name }} ({{ it.unit | unitShort }})</option>
                   }
                 </optgroup>
               }
@@ -48,7 +48,7 @@
 
       @if (!sim()) {
         <div class="placeholder">
-          <div class="placeholder__icon">📉</div>
+          <div class="placeholder__icon"><ion-icon name="trending-down-outline" aria-hidden="true"></ion-icon></div>
           <h2>Selecciona un item para empezar</h2>
           <p>Verás su trayectoria de stock proyectada, el día en que debes ordenar y la cantidad sugerida.</p>
         </div>
@@ -86,7 +86,7 @@
           </header>
           <div class="dates">
             <div class="date-row" [attr.data-status]="orderUrgencyStatus()">
-              <div class="date-row__icon">📅</div>
+              <div class="date-row__icon"><ion-icon name="calendar-outline" aria-hidden="true"></ion-icon></div>
               <div class="date-row__body">
                 <div class="date-row__title">Día sugerido para ordenar</div>
                 <div class="date-row__detail">
@@ -105,7 +105,7 @@
             </div>
 
             <div class="date-row" [attr.data-status]="sim()!.dayCrossesReorder !== null ? 'alerta' : 'optimo'">
-              <div class="date-row__icon">⚠️</div>
+              <div class="date-row__icon"><ion-icon name="warning-outline" aria-hidden="true"></ion-icon></div>
               <div class="date-row__body">
                 <div class="date-row__title">Cruce de punto de reorden ({{ sim()!.reorderPoint }} {{ unitLabel() }})</div>
                 <div class="date-row__detail">
@@ -119,7 +119,7 @@
             </div>
 
             <div class="date-row" [attr.data-status]="sim()!.dayHitsZero !== null ? 'critico' : 'optimo'">
-              <div class="date-row__icon">🚨</div>
+              <div class="date-row__icon"><ion-icon name="alert-circle-outline" aria-hidden="true"></ion-icon></div>
               <div class="date-row__body">
                 <div class="date-row__title">Stock = 0 si NO ordenas</div>
                 <div class="date-row__detail">
@@ -134,7 +134,7 @@
 
             @if (sim()!.suggestedOrderQty > 0 && sim()!.dayToOrder !== null) {
               <div class="date-row" data-status="informativo">
-                <div class="date-row__icon">📦</div>
+                <div class="date-row__icon"><ion-icon name="cube-outline" aria-hidden="true"></ion-icon></div>
                 <div class="date-row__body">
                   <div class="date-row__title">Cantidad sugerida a ordenar</div>
                   <div class="date-row__detail">

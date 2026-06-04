@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
@@ -11,6 +11,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { CustomerOrder } from '../../core/models';
 
 @Component({
@@ -21,7 +22,7 @@ import { CustomerOrder } from '../../core/models';
     DatePipe,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon,
-    PageHeaderComponent, KpiCardComponent, EmptyStateComponent,
+    PageHeaderComponent, KpiCardComponent, EmptyStateComponent, SearchBarComponent,
   ],
   templateUrl: './produccion.page.html',
   styleUrls: ['./produccion.page.scss'],
@@ -34,6 +35,17 @@ export class ProduccionPage {
 
   /** Pedidos de cliente recibidos, esperando corroboración de Ventas. */
   readonly recibidos = computed(() => this.data.pedidosRecibidos());
+
+  readonly query = signal('');
+  readonly recibidosFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.recibidos();
+    if (!q) return list;
+    return list.filter(o =>
+      (o.code ?? '').toLowerCase().includes(q) ||
+      (this.data.customerById(o.customerId ?? '')?.name ?? '').toLowerCase().includes(q)
+    );
+  });
 
   readonly totalUnidades = computed(() =>
     this.recibidos().reduce((s, o) => s + o.items.reduce((q, it) => q + it.qty, 0), 0)

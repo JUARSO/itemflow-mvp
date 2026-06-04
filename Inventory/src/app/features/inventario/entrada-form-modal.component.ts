@@ -7,12 +7,13 @@ import { FormFieldComponent } from '../../shared/components/form-field/form-fiel
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 @Component({
   selector: 'app-entrada-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DecimalPipe, IonButton, FormModalComponent, FormFieldComponent],
+  imports: [ReactiveFormsModule, DecimalPipe, IonButton, FormModalComponent, FormFieldComponent, UnitShortPipe],
   templateUrl: './entrada-form-modal.component.html',
   styleUrls: ['./entrada-form-modal.component.scss'],
 })

@@ -1,0 +1,47 @@
+<ion-content [fullscreen]="true">
+  <div class="page">
+    <div class="card">
+      <div class="brand">
+        <h1 class="brand__title">Crea tu empresa</h1>
+        <p class="brand__tagline">Registra tu organización y empieza a operar. Tu cuenta de administrador se crea automáticamente.</p>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <label class="field-label" for="orgName">Nombre de la empresa</label>
+        <input id="orgName" type="text" formControlName="orgName" placeholder="Ej: Panadería La Espiga" class="input" />
+
+        <label class="field-label" for="adminName">Tu nombre (administrador)</label>
+        <input id="adminName" type="text" formControlName="adminName" placeholder="Nombre y apellido" class="input" />
+
+        <label class="field-label" for="adminEmail">Correo electrónico</label>
+        <input id="adminEmail" type="email" formControlName="adminEmail" autocomplete="email" placeholder="tu@empresa.com" class="input" />
+
+        <label class="field-label" for="password">Contraseña</label>
+        <input id="password" type="password" formControlName="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" class="input" />
+
+        <label class="field-label">Plan</label>
+        <div class="plans">
+          @for (p of plans; track p.id) {
+            <label class="plan" [class.plan--on]="form.controls.planId.value === p.id">
+              <input type="radio" formControlName="planId" [value]="p.id" />
+              <span class="plan__name">{{ p.name }}</span>
+              <span class="plan__price mono">{{ p.priceMonthly === 0 ? 'Gratis' : '₡' + (p.priceMonthly | number:'1.0-0') + '/mes' }}</span>
+              <span class="plan__desc">{{ p.description }}</span>
+            </label>
+          }
+        </div>
+
+        @if (error()) {
+          <div class="error">{{ error() }}</div>
+        }
+
+        <ion-button expand="block" type="submit" [disabled]="loading()">
+          {{ loading() ? 'Creando empresa…' : 'Crear empresa y empezar' }}
+        </ion-button>
+      </form>
+
+      <p class="alt">¿Ya tienes cuenta? <a routerLink="/auth/login">Inicia sesión</a></p>
+      <p class="trial-note">Incluye 14 días de prueba. Sin tarjeta para empezar.</p>
+    </div>
+  </div>
+</ion-content>

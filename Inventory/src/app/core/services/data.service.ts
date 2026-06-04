@@ -5,19 +5,38 @@ import {
   PurchaseOrder, Recipe, ReturnedLot, SaleRecord, StockItem,
   SuggestedPrePurchase, SuggestedPrePurchaseItem, SuggestedReason,
   Supplier, Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
-  Urna, UrnaLote, UrnaLoteLine, PosSale, PosSaleLine, RecurringOrder, RecurringOrderItem,
+  Urna, UrnaLote, UrnaLoteLine, PosSale, PosSaleLine, PaymentMethod, ComprobanteTipo, PosCliente, RecurringOrder, RecurringOrderItem,
+  ReservaItem, WeeklyPlanItem, WeeklyProductionPlan,
 } from '../models';
 import {
   MOCK_ALERTS, MOCK_CUSTOMERS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
   MOCK_PRODUCTS, MOCK_PRODUCT_STOCK, MOCK_PURCHASE_ORDERS, MOCK_RECIPES,
   MOCK_RETURNED_LOTS, MOCK_SALES, MOCK_SUPPLIERS, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
-  MOCK_URNAS, MOCK_URNA_LOTES, MOCK_CONSUMER_PRICES,
+  MOCK_URNAS, MOCK_URNA_LOTES, MOCK_CONSUMER_PRICES, DEFAULT_TENANT_ID,
 } from '../mocks/dummy-data';
 import { computeSupplierLeadTime, LeadTimeResult } from '../lead-time';
 
 /**
- * Servicio único in-memory para el MVP.
- * Reemplazar por servicios Firebase cuando se conecte el backend real.
+ * Instantánea completa de los datos de UN tenant. Se usa para particionar el
+ * estado por organización y poder cambiar de tenant sin mezclar información.
+ */
+interface TenantData {
+  products: Product[]; supplies: Supply[]; recipes: Recipe[];
+  productStock: StockItem[]; supplyStock: SupplyStockItem[]; kardex: KardexEntry[];
+  sales: SaleRecord[]; alerts: Alert[]; predictions: DemandPrediction[];
+  pos: PurchaseOrder[]; members: Member[]; orders: CustomerOrder[]; customers: Customer[];
+  returnedLots: ReturnedLot[]; suppliers: Supplier[]; urnas: Urna[]; urnaLotes: UrnaLote[];
+  posSales: PosSale[]; posClientes: PosCliente[]; recurringOrders: RecurringOrder[];
+  reservas: ReservaItem[]; consumerPrices: Record<string, number>;
+  manualAdditions: Record<string, { supplyId: string; qty: number }[]>;
+  weeklyPlan: WeeklyProductionPlan;
+  planDeliveries: Record<string, { at: Date; total: number }>;
+}
+
+/**
+ * Servicio único in-memory para el MVP, AHORA particionado por tenant.
+ * Reemplazar por servicios Firebase (subcolecciones `tenants/{tenantId}/...`)
+ * cuando se conecte el backend real — ese será el aislamiento *seguro*.
  */
 @Injectable({ providedIn: 'root' })
 export class DataService {
@@ -40,7 +59,13 @@ export class DataService {
   private readonly _urnas = signal<Urna[]>([...MOCK_URNAS]);
   private readonly _urnaLotes = signal<UrnaLote[]>([...MOCK_URNA_LOTES]);
   private readonly _posSales = signal<PosSale[]>([]);
+  private readonly _posClientes = signal<PosCliente[]>([]);
   private readonly _recurringOrders = signal<RecurringOrder[]>([]);
+  private readonly _reservas = signal<ReservaItem[]>([]);
+  /** Plan de producción semanal recurrente (por día de la semana). */
+  private readonly _weeklyPlan = signal<WeeklyProductionPlan>({});
+  /** Entregas del plan al almacén ya realizadas (clave: fecha ISO). Evita doble entrega. */
+  private readonly _planDeliveries = signal<Record<string, { at: Date; total: number }>>({});
   /** Precio FINAL al consumidor por producto (catálogo de Ventas). */
   private readonly _consumerPrices = signal<Record<string, number>>({ ...MOCK_CONSUMER_PRICES });
   /**
@@ -55,6 +80,73 @@ export class DataService {
   constructor() {
     // Sembrar alertas auto-derivadas a partir del stock inicial.
     this.regenerateAutoAlerts();
+  }
+
+  // ===================== Aislamiento por tenant =====================
+  /** Tenant cuyo dataset está cargado en los signals. Arranca en el demo. */
+  private _tenantId = DEFAULT_TENANT_ID;
+  /** Datasets de otros tenants guardados en memoria mientras no están activos. */
+  private readonly _partitions = new Map<string, TenantData>();
+
+  /** Tenant actualmente cargado. */
+  tenantId(): string { return this._tenantId; }
+
+  /**
+   * Carga el dataset del tenant indicado. Guarda el del tenant actual, restaura
+   * el destino si ya existía, o lo inicializa VACÍO (empresa nueva) sembrando
+   * sólo a su administrador como primer miembro.
+   *
+   * NOTA DE SEGURIDAD: esta partición en memoria da aislamiento *lógico* en la
+   * sesión, no *seguridad*. El aislamiento real se enforca en el backend.
+   */
+  loadTenant(tenantId: string, seedMembers: Member[] = []): void {
+    if (tenantId === this._tenantId) return;
+    this._partitions.set(this._tenantId, this.snapshot());
+    const target = this._partitions.get(tenantId);
+    if (target) {
+      this.applyData(target);
+    } else {
+      const fresh = DataService.emptyData();
+      fresh.members = seedMembers.filter(m => m.tenantId === tenantId);
+      this.applyData(fresh);
+    }
+    this._tenantId = tenantId;
+    this.regenerateAutoAlerts();
+  }
+
+  private snapshot(): TenantData {
+    return {
+      products: this._products(), supplies: this._supplies(), recipes: this._recipes(),
+      productStock: this._productStock(), supplyStock: this._supplyStock(), kardex: this._kardex(),
+      sales: this._sales(), alerts: this._alerts(), predictions: this._predictions(),
+      pos: this._pos(), members: this._members(), orders: this._orders(), customers: this._customers(),
+      returnedLots: this._returnedLots(), suppliers: this._suppliers(), urnas: this._urnas(),
+      urnaLotes: this._urnaLotes(), posSales: this._posSales(), posClientes: this._posClientes(),
+      recurringOrders: this._recurringOrders(), reservas: this._reservas(),
+      consumerPrices: this._consumerPrices(), manualAdditions: this._manualAdditions(),
+      weeklyPlan: this._weeklyPlan(), planDeliveries: this._planDeliveries(),
+    };
+  }
+
+  private applyData(d: TenantData): void {
+    this._products.set(d.products); this._supplies.set(d.supplies); this._recipes.set(d.recipes);
+    this._productStock.set(d.productStock); this._supplyStock.set(d.supplyStock); this._kardex.set(d.kardex);
+    this._sales.set(d.sales); this._alerts.set(d.alerts); this._predictions.set(d.predictions);
+    this._pos.set(d.pos); this._members.set(d.members); this._orders.set(d.orders); this._customers.set(d.customers);
+    this._returnedLots.set(d.returnedLots); this._suppliers.set(d.suppliers); this._urnas.set(d.urnas);
+    this._urnaLotes.set(d.urnaLotes); this._posSales.set(d.posSales); this._posClientes.set(d.posClientes);
+    this._recurringOrders.set(d.recurringOrders); this._reservas.set(d.reservas);
+    this._consumerPrices.set(d.consumerPrices); this._manualAdditions.set(d.manualAdditions);
+    this._weeklyPlan.set(d.weeklyPlan); this._planDeliveries.set(d.planDeliveries);
+  }
+
+  private static emptyData(): TenantData {
+    return {
+      products: [], supplies: [], recipes: [], productStock: [], supplyStock: [], kardex: [],
+      sales: [], alerts: [], predictions: [], pos: [], members: [], orders: [], customers: [],
+      returnedLots: [], suppliers: [], urnas: [], urnaLotes: [], posSales: [], posClientes: [],
+      recurringOrders: [], reservas: [], consumerPrices: {}, manualAdditions: {}, weeklyPlan: {}, planDeliveries: {},
+    };
   }
 
 
@@ -104,12 +196,17 @@ export class DataService {
 
   // ----- Catálogo de Ventas (precios al consumidor) -----
 
-  /** Precio base de producción (lo que "vende" producción) — es el COSTO de Ventas. */
+  /** Semilla histórica de precio (campo legacy `sellPrice`). El precio de venta real se
+   *  configura en Ventas (catálogo de ventas → consumerPrice); esto solo da el valor inicial. */
   baseSalePrice(productId: string): number {
     return this.productById(productId)?.sellPrice ?? 0;
   }
 
-  /** Precio final al consumidor. Si no está configurado, cae al precio base. */
+  /**
+   * Precio FINAL de venta (ventanilla y clientes). Lo maneja Ventas (catálogo de ventas),
+   * solo el admin. Producción NO fija precio de venta, solo costo. Si aún no se configuró,
+   * cae a la semilla histórica.
+   */
   consumerPrice(productId: string): number {
     const c = this._consumerPrices()[productId];
     return c != null ? c : this.baseSalePrice(productId);
@@ -119,6 +216,19 @@ export class DataService {
   setConsumerPrice(productId: string, price: number): void {
     const p = Math.max(0, Math.round(price || 0));
     this._consumerPrices.update(map => ({ ...map, [productId]: p }));
+  }
+
+  /** Tasa de IVA del producto (del CABYS). 0 si no tiene. */
+  ivaRate(productId: string): number {
+    return this.productById(productId)?.cabysIva ?? 0;
+  }
+  /** PRECIO REAL de cobro: precio final + IVA del CABYS. Es lo que se factura/cobra. */
+  consumerPriceConIva(productId: string): number {
+    return Math.round(this.consumerPrice(productId) * (1 + this.ivaRate(productId)));
+  }
+  /** Precio por cliente con IVA aplicado (precio real de cobro al cliente). */
+  priceForCustomerConIva(customer: Customer, productId: string): number {
+    return Math.round(this.priceForCustomer(customer, productId) * (1 + this.ivaRate(productId)));
   }
 
   // ----- Inventario del almacén de Ventas -----
@@ -310,6 +420,39 @@ export class DataService {
     return new Date();
   }
 
+  // ----- Reserva (control informativo de Producción; NO afecta stock) -----
+
+  readonly reservas = this._reservas.asReadonly();
+
+  addReserva(input: { productId: string; qty: number; note?: string; userName: string }): ReservaItem {
+    const qty = Math.max(1, Math.floor(input.qty || 0));
+    const product = this.productById(input.productId);
+    if (!product) throw new Error('Producto no encontrado.');
+    const r: ReservaItem = {
+      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      productId: input.productId,
+      productName: product.name,
+      qty,
+      note: input.note?.trim() || undefined,
+      createdAt: new Date(),
+      createdBy: input.userName,
+    };
+    this._reservas.update(list => [r, ...list]);
+    return r;
+  }
+
+  updateReserva(id: string, patch: { qty?: number; note?: string }): void {
+    this._reservas.update(list => list.map(r => r.id === id ? {
+      ...r,
+      qty: patch.qty != null ? Math.max(1, Math.floor(patch.qty)) : r.qty,
+      note: patch.note !== undefined ? (patch.note.trim() || undefined) : r.note,
+    } : r));
+  }
+
+  removeReserva(id: string): void {
+    this._reservas.update(list => list.filter(r => r.id !== id));
+  }
+
   // ----- KPIs computed -----
   readonly totalProducts = computed(() => this._products().filter(p => p.active).length);
   readonly totalSupplies = computed(() => this._supplies().filter(s => s.active).length);
@@ -469,6 +612,8 @@ export class DataService {
         } else {
           unitCost = subProduct.buyPrice;
         }
+        // Incluir mano de obra/otros del subproducto en su costo unitario.
+        unitCost += subProduct.otherCost ?? 0;
         total += unitCost * item.qty;
       }
     }
@@ -483,11 +628,11 @@ export class DataService {
   effectiveProductCost(productId: string): number {
     const product = this.productById(productId);
     if (!product) return 0;
-    if (product.hasRecipe) {
-      const calc = this.computeRecipeCost(productId);
-      return calc ?? product.buyPrice;
-    }
-    return product.buyPrice;
+    const materials = product.hasRecipe
+      ? (this.computeRecipeCost(productId) ?? product.buyPrice)
+      : product.buyPrice;
+    // Costo total = materiales + otros (mano de obra, empaque, etc.).
+    return +(materials + (product.otherCost ?? 0)).toFixed(2);
   }
 
   supplyStockFor(supplyId: string): SupplyStockItem | undefined {
@@ -548,6 +693,18 @@ export class DataService {
     this._products.update(list => list.map(x => x.id === p.id ? p : x));
   }
 
+  /** Asigna (o limpia, con null) el código CABYS de un producto, con su tasa de IVA. */
+  setProductCabys(productId: string, code: string | null, desc: string | null, iva: number | null) {
+    const p = this.productById(productId);
+    if (!p) return;
+    this.updateProduct({
+      ...p,
+      cabysCode: code ?? undefined,
+      cabysDesc: desc ?? undefined,
+      cabysIva: iva ?? undefined,
+    });
+  }
+
   deleteProduct(id: string) {
     this._products.update(list => list.map(x => x.id === id ? { ...x, active: false } : x));
     this._recipes.update(list => list.filter(r => r.productId !== id));
@@ -606,6 +763,20 @@ export class DataService {
   deleteSupply(id: string) {
     this._supplies.update(list => list.map(x => x.id === id ? { ...x, active: false } : x));
     this._supplyStock.update(list => list.filter(s => s.supplyId !== id));
+  }
+
+  /** Días de cobertura de un insumo: cuántos días dura el stock al consumo (7d). */
+  supplyCoverageDays(supplyId: string): number {
+    const stock = this.supplyStockFor(supplyId)?.quantity ?? 0;
+    const daily = this.rollingMean('supply', supplyId, 7);
+    return daily > 0 ? +(stock / daily).toFixed(1) : Infinity;
+  }
+
+  /** Fija el punto de reorden de un insumo (auto-tuneo desde la predicción). */
+  updateSupplyReorderPoint(supplyId: string, reorderPoint: number): void {
+    const s = this.supplyById(supplyId);
+    if (!s) return;
+    this.updateSupply({ ...s, reorderPoint: Math.max(0, Math.round(reorderPoint)) });
   }
 
   /** Crea N insumos + sus filas de stock inicial en cero. */
@@ -868,6 +1039,7 @@ export class DataService {
     return {
       supplyId: supply.id,
       itemName: supply.name,
+      unit: supply.unit,
       qty,
       unitCost,
       currentStock,
@@ -883,6 +1055,8 @@ export class DataService {
 
   suggestedPrePurchases(today: Date = new Date()): SuggestedPrePurchase[] {
     const bucket = new Map<string, SuggestedPrePurchaseItem[]>();
+    // Demanda conocida (plan semanal + pedidos) → pre-compras dirigidas por demanda.
+    const demandMap = this.aggregateSupplyDemand(7);
 
     // --- 1. Items auto-detectados por el algoritmo de reposición ---
     for (const supply of this.activeSupplies()) {
@@ -897,12 +1071,20 @@ export class DataService {
       const consumeDuringLT = dailyDemand * lt.leadTimeDays;
       const stockAtArrival = effectiveStock - consumeDuringLT;
 
+      // Demanda CONOCIDA (plan + pedidos) que el stock+pendiente no cubre.
+      const demanda = demandMap.get(supply.id) ?? 0;
+      const demandFaltante = Math.max(0, demanda - effectiveStock);
+
+      // La demanda concreta manda; si no, los disparadores estadísticos.
       let reason: SuggestedReason | null = null;
-      if (effectiveStock <= supply.reorderPoint) reason = 'below_rop';
+      if (demandFaltante > 0) reason = 'demand';
+      else if (effectiveStock <= supply.reorderPoint) reason = 'below_rop';
       else if (stockAtArrival <= supply.minStock && dailyDemand > 0) reason = 'wont_cover_lt';
       if (!reason) continue;
 
-      const rawTarget = Math.max(0, supply.maxStock - stockAtArrival);
+      // Comprar lo necesario para: cubrir la demanda faltante Y reabastecer hacia maxStock.
+      const statTarget = Math.max(0, supply.maxStock - stockAtArrival);
+      const rawTarget = Math.max(statTarget, demandFaltante);
       if (rawTarget <= 0) continue;
 
       // Redondear a presentación entera si el insumo tiene una (no tiene
@@ -1060,58 +1242,45 @@ export class DataService {
       .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
   }
 
-  /** Cantidad total de un producto en una urna (suma de todos sus lotes). */
-  urnaProductQty(urnaId: string, productId: string): number {
-    let total = 0;
-    for (const l of this._urnaLotes()) {
-      if (l.urnaId !== urnaId) continue;
-      for (const ln of l.lines) if (ln.productId === productId) total += ln.qty;
-    }
-    return total;
+  // ===== INVENTARIO ÚNICO =====
+  // El "almacén/urna" ya no es un pozo separado: estos métodos operan sobre el
+  // stock de producto central (`_productStock`). El POS y las pantallas de venta
+  // siguen llamándolos, pero ahora todo es UN solo inventario.
+
+  /** Cantidad de un producto en inventario (urnaId se ignora: inventario único). */
+  urnaProductQty(_urnaId: string, productId: string): number {
+    return this.productStockFor(productId)?.quantity ?? 0;
   }
 
-  /**
-   * Totales por producto en una urna (agregando todos sus lotes), solo
-   * productos con stock > 0. Útil para la vista de "productos en vitrina".
-   */
-  urnaProductTotals(urnaId: string): { productId: string; productName: string; quantity: number }[] {
-    const map = new Map<string, { productId: string; productName: string; quantity: number }>();
-    for (const l of this._urnaLotes()) {
-      if (l.urnaId !== urnaId) continue;
-      for (const ln of l.lines) {
-        if (ln.qty <= 0) continue;
-        const cur = map.get(ln.productId);
-        if (cur) cur.quantity += ln.qty;
-        else map.set(ln.productId, { productId: ln.productId, productName: ln.productName, quantity: ln.qty });
-      }
-    }
-    return [...map.values()].sort((a, b) => a.productName.localeCompare(b.productName));
+  /** Totales por producto en inventario (stock > 0). */
+  urnaProductTotals(_urnaId: string): { productId: string; productName: string; quantity: number }[] {
+    return this._productStock()
+      .filter(s => s.quantity > 0)
+      .map(s => ({
+        productId: s.productId,
+        productName: this.productById(s.productId)?.name ?? s.productId,
+        quantity: s.quantity,
+      }))
+      .sort((a, b) => a.productName.localeCompare(b.productName));
   }
 
-  /**
-   * Consume `qty` de un producto en una urna en modo FIFO: descuenta primero
-   * de los lotes más antiguos. El caller debe validar disponibilidad antes.
-   */
-  private consumeUrnaFifo(urnaId: string, productId: string, qty: number): void {
-    let remaining = qty;
-    const ordered = this._urnaLotes()
-      .filter(l => l.urnaId === urnaId)
-      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
-    const deductions = new Map<string, number>();
-    for (const l of ordered) {
-      if (remaining <= 0) break;
-      const line = l.lines.find(ln => ln.productId === productId && ln.qty > 0);
-      if (!line) continue;
-      const take = Math.min(line.qty, remaining);
-      deductions.set(l.id, take);
-      remaining -= take;
-    }
-    this._urnaLotes.update(list => list.map(l => {
-      const take = deductions.get(l.id);
-      if (!take) return l;
-      return { ...l, lines: l.lines.map(ln =>
-        ln.productId === productId ? { ...ln, qty: ln.qty - take } : ln) };
-    }));
+  /** Descuenta `qty` de un producto del inventario único. El caller valida antes. */
+  private consumeUrnaFifo(_urnaId: string, productId: string, qty: number): void {
+    const stock = this.productStockFor(productId);
+    if (!stock) return;
+    const product = this.productById(productId);
+    const after = Math.max(0, stock.quantity - qty);
+    const status = this.computeProductStatus(after, product?.reorderPoint, product?.minStock);
+    this._productStock.update(list => list.map(s =>
+      s.productId === productId ? { ...s, quantity: after, status } : s));
+  }
+
+  /** Asegura que exista un StockItem para el producto (lo crea en 0 si falta). */
+  private ensureProductStock(productId: string): void {
+    if (this.productStockFor(productId)) return;
+    this._productStock.update(list => [...list, {
+      id: productId, productId, quantity: 0, reservedQty: 0, status: 'out' as StockStatus,
+    }]);
   }
 
   /** Solicitudes de reposición (órdenes con urnaId) de una urna, recientes primero. */
@@ -1299,12 +1468,185 @@ export class DataService {
    * stock de TODAS las líneas antes de descontar, consume FIFO de los lotes del
    * almacén y registra kardex `urna_sale` por línea. Devuelve el ticket.
    */
+  // ----- Plan de producción semanal recurrente -----
+  readonly weeklyProductionPlan = this._weeklyPlan.asReadonly();
+  /** Lista del plan para un día de la semana (0=Dom … 6=Sáb). */
+  weeklyPlanFor(weekday: number): WeeklyPlanItem[] {
+    return this._weeklyPlan()[weekday] ?? [];
+  }
+  /** Configura (reemplaza) la lista de un día de la semana. */
+  setWeeklyProductionDay(weekday: number, items: WeeklyPlanItem[]): void {
+    this._weeklyPlan.update(p => ({ ...p, [weekday]: items.filter(i => i.qty > 0) }));
+  }
+  /** Lista de producción de HOY, derivada directamente del plan semanal. */
+  readonly produccionDeHoy = computed(() => this._weeklyPlan()[new Date().getDay()] ?? []);
+
+  /**
+   * COBERTURA DE INSUMOS: agrega la DEMANDA (pedidos de cliente en cola de
+   * producción + plan semanal de los próximos 7 días), explota recetas a insumos,
+   * y compara contra el stock de insumos disponible. Permite saber si alcanza
+   * para completar los pedidos y cuánto falta comprar.
+   */
+  /**
+   * Demanda agregada de INSUMOS para los próximos `dias` días: explota a insumos
+   * los pedidos de cliente en cola de producción + el plan semanal. Es la base
+   * para la cobertura y para las pre-compras dirigidas por demanda.
+   */
+  aggregateSupplyDemand(dias = 7): Map<string, number> {
+    const need = new Map<string, number>();
+    const add = (productId: string, qty: number) => {
+      if (qty <= 0) return;
+      for (const n of this.explodeBom(productId, qty).supplyNeeds) {
+        need.set(n.supplyId, (need.get(n.supplyId) ?? 0) + n.qty);
+      }
+    };
+    // Demanda: pedidos de cliente / reposición en cola de producción
+    for (const o of this.produccionQueue()) {
+      if (o.status !== 'pending' && o.status !== 'in_production') continue;
+      for (const it of o.items) {
+        const remaining = o.status === 'in_production' ? Math.max(0, it.qty - it.fulfilledQty) : it.qty;
+        add(it.productId, remaining);
+      }
+    }
+    // Demanda: plan semanal proyectado sobre los próximos `dias` días
+    const plan = this._weeklyPlan();
+    const base = new Date(); base.setHours(0, 0, 0, 0);
+    for (let i = 0; i < dias; i++) {
+      const wd = new Date(base.getTime() + i * 86_400_000).getDay();
+      for (const it of (plan[wd] ?? [])) add(it.productId, it.qty);
+    }
+    return need;
+  }
+
+  readonly coberturaInsumos = computed(() => {
+    const need = this.aggregateSupplyDemand(7);
+    return [...need.entries()].map(([supplyId, qty]) => {
+      const sup = this.supplyById(supplyId);
+      const available = this.supplyStockFor(supplyId)?.quantity ?? 0;
+      const faltante = Math.max(0, qty - available);
+      return {
+        supplyId,
+        name: sup?.name ?? supplyId,
+        unit: sup?.unit ?? '',
+        cost: sup?.cost ?? 0,
+        requerido: +qty.toFixed(2),
+        disponible: available,
+        faltante: +faltante.toFixed(2),
+        suficiente: faltante <= 0,
+      };
+    }).sort((a, b) => b.faltante - a.faltante || a.name.localeCompare(b.name));
+  });
+
+  /** Insumos que NO alcanzan para la demanda actual (hay que comprar). */
+  readonly insumosFaltantes = computed(() => this.coberturaInsumos().filter(c => !c.suficiente));
+
+  readonly planDeliveries = this._planDeliveries.asReadonly();
+  private isoOf(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  /** ¿Ya se entregó al almacén el plan de esa fecha? */
+  planEntregadoDe(date: Date): { at: Date; total: number } | undefined {
+    return this._planDeliveries()[this.isoOf(date)];
+  }
+
+  /**
+   * Producción PRODUCE el plan de un día: por cada producto del plan explota su
+   * receta, DESCUENTA los insumos del inventario de insumos (y subproductos de
+   * reventa), y SUMA el producto terminado al inventario único. Registra kardex.
+   * Idempotente por fecha (no doble producción).
+   */
+  entregarPlanDelDia(date: Date, ctx: { userId: string; userName: string }): { total: number } {
+    const iso = this.isoOf(date);
+    if (this._planDeliveries()[iso]) throw new Error('El plan de este día ya fue producido.');
+    const items = (this._weeklyPlan()[date.getDay()] ?? []).filter(i => i.qty > 0);
+    if (items.length === 0) throw new Error('No hay plan configurado para este día.');
+
+    const now = new Date();
+    let total = 0;
+    for (const it of items) {
+      this.producirProducto(it.productId, it.qty, ctx, `Plan ${iso}`, now);
+      total += it.qty;
+    }
+    this._planDeliveries.update(m => ({ ...m, [iso]: { at: now, total } }));
+    return { total };
+  }
+
+  /**
+   * Fabrica `qty` de un producto: explota receta, descuenta insumos + subproductos
+   * de reventa del inventario, y suma el producto terminado al stock. Hace clamp a
+   * lo disponible (no bloquea); usa la cobertura de insumos para avisar antes.
+   */
+  private producirProducto(productId: string, qty: number, ctx: { userId: string; userName: string }, note: string, now: Date): void {
+    const { supplyNeeds, reventaNeeds } = this.explodeBom(productId, qty);
+    // Descontar insumos
+    for (const need of supplyNeeds) {
+      const sup = this.supplyById(need.supplyId);
+      const stock = this.supplyStockFor(need.supplyId);
+      const after = Math.max(0, (stock?.quantity ?? 0) - need.qty);
+      if (stock && sup) {
+        const status = this.computeStatus(after, sup.reorderPoint, sup.minStock);
+        this._supplyStock.update(list => list.map(s => s.id === stock.id ? { ...s, quantity: after, status } : s));
+      }
+      this.registerKardexEntry({
+        id: `k-${Date.now()}-${need.supplyId}-prod`,
+        supplyId: need.supplyId, itemName: need.itemName,
+        type: 'out', qty: need.qty, balance: after,
+        cost: sup?.cost ?? 0, reason: 'production',
+        note: `${note} — produce ${this.productById(productId)?.name ?? productId}`,
+        userId: ctx.userId, userName: ctx.userName, at: now,
+      });
+    }
+    // Descontar subproductos de reventa del stock de producto
+    for (const rev of reventaNeeds) {
+      this.consumeUrnaFifo('', rev.productId, rev.qty);
+    }
+    // Sumar el producto terminado al inventario único
+    this.ensureProductStock(productId);
+    const product = this.productById(productId);
+    const cur = this.productStockFor(productId);
+    const newQty = (cur?.quantity ?? 0) + qty;
+    const status = this.computeProductStatus(newQty, product?.reorderPoint, product?.minStock);
+    this._productStock.update(list => list.map(s => s.productId === productId ? { ...s, quantity: newQty, status } : s));
+    this.registerKardexEntry({
+      id: `k-${Date.now()}-${productId}-pin`,
+      productId, itemName: product?.name ?? productId,
+      type: 'in', qty, balance: newQty,
+      cost: this.effectiveProductCost(productId),
+      reason: 'production', note,
+      userId: ctx.userId, userName: ctx.userName, at: now,
+    });
+  }
+
+  // ----- Clientes del punto de venta (receptores de factura) -----
+  readonly posClientes = this._posClientes.asReadonly();
+  posClienteById(id: string): PosCliente | undefined {
+    return this._posClientes().find(c => c.id === id);
+  }
+  createPosCliente(input: Omit<PosCliente, 'id' | 'createdAt'>): PosCliente {
+    const c: PosCliente = { ...input, id: `posc-${Date.now()}`, createdAt: new Date() };
+    this._posClientes.update(list => [c, ...list]);
+    return c;
+  }
+  updatePosCliente(c: PosCliente) {
+    this._posClientes.update(list => list.map(x => x.id === c.id ? c : x));
+  }
+  deletePosCliente(id: string) {
+    this._posClientes.update(list => list.map(x => x.id === id ? { ...x, active: false } : x));
+  }
+
   registerPosSale(input: {
     almacenId: string;
     lines: { productId: string; qty: number }[];
+    paymentMethod: PaymentMethod;
+    comprobante: ComprobanteTipo;
+    customerId?: string;
     userId: string;
     userName: string;
   }): PosSale {
+    if (input.comprobante === 'factura') {
+      const cust = input.customerId ? this.posClienteById(input.customerId) : undefined;
+      if (!cust) throw new Error('Selecciona el cliente para la factura electrónica.');
+    }
     const almacenId = input.almacenId;
     if (!this.urnaById(almacenId)) throw new Error('Almacén no encontrado.');
     const clean = input.lines
@@ -1323,7 +1665,7 @@ export class DataService {
     const saleLines: PosSaleLine[] = [];
     for (const l of clean) {
       const product = this.productById(l.productId);
-      const unitPrice = this.consumerPrice(l.productId);
+      const unitPrice = this.consumerPriceConIva(l.productId); // precio real con IVA
       this.consumeUrnaFifo(almacenId, l.productId, l.qty);
       saleLines.push({
         productId: l.productId, productName: product?.name ?? l.productId,
@@ -1343,7 +1685,10 @@ export class DataService {
     const sale: PosSale = {
       id: `pos-${Date.now()}`,
       code: `VTA-${String(this._posSales().length + 1).padStart(4, '0')}`,
-      almacenId, lines: saleLines, total, at: now, soldBy: input.userName,
+      almacenId, lines: saleLines, total, paymentMethod: input.paymentMethod,
+      comprobante: input.comprobante,
+      customerId: input.comprobante === 'factura' ? input.customerId : undefined,
+      at: now, soldBy: input.userName,
     };
     this._posSales.update(list => [sale, ...list]);
     return sale;
@@ -1577,6 +1922,7 @@ export class DataService {
       displayName: input.displayName,
       role: input.role,
       active: true,
+      tenantId: this._tenantId, // miembro pertenece al tenant actual
     };
     this._members.update(list => [...list, m]);
     return m;
@@ -2287,6 +2633,35 @@ export class DataService {
   }
 
   /**
+   * Reemplaza los items de un pedido que aún está PENDIENTE (producción no lo
+   * aceptó). Recalcula el total. Usado para editar pedidos a producción.
+   */
+  updateOrderItems(orderId: string, items: { productId: string; qty: number }[]): CustomerOrder {
+    const order = this.orderById(orderId);
+    if (!order) throw new Error('Pedido no encontrado.');
+    if (order.status !== 'pending') {
+      throw new Error('No se puede editar: producción ya aceptó este pedido.');
+    }
+    const clean = items.filter(i => i.qty > 0);
+    if (clean.length === 0) throw new Error('El pedido debe tener al menos un producto.');
+    const orderItems: OrderItem[] = clean.map(it => {
+      const p = this.productById(it.productId);
+      return {
+        productId: it.productId,
+        productName: p?.name ?? '',
+        unit: p?.unit ?? 'unidad',
+        qty: it.qty,
+        unitPrice: order.customerId ? this.priceForCustomer(order.customerId, it.productId) : 0,
+        fulfilledQty: 0,
+      };
+    });
+    const total = orderItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+    const updated: CustomerOrder = { ...order, items: orderItems, totalAmount: total };
+    this._orders.update(list => list.map(o => o.id === orderId ? updated : o));
+    return updated;
+  }
+
+  /**
    * Pasa un pedido a "in_production":
    *  - Analiza stock disponible
    *  - Descuenta del stock real lo que pueda producirse (cumplimiento parcial)
@@ -2963,12 +3338,17 @@ export class DataService {
    * personalizado en `productPrices`, se usa ese; sino, el `sellPrice`
    * global del producto. `customer` puede ser el id o el objeto.
    */
+  /**
+   * Precio de venta a un cliente. Jerarquía:
+   *  1. Precio personalizado por cliente (lo fija el admin), si existe.
+   *  2. Precio FINAL del catálogo (consumerPrice) — el mismo de ventanilla.
+   * (El precio base de producción solo aplica si no hay precio final configurado.)
+   */
   priceForCustomer(customer: string | Customer | null | undefined, productId: string): number {
-    const product = this.productById(productId);
-    const global = product?.sellPrice ?? 0;
     const c = typeof customer === 'string' ? this.customerById(customer) : customer;
     const custom = c?.productPrices?.[productId];
-    return (custom != null && custom >= 0) ? custom : global;
+    if (custom != null && custom >= 0) return custom;
+    return this.consumerPrice(productId);
   }
 
   /** Busca un cliente por su token público (URL /c/:token). */

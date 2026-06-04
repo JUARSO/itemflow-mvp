@@ -37,15 +37,48 @@ export interface Member {
   displayName: string;
   role: UserRole;
   active: boolean;
+  /** Tenant (organización) al que pertenece el usuario. Clave del aislamiento. */
+  tenantId: string;
 }
 
-export interface Company {
+/** Planes de suscripción del SaaS. */
+export type PlanId = 'free' | 'pro' | 'business';
+
+/** Estado de la suscripción de un tenant. */
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
+
+/** Suscripción de un tenant. El estado lo gobierna el backend/billing (Fase 3). */
+export interface Subscription {
+  planId: PlanId;
+  status: SubscriptionStatus;
+  /** Fin del período de prueba (ISO) cuando status = 'trialing'. */
+  trialEndsAt?: string;
+  /** Fin del período pagado actual (ISO). */
+  currentPeriodEnd?: string;
+}
+
+/**
+ * Tenant / Organización: unidad de aislamiento del SaaS. Cada empresa registrada
+ * es un tenant independiente con su propia suscripción, usuarios y datos.
+ */
+export interface Tenant {
   id: string;
+  /** Identificador legible y único (para URLs/subdominios). */
+  slug: string;
   name: string;
   adminEmail: string;
   currency: string;
   timezone: string;
+  subscription: Subscription;
+  active: boolean;
+  createdAt: string;
 }
+
+/**
+ * @deprecated Usar `Tenant`. Alias mantenido por compatibilidad: el tenant
+ * cumple la forma de la antigua `Company` (id/name/adminEmail/currency/timezone).
+ */
+export type Company = Tenant;
 
 export interface Product {
   id: string;
@@ -56,6 +89,18 @@ export interface Product {
   unit: Unit;
   buyPrice: number;
   sellPrice: number;
+  /**
+   * Otros costos del producto: mano de obra y demás costos que no vienen de los
+   * insumos/receta (empaque, energía, etc.). Se suma al costo de materiales para
+   * obtener el costo total. Opcional (default 0).
+   */
+  otherCost?: number;
+  /** Código CABYS (13 dígitos) del catálogo de bienes y servicios de Hacienda CR. */
+  cabysCode?: string;
+  /** Descripción del código CABYS asignado (para mostrar sin recargar el catálogo). */
+  cabysDesc?: string;
+  /** Tasa de IVA del CABYS asignado (fracción: 0.13, 0.04, 0.02, 0.01, 0). Define el precio final con IVA. */
+  cabysIva?: number;
   leadTime: number;
   imageUrl?: string;
   active: boolean;
@@ -284,6 +329,36 @@ export interface PosSaleLine {
   lineTotal: number;
 }
 
+/** Método de pago de una venta en el punto de venta. */
+export type PaymentMethod = 'efectivo' | 'tarjeta' | 'sinpe' | 'transferencia';
+
+/** Tipo de comprobante electrónico emitido en una venta. */
+export type ComprobanteTipo = 'tiquete' | 'factura';
+
+/** Ítem del plan de producción semanal. */
+export interface WeeklyPlanItem { productId: string; qty: number; }
+/**
+ * Plan de producción semanal RECURRENTE: lista de productos por día de la semana
+ * (clave 0=Domingo … 6=Sábado). Se configura una vez, se edita, y aplica todas
+ * las semanas. Producción ve la lista de cada día directamente.
+ */
+export type WeeklyProductionPlan = Record<number, WeeklyPlanItem[]>;
+
+/**
+ * Cliente del PUNTO DE VENTA para factura electrónica (receptor). Es un registro
+ * ligero e independiente de los `Customer` del portal/pedidos: solo guarda el
+ * nombre y los datos fiscales necesarios para emitir la factura.
+ */
+export interface PosCliente {
+  id: string;
+  nombre: string;
+  email?: string;
+  telefono?: string;
+  fiscal: CustomerFiscal;
+  active: boolean;
+  createdAt: Date;
+}
+
 /**
  * Venta 1 a 1 en el punto de venta (un ticket puede tener varias líneas).
  * Descuenta stock del almacén en modo FIFO y registra kardex `urna_sale`.
@@ -294,6 +369,12 @@ export interface PosSale {
   almacenId: string;
   lines: PosSaleLine[];
   total: number;
+  /** Método de pago con que se cobró la venta. */
+  paymentMethod: PaymentMethod;
+  /** Tiquete electrónico (sin receptor) o factura electrónica (con cliente). */
+  comprobante: ComprobanteTipo;
+  /** Cliente receptor (solo en factura electrónica). */
+  customerId?: string;
   at: Date;
   soldBy: string;
 }
@@ -594,11 +675,13 @@ export interface SuggestedPrePurchase {
  *  - `manual`: agregado a mano por el usuario al carrito del proveedor.
  *    No surge del algoritmo de reposición.
  */
-export type SuggestedReason = 'below_rop' | 'wont_cover_lt' | 'manual';
+export type SuggestedReason = 'demand' | 'below_rop' | 'wont_cover_lt' | 'manual';
 
 export interface SuggestedPrePurchaseItem {
   supplyId: string;
   itemName: string;
+  /** Unidad del insumo (para mostrar junto a las cantidades). */
+  unit: Unit;
   /** Cantidad sugerida (ya redondeada a presentación si aplica). */
   qty: number;
   unitCost: number;
@@ -751,12 +834,34 @@ export interface CustomerWindow {
  * Los pedidos que crea el cliente desde el portal generan automáticamente
  * una `CustomerOrder` con `customerId` apuntando aquí.
  */
+/** Tipo de identificación según Hacienda CR (emisor y receptores). */
+export type TipoIdentificacion = '01' | '02' | '03' | '04';
+
+/**
+ * Datos fiscales del cliente (receptor) para la factura electrónica.
+ * El correo y teléfono del comprobante se toman de los campos `email`/`phone`
+ * del cliente. La ubicación es opcional.
+ */
+export interface CustomerFiscal {
+  tipoIdentificacion: TipoIdentificacion;
+  identificacion: string;        // Número de cédula (solo dígitos)
+  /** Razón social / nombre fiscal, si difiere del nombre comercial del cliente. */
+  nombre?: string;
+  provincia?: string;
+  canton?: string;
+  distrito?: string;
+  barrio?: string;
+  otrasSenas?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
   contactPerson?: string;
   email?: string;
   phone?: string;
+  /** Datos fiscales para factura electrónica (opcional hasta que se completen). */
+  fiscal?: CustomerFiscal;
   /** Token aleatorio para la URL pública (/c/:token). */
   publicToken: string;
   /** PIN numérico (4-6 dígitos) requerido para entrar al portal. */
@@ -801,4 +906,19 @@ export interface RecurringOrder {
   createdAt: Date;
   /** Última vez que se generó un pedido a partir de esta plantilla. */
   lastGeneratedAt?: Date;
+}
+
+/**
+ * Producto EN RESERVA (lado Producción). Es solo un control informativo: NO
+ * descuenta inventario ni genera movimientos. Se puede editar o eliminar
+ * libremente.
+ */
+export interface ReservaItem {
+  id: string;
+  productId: string;
+  productName: string;
+  qty: number;
+  note?: string;
+  createdAt: Date;
+  createdBy: string;
 }

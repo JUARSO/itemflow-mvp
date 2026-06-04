@@ -8,6 +8,7 @@ import { DataService } from '../../core/services/data.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { Customer, CustomerOrder, OrderItem } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const DAY_LABELS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'] as const;
 
@@ -30,6 +31,7 @@ interface CartLine { productId: string; qty: number; }
   imports: [
     CommonModule, DatePipe, DecimalPipe,
     IonContent, IonButton, IonIcon, IonBadge,
+    UnitShortPipe,
   ],
   templateUrl: './portal-cliente.page.html',
   styleUrls: ['./portal-cliente.page.scss'],
@@ -52,11 +54,6 @@ export class PortalClientePage {
   readonly editingId = signal<string | null>(null);
   readonly receiptDraft = signal<Record<string, number>>({});
   readonly noteDraft = signal('');
-
-  /** Filtros del historial. */
-  readonly histFrom = signal('');
-  readonly histTo = signal('');
-  readonly histStatus = signal<'all' | 'pending' | 'in_production' | 'received' | 'cancelled'>('all');
 
   readonly customer = computed<Customer | null>(() => {
     const token = this.route.snapshot.paramMap.get('token') ?? '';
@@ -138,56 +135,13 @@ export class PortalClientePage {
     this.misPedidos().filter(o => o.status === 'completed' && !o.customerConfirmedAt)
   );
 
-  /** Historial: todos los pedidos menos los que están "por recibir". */
-  readonly historial = computed(() =>
-    this.misPedidos().filter(o => !(o.status === 'completed' && !o.customerConfirmedAt))
+  /** Último pedido ya recibido (confirmado por el cliente). Siempre visible. */
+  readonly ultimoRecibido = computed(() =>
+    this.misPedidos()
+      .filter(o => !!o.customerConfirmedAt)
+      .sort((a, b) => (b.customerConfirmedAt!.getTime()) - (a.customerConfirmedAt!.getTime()))[0]
+      ?? null
   );
-
-  /** Historial filtrado por rango de fechas y estado. */
-  readonly historialFiltrado = computed(() => {
-    const from = this.parseDateStart(this.histFrom());
-    const to = this.parseDateEnd(this.histTo());
-    const st = this.histStatus();
-
-    return this.historial().filter(o => {
-      const ref = o.createdAt.getTime();
-      if (from !== null && ref < from) return false;
-      if (to !== null && ref > to) return false;
-      if (st !== 'all') {
-        if (st === 'received') {
-          if (!o.customerConfirmedAt) return false;
-        } else {
-          // pending / in_production / cancelled: comparar status directo,
-          // pero excluir los ya recibidos (que pueden ser completed).
-          if (o.customerConfirmedAt) return false;
-          if (o.status !== st) return false;
-        }
-      }
-      return true;
-    });
-  });
-
-  readonly hasHistoryFilters = computed(() =>
-    !!this.histFrom() || !!this.histTo() || this.histStatus() !== 'all'
-  );
-
-  clearHistoryFilters() {
-    this.histFrom.set('');
-    this.histTo.set('');
-    this.histStatus.set('all');
-  }
-
-  private parseDateStart(s: string): number | null {
-    if (!s) return null;
-    const d = new Date(s + 'T00:00:00');
-    return isNaN(d.getTime()) ? null : d.getTime();
-  }
-
-  private parseDateEnd(s: string): number | null {
-    if (!s) return null;
-    const d = new Date(s + 'T23:59:59.999');
-    return isNaN(d.getTime()) ? null : d.getTime();
-  }
 
   async validatePin() {
     const c = this.customer();
@@ -224,6 +178,29 @@ export class PortalClientePage {
   }
   removeFromCart(productId: string) {
     this.cart.update(lines => lines.filter(l => l.productId !== productId));
+  }
+
+  /** Copia los productos de un pedido anterior al carrito para repetirlo. */
+  async repetirPedido(o: CustomerOrder) {
+    if (!this.canOrderToday()) {
+      await this.toast.show('Hoy no es día de pedidos según tu configuración.', 'danger');
+      return;
+    }
+    const disponibles = new Set(this.productos().map(p => p.id));
+    const lines = o.items
+      .filter(it => disponibles.has(it.productId))
+      .map(it => ({ productId: it.productId, qty: it.qty }));
+    if (lines.length === 0) {
+      await this.toast.show('Ninguno de esos productos está disponible ahora.', 'danger');
+      return;
+    }
+    this.cart.set(lines);
+    const omitidos = o.items.length - lines.length;
+    await this.toast.show(
+      omitidos > 0
+        ? `Pedido copiado al carrito (${omitidos} producto(s) ya no disponibles se omitieron).`
+        : 'Pedido copiado al carrito.',
+    );
   }
 
   async submitOrder() {
@@ -330,38 +307,4 @@ export class PortalClientePage {
     }
   }
 
-  // ===== Helpers historial =====
-
-  hasDiff(it: OrderItem): boolean {
-    return it.receivedQty !== undefined && it.receivedQty < it.fulfilledQty;
-  }
-
-  /**
-   * Subtotal a mostrar en el historial: si ya hay receivedQty (confirmado),
-   * usa esa cantidad; si no, usa qty original (lo solicitado).
-   */
-  historicalSubtotal(o: CustomerOrder, it: OrderItem): number {
-    const qty = o.customerConfirmedAt ? (it.receivedQty ?? 0) : it.qty;
-    return qty * it.unitPrice;
-  }
-
-  statusLabel(o: CustomerOrder): string {
-    if (o.customerConfirmedAt) return 'Recibido';
-    return {
-      pending: 'Pendiente',
-      in_production: 'En producción',
-      completed: 'Producido',
-      cancelled: 'Cancelado',
-    }[o.status] ?? o.status;
-  }
-
-  statusColor(o: CustomerOrder): string {
-    if (o.customerConfirmedAt) return 'success';
-    return {
-      pending: 'warning',
-      in_production: 'primary',
-      completed: 'tertiary',
-      cancelled: 'medium',
-    }[o.status] ?? 'medium';
-  }
 }

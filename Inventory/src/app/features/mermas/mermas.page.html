@@ -37,6 +37,8 @@
         </ion-segment>
       </div>
 
+      <app-search-bar [(query)]="query" placeholder="Buscar merma por producto o lote" />
+
       @if (tab() === 'pending') {
         @if (pendientes().length === 0) {
           <div class="empty">
@@ -46,7 +48,7 @@
           </div>
         } @else {
           <div class="cards">
-            @for (lot of pendientes(); track lot.id) {
+            @for (lot of pendientesFiltrados(); track lot.id) {
               <article class="card">
                 <header class="card__head">
                   <div>
@@ -143,7 +145,7 @@
           </div>
         } @else {
           <div class="hist-list">
-            @for (lot of historico(); track lot.id) {
+            @for (lot of historicoFiltrados(); track lot.id) {
               <article class="hist-card"
                 [class.hist-card--full-merma]="lot.mermaQty === lot.qty"
                 [class.hist-card--reused]="lot.mermaQty === 0">

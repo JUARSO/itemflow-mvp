@@ -3,15 +3,17 @@ import { DecimalPipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
-  IonButton,
+  IonButton, IonIcon,
 } from '@ionic/angular/standalone';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { PredictionService, DECISION_TO_STATUS } from '../../core/services/prediction.service';
 import { DataService } from '../../core/services/data.service';
 import { PredictionEvent, PredictionRequest } from '../../core/models';
 import { UrgencyGaugeComponent } from './urgency-gauge.component';
 import { ProjectionChartComponent, ProjectionMarker } from './projection-chart.component';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 type CatalogItemKind = 'supply' | 'product';
 interface CatalogItem {
@@ -23,6 +25,21 @@ interface CatalogItem {
 }
 
 type AccordionId = 'inventario' | 'politica' | 'demanda' | 'logistica';
+
+/** Resumen de predicción de un ítem para la grilla de tarjetas. */
+interface PredCard {
+  kind: CatalogItemKind;
+  id: string;
+  name: string;
+  unit: string;
+  stock: number;
+  diasCobertura: number;
+  reorderPoint: number;
+  urgencia: number;       // 0..1
+  cantidad: number;       // a ordenar
+  decisionTitle: string;
+  status: string;         // critico_extremo | critico | alerta | optimo | informativo
+}
 
 /** Métricas de evaluación fijas (provistas por equipo ML). */
 const MODEL_METRICS = [
@@ -38,8 +55,9 @@ const MODEL_METRICS = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     DecimalPipe, ReactiveFormsModule, FormsModule,
-    IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonButton,
+    IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton, IonButton, IonIcon,
     PageHeaderComponent, UrgencyGaugeComponent, ProjectionChartComponent,
+    UnitShortPipe, FormModalComponent,
   ],
   templateUrl: './predicciones.page.html',
   styleUrls: ['./predicciones.page.scss'],
@@ -55,6 +73,12 @@ export class PrediccionesPage {
   // ---------- Cargar desde catálogo ----------
   selectedItemRef = '';
   readonly loadedItemLabel = signal<string>('');
+  /** Id del insumo cargado (para auto-tunear su ROP). null si es producto o nada. */
+  readonly loadedSupplyId = signal<string | null>(null);
+  /** Unidad del ítem cargado, para mostrarla en el formulario y resultados. */
+  readonly loadedUnit = signal<string>('unidad');
+  /** Abre el modal con el detalle del análisis. */
+  readonly detalleOpen = signal(false);
 
   readonly supplyItems = computed<CatalogItem[]>(() =>
     this.data.activeSupplies().map(s => ({
@@ -117,6 +141,8 @@ export class PrediccionesPage {
       ? ` · LT real promedio: ${lt.avg.toFixed(1)}d (n=${lt.count})`
       : '';
     this.loadedItemLabel.set(`${supply.name} (${supply.sku})${ltNote}`);
+    this.loadedSupplyId.set(supply.id);
+    this.loadedUnit.set(supply.unit);
     this.toast.show(`Datos de "${supply.name}" cargados.`, 'success');
   }
 
@@ -148,7 +174,126 @@ export class PrediccionesPage {
       ? ` · LT real promedio: ${lt.avg.toFixed(1)}d (n=${lt.count})`
       : '';
     this.loadedItemLabel.set(`${product.name} (${product.sku})${ltNote}`);
+    this.loadedSupplyId.set(null);
+    this.loadedUnit.set(product.unit);
     this.toast.show(`Datos de "${product.name}" cargados.`, 'success');
+  }
+
+  /** Aplica el ROP calculado por el modelo al insumo cargado (auto-tuneo). */
+  async aplicarRopSugerido(rop: number) {
+    const id = this.loadedSupplyId();
+    if (!id) return;
+    this.data.updateSupplyReorderPoint(id, rop);
+    this.form.patchValue({ reorder_point_manual: Math.max(0, Math.round(rop)) });
+    await this.toast.show(`Punto de reorden actualizado a ${Math.round(rop)} u.`, 'success');
+  }
+
+  // ========================================================
+  //  Grilla de tarjetas: predicción de TODOS los ítems a la vez
+  // ========================================================
+  private nowParts() {
+    const now = new Date();
+    return { dia_semana_num: ((now.getDay() + 6) % 7) + 1, mes_num: now.getMonth() + 1 };
+  }
+
+  private supplyRequest(id: string): PredictionRequest | null {
+    const supply = this.data.supplyById(id);
+    if (!supply) return null;
+    const stock = this.data.supplyStockFor(id);
+    const lt = this.data.historicalLeadTime('supply', id);
+    const ltAvg = Math.max(1, lt.count >= 1 ? +lt.avg.toFixed(2) : this.dynamicSupplyLeadTime(id) || 1);
+    return {
+      actual_stock: stock?.quantity ?? 0,
+      dias_desde_ultimo_restock: this.data.daysSinceLastRestock('supply', id),
+      rolling_mean_7d: +this.data.rollingMean('supply', id, 7).toFixed(2),
+      rolling_mean_14d: +this.data.rollingMean('supply', id, 14).toFixed(2),
+      rolling_mean_30d: +this.data.rollingMean('supply', id, 30).toFixed(2),
+      rolling_std_7d: +this.data.rollingStd('supply', id, 7).toFixed(2),
+      lt_avg: ltAvg,
+      lt_std: lt.count >= 2 ? +lt.std.toFixed(2) : Math.max(0.5, +(ltAvg * 0.3).toFixed(1)),
+      stock_min: supply.minStock,
+      stock_max: supply.maxStock,
+      reorder_point_manual: supply.reorderPoint,
+      ...this.nowParts(),
+    };
+  }
+
+  private productRequest(id: string): PredictionRequest | null {
+    const product = this.data.productById(id);
+    if (!product) return null;
+    const stock = this.data.productStockFor(id);
+    const lt = this.data.historicalLeadTime('product', id);
+    const reorderPoint = product.reorderPoint ?? 0;
+    const minStock = product.minStock ?? Math.floor(reorderPoint / 3);
+    const maxStock = Math.max(reorderPoint * 3, minStock + 10);
+    const ltAvg = Math.max(1, lt.count >= 1 ? +lt.avg.toFixed(2) : product.leadTime || 1);
+    return {
+      actual_stock: stock?.quantity ?? 0,
+      dias_desde_ultimo_restock: this.data.daysSinceLastRestock('product', id),
+      rolling_mean_7d: +this.data.rollingMean('product', id, 7).toFixed(2),
+      rolling_mean_14d: +this.data.rollingMean('product', id, 14).toFixed(2),
+      rolling_mean_30d: +this.data.rollingMean('product', id, 30).toFixed(2),
+      rolling_std_7d: +this.data.rollingStd('product', id, 7).toFixed(2),
+      lt_avg: ltAvg,
+      lt_std: lt.count >= 2 ? +lt.std.toFixed(2) : Math.max(0.5, +(ltAvg * 0.3).toFixed(1)),
+      stock_min: minStock,
+      stock_max: maxStock,
+      reorder_point_manual: reorderPoint || Math.floor((minStock + maxStock) / 2),
+      ...this.nowParts(),
+    };
+  }
+
+  /** Tarjeta resumen por ítem (corre el simulador local). Ordenadas por urgencia. */
+  readonly tarjetas = computed<PredCard[]>(() => {
+    const cards: PredCard[] = [];
+    for (const s of this.data.activeSupplies()) {
+      const req = this.supplyRequest(s.id);
+      if (req) cards.push(this.toCard('supply', s.id, s.name, s.unit, req));
+    }
+    for (const p of this.data.activeProducts().filter(p => !p.hasRecipe)) {
+      const req = this.productRequest(p.id);
+      if (req) cards.push(this.toCard('product', p.id, p.name, p.unit, req));
+    }
+    return cards.sort((a, b) => b.urgencia - a.urgencia);
+  });
+
+  private toCard(kind: CatalogItemKind, id: string, name: string, unit: string, req: PredictionRequest): PredCard {
+    const res = this.pred.simulate(req, { kind, id });
+    const meta = DECISION_TO_STATUS[res.orden.decision];
+    return {
+      kind, id, name, unit,
+      stock: req.actual_stock,
+      diasCobertura: res.derivados.dias_cobertura,
+      reorderPoint: res.derivados.reorder_point,
+      urgencia: res.orden.urgencia,
+      cantidad: res.orden.cantidad_final,
+      decisionTitle: meta.title,
+      status: meta.status,
+    };
+  }
+
+  /** ¿Qué ítem está seleccionado en la grilla (para resaltar la tarjeta)? */
+  readonly seleccionado = computed(() => this.selectedItemRefSig());
+  private readonly selectedItemRefSig = signal('');
+
+  fmtCobertura(d: number): string { return isFinite(d) ? `${d.toFixed(1)} d` : '∞'; }
+
+  /** Tap en una tarjeta: carga sus datos, corre el análisis y abre el modal. */
+  async seleccionarTarjeta(c: PredCard) {
+    this.selectedItemRef = `${c.kind}:${c.id}`;
+    this.selectedItemRefSig.set(this.selectedItemRef);
+    // Side-effects: etiqueta, unidad, supplyId (para título/ROP del detalle).
+    if (c.kind === 'supply') this.loadFromSupply(c.id);
+    else this.loadFromProduct(c.id);
+    // Predicción directa con el request del ítem (sin gate del formulario).
+    const req = c.kind === 'supply' ? this.supplyRequest(c.id) : this.productRequest(c.id);
+    if (!req) return;
+    try {
+      await this.pred.predict(req, { kind: c.kind, id: c.id });
+      this.detalleOpen.set(true);
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'Error al analizar.', 'danger');
+    }
   }
 
   private readonly openSet = signal<Set<AccordionId>>(new Set(['inventario', 'politica', 'demanda']));
@@ -265,6 +410,7 @@ export class PrediccionesPage {
           })()
         : undefined;
       await this.pred.predict(payload, itemContext);
+      if (this.pred.state().result) this.detalleOpen.set(true);
     } catch (e: unknown) {
       await this.toast.show(
         e instanceof Error ? e.message : 'Error al ejecutar la predicción.',
@@ -334,7 +480,7 @@ export class PrediccionesPage {
 
   readonly sliderStatusIcon = computed(() => {
     const s = this.sliderStatus();
-    return s === 'critico' ? '🚨' : s === 'alerta' ? '⚠️' : '✓';
+    return s === 'critico' ? 'alert-circle-outline' : s === 'alerta' ? 'warning-outline' : 'checkmark-outline';
   });
 
   readonly sliderStatusExplain = computed(() => {

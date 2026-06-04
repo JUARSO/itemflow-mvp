@@ -1,13 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { DecimalPipe } from '@angular/common';
 import { FormArray, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { startWith } from 'rxjs';
-import { IonButton } from '@ionic/angular/standalone';
+import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { Recipe, RecipeSheet, RecipeSize } from '../../core/models';
 import { DataService } from '../../core/services/data.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 type ItemGroup = ReturnType<RecetaFormModalComponent['buildItemGroup']>;
 
@@ -15,7 +17,7 @@ type ItemGroup = ReturnType<RecetaFormModalComponent['buildItemGroup']>;
   selector: 'app-receta-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, IonButton, FormModalComponent, FormFieldComponent],
+  imports: [DecimalPipe, ReactiveFormsModule, IonButton, IonIcon, FormModalComponent, FormFieldComponent, UnitShortPipe],
   templateUrl: './receta-form-modal.component.html',
   styleUrls: ['./receta-form-modal.component.scss'],
 })
@@ -113,6 +115,33 @@ export class RecetaFormModalComponent {
   /** Cuando cambia el kind, limpiar el itemId (no tiene sentido conservar un supplyId si ahora es subproducto). */
   onKindChange(i: number) {
     this.items.at(i)?.get('itemId')?.setValue('');
+  }
+
+  /** Costo que aporta el ítem `i` a una corrida (en vivo según el form). */
+  itemCost(i: number): number {
+    const g = this.items.at(i);
+    if (!g) return 0;
+    const itemId = g.get('itemId')?.value as string;
+    const qty = Number(g.get('qty')?.value) || 0;
+    if (!itemId || qty <= 0) return 0;
+    if (this.kindAt(i) === 'supply') {
+      return (this.data.supplyById(itemId)?.cost ?? 0) * qty;
+    }
+    return this.data.effectiveProductCost(itemId) * qty;
+  }
+
+  /** Costo total de la corrida (suma de todos los ítems). */
+  costoTotalForm(): number {
+    let total = 0;
+    for (let i = 0; i < this.items.length; i++) total += this.itemCost(i);
+    return total;
+  }
+
+  /** Costo por unidad producida (total ÷ yield). */
+  costoUnidadForm(): number {
+    const y = Number(this.form.controls.yieldQty.value) || 0;
+    if (y <= 0) return 0;
+    return this.costoTotalForm() / y;
   }
 
   /**

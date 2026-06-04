@@ -13,7 +13,7 @@
 
   @if (!urna()) {
     <app-empty-state
-      icon="🏪"
+      icon="storefront-outline"
       title="Sin almacén"
       body="No hay almacén de ventas configurado.">
     </app-empty-state>
@@ -73,7 +73,7 @@
     <div class="list">
       @if (historial().length === 0) {
         <app-empty-state
-          icon="✅"
+          icon="checkmark-circle-outline"
           title="Sin mermas registradas"
           body="Aquí aparecen las mermas del almacén y las de entrega registradas al facturar pedidos.">
         </app-empty-state>
@@ -91,7 +91,7 @@
               · {{ lot.createdAt | date:'dd-MM-yyyy HH:mm' }} · {{ lot.reviewedBy }}
             </div>
           </div>
-          <ion-badge color="danger">−{{ lot.mermaQty }} {{ lot.unit }}</ion-badge>
+          <ion-badge color="danger">−{{ lot.mermaQty }} {{ lot.unit | unitShort }}</ion-badge>
         </article>
       }
     </div>

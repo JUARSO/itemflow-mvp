@@ -3,7 +3,8 @@
       [backdropDismiss]="true"
       (didDismiss)="dismissed.emit()"
       class="nb-modal"
-      [class.nb-modal--wide]="size() === 'wide'">
+      [class.nb-modal--wide]="size() === 'wide'"
+      [class.nb-modal--full]="size() === 'full'">
       <ng-template>
         <div class="modal-shell">
           <header class="modal-shell__head">

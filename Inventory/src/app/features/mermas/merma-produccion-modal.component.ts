@@ -8,6 +8,7 @@ import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { ProductionMermaReason } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const REASON_OPTIONS: { value: ProductionMermaReason; label: string }[] = [
   { value: 'damaged',      label: 'Dañado / quebrado' },
@@ -31,6 +32,7 @@ const REASON_OPTIONS: { value: ProductionMermaReason; label: string }[] = [
     CommonModule, DecimalPipe,
     IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
     IonButton, IonIcon,
+    UnitShortPipe,
   ],
   templateUrl: './merma-produccion-modal.component.html',
   styleUrls: ['./merma-produccion-modal.component.scss'],

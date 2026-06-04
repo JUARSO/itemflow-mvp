@@ -1,6 +1,6 @@
     @if (hasStockout()) {
       <div class="banner" role="status">
-        ⚠️ Quiebre de stock detectado · ROP mínimo recomendado: {{ recommendedRop() }} u
+<ion-icon name="warning-outline" aria-hidden="true"></ion-icon> Quiebre de stock detectado · ROP mínimo recomendado: {{ recommendedRop() }} {{ unit() }}
       </div>
     }
 
@@ -97,7 +97,7 @@
              [style.left.px]="tooltipLeft()"
              [style.top.px]="tooltipTop()">
           <div><strong>Día {{ hoverDay() }}</strong></div>
-          <div>Stock: <span class="mono">{{ valueAt(hoverDay()!) }} u</span></div>
+          <div>Stock: <span class="mono">{{ valueAt(hoverDay()!) }} {{ unit() }}</span></div>
           <div>Estado: {{ statusLabel(statusAt(hoverDay()!)) }}</div>
         </div>
       }

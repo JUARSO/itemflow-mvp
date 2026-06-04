@@ -63,7 +63,7 @@
 
   <div class="list">
     @if (visibles().length === 0) {
-      <app-empty-state icon="📦" title="Sin productos"
+      <app-empty-state icon="cube-outline" title="Sin productos"
         body="No hay productos en el catálogo o no coinciden con la búsqueda."></app-empty-state>
     }
     @for (v of visibles(); track v.product.id) {
@@ -74,7 +74,7 @@
         </div>
 
         <div class="row__stock">
-          <div class="row__qty mono">{{ v.qty }} <span class="unit">{{ v.product.unit }}</span></div>
+          <div class="row__qty mono">{{ v.qty }} <span class="unit">{{ v.product.unit | unitShort }}</span></div>
           <app-status-badge [status]="v.status"></app-status-badge>
         </div>
 

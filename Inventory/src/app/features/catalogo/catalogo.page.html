@@ -26,7 +26,7 @@
 
       @if (visibles().length === 0 && data.activeProducts().length === 0) {
         <app-empty-state
-          icon="📋"
+          icon="clipboard-outline"
           title="No hay productos en el catálogo"
           body="Empieza agregando los productos que vendes. Sin catálogo no puedes registrar ventas ni recetas."
           ctaLabel="Agregar primer producto"
@@ -48,22 +48,12 @@
               <div class="card__sku mono">{{ p.sku }}</div>
               <div class="card__row">
                 <div class="card__cell">
-                  <div class="card__label">Precio venta</div>
-                  <div class="card__value mono">₡{{ p.sellPrice | number:'1.0-0' }}</div>
+                  <div class="card__label">
+                    Costo
+                    @if (p.hasRecipe) { <span class="card__tag">receta</span> }
+                  </div>
+                  <div class="card__value mono">₡{{ effectiveCost(p) | number:'1.0-0' }}</div>
                 </div>
-                @if (tenant.canEditCatalog()) {
-                  <div class="card__cell">
-                    <div class="card__label">
-                      Costo
-                      @if (p.hasRecipe) { <span class="card__tag">receta</span> }
-                    </div>
-                    <div class="card__value mono">₡{{ effectiveCost(p) | number:'1.0-0' }}</div>
-                  </div>
-                  <div class="card__cell">
-                    <div class="card__label">Margen</div>
-                    <div class="card__value mono">{{ margen(p.sellPrice, effectiveCost(p)) }}%</div>
-                  </div>
-                }
               </div>
               @if (tenant.canEditCatalog()) {
                 <div class="card__actions">

@@ -14,6 +14,7 @@ import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.comp
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { CustomerOrder } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 @Component({
   selector: 'app-inventario-ventas',
@@ -24,6 +25,7 @@ import { CustomerOrder } from '../../core/models';
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonSearchbar,
     PageHeaderComponent, KpiCardComponent, StatusBadgeComponent, EmptyStateComponent,
+    UnitShortPipe,
   ],
   templateUrl: './inventario-ventas.page.html',
   styleUrls: ['./inventario-ventas.page.scss'],

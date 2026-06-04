@@ -1,0 +1,89 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Clientes de factura (POS)</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <app-page-header
+    title="Clientes de factura (POS)"
+    subtitle="Receptores para factura electrónica en el punto de venta. Solo datos fiscales.">
+    <ion-button (click)="abrirNuevo()">+ Nuevo cliente</ion-button>
+  </app-page-header>
+
+  @if (data.posClientes().length === 0 || (data.posClientes().length > 0 && visibles().length === 0 && query() === '')) {
+    <app-empty-state icon="people-outline" title="Sin clientes de factura"
+      body="Agrega los clientes a los que les emites factura electrónica desde el punto de venta."
+      ctaLabel="Agregar primer cliente"
+      (ctaClick)="abrirNuevo()">
+    </app-empty-state>
+  } @else {
+    <app-search-bar [(query)]="query" placeholder="Buscar por nombre, identificación o correo" />
+
+    <div class="cards">
+      @for (c of visibles(); track c.id) {
+        <article class="card">
+          <header class="card__head">
+            <h3 class="card__name">{{ c.nombre }}</h3>
+            <ion-badge color="primary">{{ tipoIdLabel(c.fiscal.tipoIdentificacion) }}</ion-badge>
+          </header>
+
+          <div class="card__row">
+            <span class="muted">Identificación</span>
+            <span class="mono">{{ c.fiscal.identificacion }}</span>
+          </div>
+          @if (c.fiscal.nombre) {
+            <div class="card__row">
+              <span class="muted">Razón social</span>
+              <span>{{ c.fiscal.nombre }}</span>
+            </div>
+          }
+          @if (c.email) {
+            <div class="card__row">
+              <span class="muted">Correo</span>
+              <span class="mono">{{ c.email }}</span>
+            </div>
+          }
+          @if (c.telefono) {
+            <div class="card__row">
+              <span class="muted">Teléfono</span>
+              <span class="mono">{{ c.telefono }}</span>
+            </div>
+          }
+          @if (ubicacionDe(c); as ubic) {
+            <div class="card__row">
+              <span class="muted">Ubicación</span>
+              <span>{{ ubic }}</span>
+            </div>
+          }
+          @if (c.fiscal.otrasSenas) {
+            <p class="card__senas">{{ c.fiscal.otrasSenas }}</p>
+          }
+
+          <div class="card__actions">
+            <ion-button size="small" fill="outline" (click)="abrirEditar(c)">Editar</ion-button>
+            <ion-button size="small" color="danger" fill="outline" (click)="pedirEliminar(c)">Eliminar</ion-button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  <app-pos-cliente-form-modal
+    [isOpen]="modalOpen()"
+    [editing]="editing()"
+    (closed)="cerrarModal()"
+    (saved)="cerrarModal()">
+  </app-pos-cliente-form-modal>
+
+  <app-confirm-dialog
+    [isOpen]="confirmOpen()"
+    title="Eliminar cliente"
+    [message]="'¿Eliminar a ' + (aEliminar()?.nombre ?? '') + ' de los clientes de factura?'"
+    tone="danger"
+    confirmLabel="Sí, eliminar"
+    (confirmed)="eliminar()"
+    (cancelled)="confirmOpen.set(false)">
+  </app-confirm-dialog>
+</ion-content>

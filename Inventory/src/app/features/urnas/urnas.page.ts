@@ -12,6 +12,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { CustomerOrder } from '../../core/models';
 
 @Component({
@@ -22,7 +23,7 @@ import { CustomerOrder } from '../../core/models';
     DecimalPipe, DatePipe, RouterLink,
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonBadge,
-    PageHeaderComponent, KpiCardComponent, EmptyStateComponent,
+    PageHeaderComponent, KpiCardComponent, EmptyStateComponent, SearchBarComponent,
   ],
   templateUrl: './urnas.page.html',
   styleUrls: ['./urnas.page.scss'],
@@ -44,6 +45,23 @@ export class UrnasPage {
 
   /** Lotes (tandas) recibidos, recientes primero. */
   readonly lotes = computed(() => this.data.urnaLotesFor(this.almacenId()));
+
+  readonly query = signal('');
+  readonly stockLinesFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.stockLines();
+    if (!q) return list;
+    return list.filter(x => (x.product?.name ?? x.productId ?? '').toLowerCase().includes(q));
+  });
+  readonly lotesFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.lotes();
+    if (!q) return list;
+    return list.filter(x =>
+      (x.code ?? '').toLowerCase().includes(q) ||
+      x.lines.some(ln => (ln.productName ?? '').toLowerCase().includes(q))
+    );
+  });
 
   readonly unidades = computed(() =>
     this.data.urnaProductTotals(this.almacenId()).reduce((s, l) => s + l.quantity, 0)
@@ -93,7 +111,7 @@ export class UrnasPage {
   }
 
   statusLabel(o: CustomerOrder): string {
-    if (o.deliveredToUrnaAt) return 'Recibido ✓';
+    if (o.deliveredToUrnaAt) return 'Recibido';
     switch (o.status) {
       case 'pending': return 'Pendiente — sin tomar';
       case 'in_production': return 'Tomado · en fabricación';

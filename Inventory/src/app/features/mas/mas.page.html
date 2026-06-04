@@ -47,7 +47,7 @@
             }
           </div>
           <div class="brand-preview__text">
-            <div class="brand-preview__name">{{ nameDraft() || 'ItemFlow' }}</div>
+            <div class="brand-preview__name">{{ nameDraft() || 'Atlas' }}</div>
             <div class="brand-preview__company">{{ tenant.company().name }}</div>
           </div>
         </div>
@@ -60,7 +60,7 @@
               [(ngModel)]="nameDraftRaw"
               (ngModelChange)="onBrandingChange()"
               maxlength="32"
-              placeholder="ItemFlow" />
+              placeholder="Atlas" />
           </label>
           <label class="field field--narrow">
             <span class="field__label">Logo (emoji o texto)</span>
@@ -69,7 +69,7 @@
               [(ngModel)]="logoDraftRaw"
               (ngModelChange)="onBrandingChange()"
               maxlength="3"
-              placeholder="📦"
+              placeholder=""
               [disabled]="!!branding.branding().logoImage" />
           </label>
         </div>
@@ -92,7 +92,7 @@
                 accept="image/*"
                 (change)="onLogoFile($event)"
                 hidden />
-              <span>{{ branding.branding().logoImage ? '📷 Reemplazar imagen' : '📷 Subir imagen…' }}</span>
+              <ion-icon name="camera-outline" aria-hidden="true"></ion-icon> <span>{{ branding.branding().logoImage ? 'Reemplazar imagen' : 'Subir imagen…' }}</span>
             </label>
             @if (branding.branding().logoImage) {
               <ion-button fill="clear" class="ghost" size="small" (click)="clearLogo()">
@@ -158,6 +158,12 @@
           <span class="mono">{{ tenant.company().timezone }}</span>
         </div>
       </section>
+
+      @if (auth.isAdmin()) {
+        <section class="card">
+          <app-facturacion-config></app-facturacion-config>
+        </section>
+      }
 
       <section class="card">
         <div class="card__head">

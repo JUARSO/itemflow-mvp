@@ -16,12 +16,13 @@ export interface Branding {
   logoImage?: string;
 }
 
-const STORAGE_KEY = 'noble_branding_v1';
+const STORAGE_KEY = 'atlas_branding_v1';
 
+/** Marca por defecto = la plataforma (Atlas). Cada tenant la personaliza. */
 const DEFAULTS: Branding = {
-  displayName: 'NOBLE',
-  logo: 'N',
-  logoImage: 'assets/branding/noble-logo.png',
+  displayName: 'Atlas',
+  logo: 'A',
+  logoImage: 'assets/branding/atlas-logo.svg',
 };
 
 /** Tamaño máximo (lado mayor) al que se redimensiona la imagen subida. */

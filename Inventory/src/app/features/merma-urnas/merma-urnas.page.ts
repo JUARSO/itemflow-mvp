@@ -13,6 +13,7 @@ import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.comp
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { ProductionMermaReason, ReturnedLot } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const MERMA_REASONS: { value: ProductionMermaReason; label: string }[] = [
   { value: 'damaged', label: 'Dañado' },
@@ -30,6 +31,7 @@ const MERMA_REASONS: { value: ProductionMermaReason; label: string }[] = [
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonBadge,
     PageHeaderComponent, KpiCardComponent, EmptyStateComponent, FormFieldComponent,
+    UnitShortPipe,
   ],
   templateUrl: './merma-urnas.page.html',
   styleUrls: ['./merma-urnas.page.scss'],

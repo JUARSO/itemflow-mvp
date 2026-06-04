@@ -8,10 +8,13 @@ import {
 import { DataService } from '../../core/services/data.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 const MS_PER_DAY = 86_400_000;
 /** Días mínimos a visualizar aunque no haya entregas más allá. */
 const MIN_HORIZON_DAYS = 30;
+/** Días hacia adelante que proyecta el plan semanal recurrente (2 semanas). */
+const PLAN_HORIZON_DAYS = 14;
 
 /**
  * Origen individual de una tarea agregada: un pedido específico de un
@@ -64,6 +67,7 @@ interface DayBucket {
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon,
     PageHeaderComponent, KpiCardComponent,
+    UnitShortPipe,
   ],
   templateUrl: './planificacion.page.html',
   styleUrls: ['./planificacion.page.scss'],
@@ -134,6 +138,48 @@ export class PlanificacionPage {
             startDate,
             deliveryDate,
             totalQty: remaining,
+            sources: [source],
+            overdue: startDate.getTime() < todayMs,
+          });
+        }
+      }
+    }
+
+    // ----- Plan de producción SEMANAL recurrente (almacén) -----
+    // Proyecta la config semanal sobre los próximos días: cada día toma la lista
+    // de su día de la semana. Al editar la config, esto se recalcula solo.
+    const plan = this.data.weeklyProductionPlan();
+    for (let i = 0; i < PLAN_HORIZON_DAYS; i++) {
+      const day = this.normalizeDate(new Date(todayMs + i * MS_PER_DAY));
+      const items = plan[day.getDay()] ?? [];
+      if (items.length === 0) continue;
+      const deliveryIso = this.toIso(day);
+      for (const it of items) {
+        if (it.qty <= 0) continue;
+        const prod = this.data.productById(it.productId);
+        const leadTime = prod?.leadTime ?? 1;
+        const startDate = new Date(day.getTime() - leadTime * MS_PER_DAY);
+        const key = `${it.productId}::${deliveryIso}`;
+        const source: TaskSource = {
+          orderId: `plan-${deliveryIso}-${it.productId}`,
+          orderCode: 'Plan semanal',
+          cliente: 'Almacén · plan semanal',
+          qty: it.qty,
+        };
+        const existing = map.get(key);
+        if (existing) {
+          existing.totalQty += it.qty;
+          existing.sources.push(source);
+        } else {
+          map.set(key, {
+            key,
+            productId: it.productId,
+            productName: prod?.name ?? it.productId,
+            unit: prod?.unit ?? 'u',
+            leadTime,
+            startDate,
+            deliveryDate: day,
+            totalQty: it.qty,
             sources: [source],
             overdue: startDate.getTime() < todayMs,
           });

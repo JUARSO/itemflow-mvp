@@ -21,11 +21,68 @@
           <input type="email" formControlName="email" />
         </app-form-field>
 
+        <!-- Datos de factura electrónica -->
+        <h3 class="section-title">Factura electrónica</h3>
+        <p class="hint">
+          Datos fiscales del cliente (receptor). El comprobante se envía al email de arriba.
+          Completa la identificación para poder facturarle electrónicamente.
+        </p>
+        <div class="row">
+          <app-form-field label="Tipo de identificación">
+            <select formControlName="feTipo">
+              @for (t of tiposId; track t.id) {
+                <option [value]="t.id">{{ t.label }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Número de identificación">
+            <input type="text" inputmode="numeric" formControlName="feIdentificacion" placeholder="Sin guiones" />
+          </app-form-field>
+        </div>
+        <app-form-field label="Nombre / razón social fiscal (si difiere)">
+          <input type="text" formControlName="feNombre" placeholder="Opcional — usa el nombre del cliente si se deja vacío" />
+        </app-form-field>
+        <div class="row row--3">
+          <app-form-field label="Provincia">
+            <select [value]="provinciaSel()" (change)="onProvincia($any($event.target).value)">
+              <option value="">— Selecciona —</option>
+              @for (p of provinciaOpts(); track p.codigo) {
+                <option [value]="p.codigo">{{ p.nombre }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Cantón">
+            <select [value]="cantonSel()" (change)="onCanton($any($event.target).value)" [disabled]="!provinciaSel()">
+              <option value="">— Selecciona —</option>
+              @for (c of cantonOpts(); track c.codigo) {
+                <option [value]="c.codigo">{{ c.nombre }}</option>
+              }
+            </select>
+          </app-form-field>
+          <app-form-field label="Distrito">
+            <select [value]="distritoSel()" (change)="onDistrito($any($event.target).value)" [disabled]="!cantonSel()">
+              <option value="">— Selecciona —</option>
+              @for (d of distritoOpts(); track d.codigo) {
+                <option [value]="d.codigo">{{ d.nombre }}</option>
+              }
+            </select>
+          </app-form-field>
+        </div>
+        <app-form-field label="Barrio">
+          <input type="text" formControlName="feBarrio" />
+        </app-form-field>
+        <app-form-field label="Otras señas (dirección exacta)">
+          <textarea formControlName="feOtrasSenas" rows="2"></textarea>
+        </app-form-field>
+
         <!-- Productos permitidos -->
         <h3 class="section-title">Productos que puede pedir</h3>
         <p class="hint">
-          Si no marcas ninguno, el cliente verá todo el catálogo con precio normal.
-          El precio en blanco usa el precio de venta global.
+          Si no marcas ninguno, el cliente verá todo el catálogo con el precio final.
+          El precio en blanco usa el precio final del catálogo.
+          @if (!tenant.canSetFinalPrices()) {
+            <strong> Solo el administrador puede fijar los precios por cliente.</strong>
+          }
         </p>
         <div class="products">
           @for (p of data.activeProducts(); track p.id) {
@@ -42,11 +99,12 @@
                   <span class="cur">₡</span>
                   <input type="number" min="0" step="1"
                     [value]="priceOf(p.id)"
-                    [placeholder]="p.sellPrice"
+                    [placeholder]="data.consumerPrice(p.id)"
+                    [disabled]="!tenant.canSetFinalPrices()"
                     (input)="setPrice(p.id, $any($event.target).value)" />
                 </div>
               } @else {
-                <span class="product-row__global mono">₡{{ p.sellPrice }}</span>
+                <span class="product-row__global mono">₡{{ data.consumerPrice(p.id) }}</span>
               }
             </div>
           }

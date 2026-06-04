@@ -1,21 +1,23 @@
 /* =========================================================
-   NOBLE Bakery & Pastry — Tokens de diseño
-   Inspirado en noble.cr: monocromático cálido, oliva oscuro,
-   cremas tipo papel, acentos ámbar. Calma · sofisticación.
+   Atlas — Tokens de diseño (tema de plataforma)
+   Monocromático cálido: oliva oscuro, cremas tipo papel,
+   acentos ámbar. Calma · sofisticación. Cada tenant puede
+   personalizar su marca; esta es la paleta base del producto.
    ========================================================= */
 
 :root {
-  /* --- Marca (oliva oscuro tipo "tinta" europea) --- */
-  --ui-primary: #292E26;        /* dark olive / charcoal NOBLE */
+  /* --- Marca (oliva oscuro tipo "tinta") --- */
+  --ui-primary: #292E26;        /* dark olive / charcoal */
   --ui-primary-tint: #3d433a;
   --ui-primary-shade: #1e2219;
   --ui-primary-contrast: #ffffff;
   --ui-secondary: #5c5448;      /* warm taupe */
+  --ui-accent: #b45309;         /* acento ámbar (bordes/realces) */
 
   /* --- Estados semánticos (tonos cálidos coherentes) --- */
   --ui-success: #5f7d4f;        /* olive green */
   --ui-success-tint: #eef2ea;
-  --ui-warning: #b45309;        /* amber NOBLE */
+  --ui-warning: #b45309;        /* amber */
   --ui-warning-tint: #f6ecdc;
   --ui-danger: #9c4a40;         /* rojo ladrillo oscuro */
   --ui-danger-tint: #f3e9e6;
@@ -24,13 +26,13 @@
   --ui-transit: #6a705f;        /* sage gris (entre primary y muted) */
   --ui-transit-tint: #ecede8;
 
-  /* --- Superficie (cremas tipo papel NOBLE) --- */
+  /* --- Superficie (cremas tipo papel) --- */
   --ui-surface: #ffffff;        /* papel base */
-  --ui-surface-2: #F7F6F4;      /* crema NOBLE */
-  --ui-surface-3: #eceae5;      /* hover / sección alterna NOBLE */
+  --ui-surface-2: #F7F6F4;      /* crema */
+  --ui-surface-3: #eceae5;      /* hover / sección alterna */
 
   /* --- Texto (escala olivácea oscura) --- */
-  --ui-text: #1e2219;           /* tinta principal NOBLE */
+  --ui-text: #1e2219;           /* tinta principal */
   --ui-text-strong: #14170f;    /* títulos y números clave */
   --ui-text-muted: #6b6a64;     /* secundario, metadatos */
   --ui-text-subtle: #a09e96;    /* placeholders, labels muy chicos */
@@ -54,7 +56,7 @@
   --ui-radius-lg: 8px;
   --ui-radius-pill: 9999px;
 
-  /* --- Tipografía (NOBLE: Outfit/DM Sans display, Inter body) --- */
+  /* --- Tipografía (Outfit/DM Sans display, Inter body) --- */
   --ui-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --ui-font-display: 'Outfit', 'DM Sans', 'Inter', sans-serif;
   --ui-font-mono: 'IBM Plex Mono', 'PT Mono', 'SF Mono', Menlo, monospace;
@@ -85,6 +87,7 @@
   --ui-sp-2: 8px;
   --ui-sp-3: 12px;
   --ui-sp-4: 16px;
+  --ui-sp-5: 20px;
   --ui-sp-6: 24px;
   --ui-sp-8: 32px;
 

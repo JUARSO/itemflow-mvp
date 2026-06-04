@@ -2,6 +2,7 @@
       --width: 420px;
       --max-width: 95vw;
       --height: auto;
+      --max-height: 90vh;
       --border-radius: 0;
       --box-shadow: none;
       --background: transparent;
@@ -15,6 +16,8 @@
     .confirm {
       padding: var(--ui-sp-6);
       text-align: center;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     .confirm__icon {
       width: 64px;

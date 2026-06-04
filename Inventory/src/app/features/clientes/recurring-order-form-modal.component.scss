@@ -41,3 +41,5 @@
   background: var(--ui-surface);
   color: var(--ui-text);
 }
+
+.day:hover:not(.day--on) { background: var(--ui-surface-3); border-color: var(--ui-primary); }

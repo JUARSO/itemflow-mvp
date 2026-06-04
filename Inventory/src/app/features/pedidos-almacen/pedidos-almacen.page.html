@@ -11,6 +11,42 @@
     subtitle="Reposiciones de almacén y pedidos de clientes corroborados. Fabrícalos y márcalos listos.">
   </app-page-header>
 
+  <!-- Plan semanal: lo que toca producir HOY (directo de la config de Ventas) -->
+  <section class="plan-hoy">
+    <div class="plan-hoy__head">
+      <span class="plan-hoy__title">Plan de hoy · {{ diaHoy }}</span>
+      @if (planHoy().length > 0) {
+        <span class="plan-hoy__total mono">{{ totalPlanHoy() }} u</span>
+      }
+    </div>
+    @if (planHoy().length === 0) {
+      <p class="plan-hoy__empty">No hay lista configurada para hoy en “Pedir a producción”.</p>
+    } @else {
+      <div class="plan-hoy__items">
+        @for (it of planHoy(); track it.productId) {
+          <span class="plan-hoy__item">
+            {{ productName(it.productId) }} <strong class="mono">×{{ it.qty }}</strong>
+          </span>
+        }
+      </div>
+      <div class="plan-hoy__action">
+        @if (entregaHoy(); as e) {
+          <span class="plan-hoy__done">
+            <ion-icon name="checkmark-circle-outline" aria-hidden="true"></ion-icon>
+            Entregado al almacén — {{ e.total }} u
+          </span>
+        } @else {
+          <ion-button size="small" (click)="entregarPlanHoy()">
+            <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+            Marcar producido y entregar al almacén
+          </ion-button>
+        }
+      </div>
+    }
+  </section>
+
+  <app-search-bar [(query)]="query" placeholder="Buscar por código o producto" />
+
   <div class="kpis">
     <app-kpi-card label="Por producir" [value]="porProducir()" tone="warning"></app-kpi-card>
     <app-kpi-card label="En producción" [value]="enProduccion()" tone="primary"></app-kpi-card>
@@ -20,12 +56,12 @@
   <div class="list">
     @if (requests().length === 0) {
       <app-empty-state
-        icon="🏭"
+        icon="business-outline"
         title="Sin pedidos por producir"
         body="Cuando Ventas pida reposición o corrobore un pedido de cliente, aparecerá aquí.">
       </app-empty-state>
     }
-    @for (o of requests(); track o.id) {
+    @for (o of requestsFiltrados(); track o.id) {
       <article class="req" [attr.data-status]="o.status" [attr.data-tipo]="esCliente(o) ? 'cliente' : 'almacen'">
         <header class="req__head">
           <div class="req__id">

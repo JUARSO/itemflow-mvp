@@ -7,6 +7,7 @@ import { FormModalComponent } from '../../shared/components/form-modal/form-moda
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { DataService } from '../../core/services/data.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 type LineGroup = ReturnType<OcFormModalComponent['buildLineGroup']>;
 
@@ -14,7 +15,7 @@ type LineGroup = ReturnType<OcFormModalComponent['buildLineGroup']>;
   selector: 'app-oc-form-modal',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, DecimalPipe, IonButton, FormModalComponent, FormFieldComponent],
+  imports: [ReactiveFormsModule, DecimalPipe, IonButton, FormModalComponent, FormFieldComponent, UnitShortPipe],
   templateUrl: './oc-form-modal.component.html',
   styleUrls: ['./oc-form-modal.component.scss'],
 })
@@ -92,13 +93,18 @@ export class OcFormModalComponent {
   addLine() { this.lines.push(this.buildLineGroup()); }
   removeLine(i: number) { this.lines.removeAt(i); }
 
-  /** Al elegir un proveedor registrado: precarga expectedDate con today + leadTime. */
+  /**
+   * Al elegir un proveedor registrado: precarga expectedDate con la próxima
+   * fecha de entrega según su CALENDARIO (días de entrega), o today+leadTime.
+   */
   onSupplierChange() {
     const s = this.selectedSupplier();
     if (!s) return;
     if (!this.form.controls.expectedDate.value) {
-      const d = new Date();
-      d.setDate(d.getDate() + s.leadTimeDays);
+      const lt = this.data.supplierLeadTime(s.id);
+      const d = lt ? lt.nextDeliveryDate : (() => {
+        const x = new Date(); x.setDate(x.getDate() + s.leadTimeDays); return x;
+      })();
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       this.form.controls.expectedDate.setValue(iso);
     }

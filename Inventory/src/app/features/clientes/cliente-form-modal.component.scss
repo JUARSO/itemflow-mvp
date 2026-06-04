@@ -1,5 +1,6 @@
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-sp-3); }
-    @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+    .row--3 { grid-template-columns: 1fr 1fr 1fr; }
+    @media (max-width: 480px) { .row, .row--3 { grid-template-columns: 1fr; } }
 
     .section-title {
       font-size: var(--ui-fs-sm);

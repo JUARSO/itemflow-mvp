@@ -1,0 +1,78 @@
+<app-form-modal
+  [isOpen]="isOpen()"
+  [title]="editing() ? 'Editar cliente de factura' : 'Nuevo cliente de factura'"
+  (dismissed)="closed.emit()">
+
+  <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+    <app-form-field label="Nombre del cliente" [required]="true">
+      <input type="text" formControlName="nombre" placeholder="Ej: Juan Pérez" />
+    </app-form-field>
+
+    <div class="row">
+      <app-form-field label="Tipo de identificación">
+        <select formControlName="feTipo">
+          @for (t of tiposId; track t.id) {
+            <option [value]="t.id">{{ t.label }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field label="Número de identificación" [required]="true">
+        <input type="text" inputmode="numeric" formControlName="feIdentificacion" placeholder="Sin guiones" />
+      </app-form-field>
+    </div>
+
+    <app-form-field label="Razón social fiscal (si difiere del nombre)">
+      <input type="text" formControlName="feNombre" placeholder="Opcional" />
+    </app-form-field>
+
+    <div class="row">
+      <app-form-field label="Correo (envío de factura)">
+        <input type="email" formControlName="email" placeholder="cliente@correo.cr" />
+      </app-form-field>
+      <app-form-field label="Teléfono">
+        <input type="text" inputmode="tel" formControlName="telefono" />
+      </app-form-field>
+    </div>
+
+    <div class="row row--3">
+      <app-form-field label="Provincia">
+        <select [value]="provinciaSel()" (change)="onProvincia($any($event.target).value)">
+          <option value="">— Selecciona —</option>
+          @for (p of provinciaOpts(); track p.codigo) {
+            <option [value]="p.codigo">{{ p.nombre }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field label="Cantón">
+        <select [value]="cantonSel()" (change)="onCanton($any($event.target).value)" [disabled]="!provinciaSel()">
+          <option value="">— Selecciona —</option>
+          @for (c of cantonOpts(); track c.codigo) {
+            <option [value]="c.codigo">{{ c.nombre }}</option>
+          }
+        </select>
+      </app-form-field>
+      <app-form-field label="Distrito">
+        <select [value]="distritoSel()" (change)="onDistrito($any($event.target).value)" [disabled]="!cantonSel()">
+          <option value="">— Selecciona —</option>
+          @for (d of distritoOpts(); track d.codigo) {
+            <option [value]="d.codigo">{{ d.nombre }}</option>
+          }
+        </select>
+      </app-form-field>
+    </div>
+
+    <app-form-field label="Barrio">
+      <input type="text" formControlName="feBarrio" />
+    </app-form-field>
+    <app-form-field label="Otras señas (dirección exacta)">
+      <textarea formControlName="feOtrasSenas" rows="2"></textarea>
+    </app-form-field>
+  </form>
+
+  <div footer>
+    <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
+    <ion-button (click)="onSubmit()" [disabled]="form.invalid">
+      {{ editing() ? 'Guardar cambios' : 'Crear cliente' }}
+    </ion-button>
+  </div>
+</app-form-modal>

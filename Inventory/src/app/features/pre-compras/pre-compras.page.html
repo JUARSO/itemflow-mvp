@@ -8,7 +8,7 @@
     <ion-content>
       <app-page-header
         title="Pre-compras sugeridas"
-        subtitle="Cálculo en tiempo real según stock, consumo diario y calendario del proveedor. Al aprobar se genera la OC.">
+        subtitle="Dirigida por demanda: combina tus pedidos y el plan semanal con el stock, el consumo y el calendario del proveedor. Al aprobar se genera la OC con fecha esperada.">
       </app-page-header>
 
       <div class="kpis">
@@ -91,16 +91,17 @@
                   <span class="pre-item__name">
                     {{ it.itemName }}
                     @switch (it.reason) {
-                      @case ('below_rop')     { <ion-badge color="danger" class="mini">Bajo ROP</ion-badge> }
+                      @case ('demand')        { <ion-badge color="danger" class="mini">Demanda</ion-badge> }
+                      @case ('below_rop')     { <ion-badge color="warning" class="mini">Bajo ROP</ion-badge> }
                       @case ('wont_cover_lt') { <ion-badge color="warning" class="mini">No cubre LT</ion-badge> }
                       @case ('manual')        { <ion-badge color="primary" class="mini">Manual</ion-badge> }
                     }
                     @if (it.pendingQty > 0) {
-                      <small class="pending">+{{ it.pendingQty | number:'1.0-1' }} en camino</small>
+                      <small class="pending">+{{ it.pendingQty | number:'1.0-1' }} {{ it.unit | unitShort }} en camino</small>
                     }
                   </span>
                   <span class="mono">
-                    {{ it.currentStock | number:'1.0-1' }}
+                    {{ it.currentStock | number:'1.0-1' }} {{ it.unit | unitShort }}
                     <small class="muted">/ {{ it.reorderPoint | number:'1.0-0' }}</small>
                   </span>
                   <span class="mono" [class.urgent]="it.daysUntilEmpty < pre.leadTimeDays">
@@ -110,7 +111,7 @@
                       —
                     }
                   </span>
-                  <span class="mono"><strong>{{ it.qty }}</strong></span>
+                  <span class="mono"><strong>{{ it.qty }} {{ it.unit | unitShort }}</strong></span>
                   <span class="mono">₡{{ it.qty * it.unitCost | number:'1.0-0' }}</span>
                   <span class="pre-item__action">
                     @if (it.manual && tenant.canManagePrePurchaseOrders()) {
@@ -129,7 +130,7 @@
                     <select [value]="addSupplyId()" (change)="addSupplyId.set($any($event.target).value)">
                       <option value="">— Insumo del proveedor —</option>
                       @for (s of supplierAvailableSupplies(pre); track s.id) {
-                        <option [value]="s.id">{{ s.name }} ({{ s.unit }})</option>
+                        <option [value]="s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
                       }
                     </select>
                     <input type="number" min="0.001" step="0.001"

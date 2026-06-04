@@ -1,0 +1,74 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--ui-sp-3);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-3);
+}
+@media (max-width: 600px) { .kpis { grid-template-columns: 1fr; } }
+
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-sp-2);
+  padding: 0 var(--ui-sp-4) var(--ui-sp-4);
+}
+.add__select, .add__qty, .add__note {
+  padding: 8px 10px;
+  min-height: 40px;
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.add__select { flex: 1 1 200px; min-width: 0; }
+.add__qty { width: 90px; text-align: right; }
+.add__note { flex: 2 1 220px; min-width: 0; }
+
+.list {
+  padding: 0 var(--ui-sp-4) var(--ui-sp-8);
+  display: grid;
+  gap: var(--ui-sp-2);
+}
+.res {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-sp-3);
+  background: var(--ui-surface);
+  border: var(--ui-border-w-md) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  padding: var(--ui-sp-3) var(--ui-sp-4);
+}
+.res__info { flex: 1 1 auto; min-width: 0; }
+.res__name { font-family: var(--ui-font-display); font-weight: var(--ui-fw-bold); color: var(--ui-text); }
+.res__meta { font-size: var(--ui-fs-xs); }
+.res__note, .res__note-ro {
+  margin-top: 4px;
+  font-size: var(--ui-fs-sm);
+}
+.res__note {
+  width: 100%;
+  max-width: 320px;
+  padding: 4px 8px;
+  border: var(--ui-border-w-sm) solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+}
+.res__qtyinput {
+  width: 72px;
+  text-align: right;
+  padding: 6px 8px;
+  font-weight: var(--ui-fw-black);
+  border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.res__rm {
+  background: none; border: none; cursor: pointer;
+  color: var(--ui-danger); padding: 4px;
+}
+.muted { color: var(--ui-text-muted); }
+
+.res__rm:hover { color: var(--ui-danger); }

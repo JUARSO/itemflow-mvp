@@ -79,8 +79,8 @@
                             <div class="editor-row__name">
                               <strong>{{ it.productName }}</strong>
                               <span class="muted">
-                                Pedido: <span class="mono">{{ it.qty }}</span> {{ it.unit }} ·
-                                Producido: <span class="mono">{{ it.fulfilledQty }}</span> {{ it.unit }}
+                                Pedido: <span class="mono">{{ it.qty }}</span> {{ it.unit | unitShort }} ·
+                                Producido: <span class="mono">{{ it.fulfilledQty }}</span> {{ it.unit | unitShort }}
                               </span>
                             </div>
                             <div class="editor-row__input">
@@ -139,7 +139,7 @@
                           <div class="receive-card__item">
                             <span>{{ it.productName }}</span>
                             <span class="mono">
-                              {{ it.fulfilledQty }} {{ it.unit }}
+                              {{ it.fulfilledQty }} {{ it.unit | unitShort }}
                             </span>
                           </div>
                         }
@@ -193,7 +193,7 @@
                   @for (p of productos(); track p.id) {
                     <button class="product" (click)="addToCart(p.id)" [disabled]="!canOrderToday()">
                       <div class="product__name">{{ p.name }}</div>
-                      <div class="product__price">₡{{ precioProducto(p.id) | number:'1.0-0' }} / {{ p.unit }}</div>
+                      <div class="product__price">₡{{ precioProducto(p.id) | number:'1.0-0' }} / {{ p.unit | unitShort }}</div>
                       <div class="product__add">+ Agregar</div>
                     </button>
                   }
@@ -252,123 +252,86 @@
               </aside>
             </div>
 
-            <!-- HISTORIAL DETALLADO -->
-            <section class="history-section">
-              <div class="history-section__head">
-                <h2 class="section-title">Historial de pedidos</h2>
-                @if (hasHistoryFilters()) {
-                  <button class="link-btn" (click)="clearHistoryFilters()">Limpiar filtros</button>
-                }
-              </div>
+            <!-- Último pedido recibido (siempre visible) -->
+            @if (ultimoRecibido(); as o) {
+              <section class="history-section">
+                <div class="history-section__head">
+                  <h2 class="section-title">Último pedido recibido</h2>
+                </div>
 
-              <div class="history-filters">
-                <div class="hf">
-                  <label>Desde</label>
-                  <input type="date"
-                    [value]="histFrom()"
-                    (change)="histFrom.set($any($event.target).value)" />
-                </div>
-                <div class="hf">
-                  <label>Hasta</label>
-                  <input type="date"
-                    [value]="histTo()"
-                    (change)="histTo.set($any($event.target).value)" />
-                </div>
-                <div class="hf">
-                  <label>Estado</label>
-                  <select [value]="histStatus()"
-                    (change)="histStatus.set($any($event.target).value)">
-                    <option value="all">Todos</option>
-                    <option value="pending">Pendiente</option>
-                    <option value="in_production">En producción</option>
-                    <option value="received">Recibido</option>
-                    <option value="cancelled">Cancelado</option>
-                  </select>
-                </div>
-                <div class="hf hf--summary">
-                  <label>Resultados</label>
-                  <span class="hf__count mono">{{ historialFiltrado().length }} / {{ historial().length }}</span>
-                </div>
-              </div>
-
-              @if (historial().length === 0) {
-                <p class="empty-msg">Aún no tienes pedidos en tu historial.</p>
-              } @else if (historialFiltrado().length === 0) {
-                <p class="empty-msg">Ningún pedido coincide con los filtros aplicados.</p>
-              } @else {
                 <div class="history-list">
-                  @for (o of historialFiltrado(); track o.id) {
-                    <article class="history-card" [class.history-card--confirmed]="!!o.customerConfirmedAt">
-                      <header class="history-card__head">
-                        <div>
-                          <span class="mono">{{ o.code }}</span>
-                          <ion-badge [color]="statusColor(o)">{{ statusLabel(o) }}</ion-badge>
-                        </div>
-                        <div class="history-card__dates">
-                          <span>Creado {{ o.createdAt | date:'dd-MM-yyyy' }}</span>
-                          @if (o.customerConfirmedAt) {
-                            <span> · Recibido {{ o.customerConfirmedAt | date:'dd-MM-yyyy' }}</span>
-                          }
-                        </div>
-                      </header>
+                  <article class="history-card history-card--confirmed">
+                    <header class="history-card__head">
+                      <div>
+                        <span class="mono">{{ o.code }}</span>
+                        <ion-badge color="success">Recibido</ion-badge>
+                      </div>
+                      <div class="history-card__dates">
+                        <span>Creado {{ o.createdAt | date:'dd-MM-yyyy' }}</span>
+                        <span> · Recibido {{ o.customerConfirmedAt | date:'dd-MM-yyyy' }}</span>
+                      </div>
+                    </header>
 
-                      <div class="history-table">
-                        <div class="history-table__row history-table__row--head">
-                          <div>Producto</div>
-                          <div class="num">Pedido</div>
-                          <div class="num">Producido</div>
-                          <div class="num">Recibido</div>
-                          <div class="num">Subtotal</div>
+                    <div class="history-table">
+                      <div class="history-table__row history-table__row--head">
+                        <div>Producto</div>
+                        <div class="num">Pedido</div>
+                        <div class="num">Producido</div>
+                        <div class="num">Recibido</div>
+                        <div class="num">Subtotal</div>
+                      </div>
+                      @for (it of o.items; track it.productId) {
+                        <div class="history-table__row">
+                          <div>{{ it.productName }}</div>
+                          <div class="num mono">{{ it.qty }} {{ it.unit | unitShort }}</div>
+                          <div class="num mono">{{ it.fulfilledQty }} {{ it.unit | unitShort }}</div>
+                          <div class="num mono"
+                            [class.diff-down]="(it.receivedQty ?? 0) < it.fulfilledQty">
+                            {{ it.receivedQty ?? 0 }} {{ it.unit | unitShort }}
+                          </div>
+                          <div class="num mono">
+                            ₡{{ (it.receivedQty ?? 0) * it.unitPrice | number:'1.0-0' }}
+                          </div>
                         </div>
-                        @for (it of o.items; track it.productId) {
-                          <div class="history-table__row">
-                            <div>{{ it.productName }}</div>
-                            <div class="num mono">{{ it.qty }} {{ it.unit }}</div>
-                            <div class="num mono">{{ it.fulfilledQty }} {{ it.unit }}</div>
-                            <div class="num mono"
-                              [class.diff-down]="hasDiff(it)">
-                              @if (o.customerConfirmedAt) {
-                                {{ it.receivedQty ?? 0 }} {{ it.unit }}
-                              } @else {
-                                <span class="muted">—</span>
-                              }
-                            </div>
-                            <div class="num mono">
-                              ₡{{ historicalSubtotal(o, it) | number:'1.0-0' }}
-                            </div>
+                      }
+                    </div>
+
+                    <footer class="history-card__foot">
+                      <div class="history-totals">
+                        <div>
+                          <span class="muted">Total original</span>
+                          <span class="mono">₡{{ o.totalAmount | number:'1.0-0' }}</span>
+                        </div>
+                        <div class="history-totals__final">
+                          <span>Total final cobrado</span>
+                          <strong class="mono">₡{{ o.finalAmount ?? o.totalAmount | number:'1.0-0' }}</strong>
+                        </div>
+                        @if ((o.finalAmount ?? o.totalAmount) < o.totalAmount) {
+                          <div class="history-totals__diff">
+                            Diferencia: −₡{{ (o.totalAmount - (o.finalAmount ?? 0)) | number:'1.0-0' }}
                           </div>
                         }
                       </div>
-
-                      <footer class="history-card__foot">
-                        <div class="history-totals">
-                          <div>
-                            <span class="muted">Total original</span>
-                            <span class="mono">₡{{ o.totalAmount | number:'1.0-0' }}</span>
-                          </div>
-                          @if (o.customerConfirmedAt) {
-                            <div class="history-totals__final">
-                              <span>Total final cobrado</span>
-                              <strong class="mono">₡{{ o.finalAmount ?? o.totalAmount | number:'1.0-0' }}</strong>
-                            </div>
-                            @if ((o.finalAmount ?? o.totalAmount) < o.totalAmount) {
-                              <div class="history-totals__diff">
-                                Diferencia: −₡{{ (o.totalAmount - (o.finalAmount ?? 0)) | number:'1.0-0' }}
-                              </div>
-                            }
-                          }
+                      @if (o.customerNote) {
+                        <div class="history-note">
+                          <strong>Nota:</strong> {{ o.customerNote }}
                         </div>
-                        @if (o.customerNote) {
-                          <div class="history-note">
-                            <strong>Nota:</strong> {{ o.customerNote }}
-                          </div>
-                        }
-                      </footer>
-                    </article>
-                  }
+                      }
+                    </footer>
+
+                    <div class="history-card__actions">
+                      <ion-button expand="block" fill="outline"
+                        (click)="repetirPedido(o)"
+                        [disabled]="!canOrderToday()">
+                        <ion-icon name="repeat-outline" slot="start"></ion-icon>
+                        Repetir pedido
+                      </ion-button>
+                    </div>
+                  </article>
                 </div>
-              }
-            </section>
+              </section>
+            }
+
           </main>
         }
       </div>

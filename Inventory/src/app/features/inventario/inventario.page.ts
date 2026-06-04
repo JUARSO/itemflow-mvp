@@ -12,6 +12,7 @@ import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.comp
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { EntradaFormModalComponent } from './entrada-form-modal.component';
 import { StockStatus } from '../../core/models';
+import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
 type StatusFilter = 'todos' | StockStatus;
 
@@ -25,6 +26,7 @@ type StatusFilter = 'todos' | StockStatus;
     IonSearchbar, IonSegment, IonSegmentButton, IonLabel, IonButton, IonIcon,
     PageHeaderComponent, KpiCardComponent, StatusBadgeComponent,
     EntradaFormModalComponent,
+    UnitShortPipe,
   ],
   templateUrl: './inventario.page.html',
   styleUrls: ['./inventario.page.scss'],

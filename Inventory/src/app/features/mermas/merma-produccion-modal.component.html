@@ -81,7 +81,7 @@
                   @for (s of supplyImpact(); track s.id) {
                     <div class="preview__row preview__row--detail">
                       <span>· {{ s.name }}</span>
-                      <span class="mono">{{ s.qty | number:'1.0-3' }} {{ s.unit }}</span>
+                      <span class="mono">{{ s.qty | number:'1.0-3' }} {{ s.unit | unitShort }}</span>
                     </div>
                   }
                 } @else {

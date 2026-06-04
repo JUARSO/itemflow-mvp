@@ -11,6 +11,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { CustomerOrder, OrderItem } from '../../core/models';
 
 type Tab = 'facturar' | 'historial';
@@ -24,6 +25,7 @@ type Tab = 'facturar' | 'historial';
     IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
     IonButton, IonIcon, IonBadge, IonSegment, IonSegmentButton, IonLabel,
     PageHeaderComponent, KpiCardComponent, EmptyStateComponent,
+    SearchBarComponent,
   ],
   templateUrl: './facturar-pedidos.page.html',
   styleUrls: ['./facturar-pedidos.page.scss'],
@@ -36,14 +38,30 @@ export class FacturarPedidosPage {
 
   readonly tab = signal<Tab>('facturar');
 
+  readonly query = signal('');
+
   readonly porFacturar = computed(() => this.data.pedidosPorFacturar());
   readonly historial = computed(() => this.data.pedidosFacturados());
+
+  readonly porFacturarFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.porFacturar();
+    if (!q) return list;
+    return list.filter(o => (o.code ?? '').toLowerCase().includes(q) || (this.data.customerById(o.customerId ?? '')?.name ?? '').toLowerCase().includes(q));
+  });
+
+  readonly historialFiltrados = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const list = this.historial();
+    if (!q) return list;
+    return list.filter(o => (o.code ?? '').toLowerCase().includes(q) || (this.data.customerById(o.customerId ?? '')?.name ?? '').toLowerCase().includes(q));
+  });
 
   /** Cantidad entregada editada por (orderId:productId). */
   readonly entregado = signal<Record<string, number>>({});
 
   clienteNombre(o: CustomerOrder): string {
-    return o.customerId ? (this.data.customerById(o.customerId)?.name ?? 'Cliente') : '—';
+    return o.customerId ? (this.data.customerById(o.customerId ?? '')?.name ?? 'Cliente') : '—';
   }
 
   private key(orderId: string, productId: string): string { return `${orderId}:${productId}`; }

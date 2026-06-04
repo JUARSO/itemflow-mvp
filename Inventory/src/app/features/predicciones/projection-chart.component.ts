@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, ElementRef, input, signal, viewChild } from '@angular/core';
+import { IonIcon } from '@ionic/angular/standalone';
 
 /**
  * Gráfico SVG inline de proyección de stock.
@@ -25,6 +26,7 @@ export interface ProjectionMarker {
   selector: 'app-projection-chart',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [IonIcon],
   templateUrl: './projection-chart.component.html',
   styleUrls: ['./projection-chart.component.scss'],
 })
@@ -41,6 +43,8 @@ export class ProjectionChartComponent {
 
   /** ROP mínimo recomendado mostrado en el banner cuando hay quiebre. */
   readonly recommendedRop = input<number>(0);
+  /** Unidad (abreviada) del ítem, para las etiquetas del gráfico. */
+  readonly unit = input<string>('u');
 
   // Geometría
   readonly W = 800;

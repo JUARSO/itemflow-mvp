@@ -123,10 +123,10 @@
                 <div class="cell__name">{{ row.name }}</div>
                 <div class="cell__sub mono">{{ row.sku }}</div>
               </div>
-              <div class="num mono">{{ row.quantity | number:'1.0-0' }} {{ row.unit }}</div>
+              <div class="num mono">{{ row.quantity | number:'1.0-0' }} {{ row.unit | unitShort }}</div>
               <div class="num mono">
                 @if (row.reorderPoint != null) {
-                  {{ row.reorderPoint | number:'1.0-0' }} {{ row.unit }}
+                  {{ row.reorderPoint | number:'1.0-0' }} {{ row.unit | unitShort }}
                 } @else {
                   <span class="muted">—</span>
                 }

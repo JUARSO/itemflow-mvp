@@ -82,6 +82,14 @@ export class PredictionService {
     return await res.json() as PredictionResponse;
   }
 
+  /**
+   * Calcula la predicción LOCALMENTE (determinista, sin backend ni estado).
+   * Útil para evaluar muchos ítems a la vez (ej. la grilla de tarjetas).
+   */
+  simulate(req: PredictionRequest, itemContext?: PredictionItemContext): PredictionResponse {
+    return this.simulateLocally(req, itemContext);
+  }
+
   // ------------------------------------------------------------
   //  Simulador local determinista (fallback sin backend)
   //
@@ -185,9 +193,9 @@ export const DECISION_TO_STATUS: Record<PredictionDecision, {
   title: string;
   icon: string;
 }> = {
-  ORDENAR_URGENTE:     { status: 'critico',          title: 'Ordenar urgente',        icon: '🚨' },
-  EVALUAR_ORDEN:       { status: 'alerta',           title: 'Evaluar orden',          icon: '⚠️' },
-  STOCK_SUFICIENTE:    { status: 'optimo',           title: 'Stock suficiente',       icon: '✓' },
-  SOBRESTOCK:          { status: 'informativo',      title: 'Sobrestock',             icon: 'ℹ️' },
-  CRITICO_BAJO_MINIMO: { status: 'critico_extremo',  title: 'Crítico — bajo mínimo',  icon: '⛔' },
+  ORDENAR_URGENTE:     { status: 'critico',          title: 'Ordenar urgente',        icon: 'alert-circle-outline' },
+  EVALUAR_ORDEN:       { status: 'alerta',           title: 'Evaluar orden',          icon: 'warning-outline' },
+  STOCK_SUFICIENTE:    { status: 'optimo',           title: 'Stock suficiente',       icon: 'checkmark-outline' },
+  SOBRESTOCK:          { status: 'informativo',      title: 'Sobrestock',             icon: 'information-circle-outline' },
+  CRITICO_BAJO_MINIMO: { status: 'critico_extremo',  title: 'Crítico — bajo mínimo',  icon: 'close-circle-outline' },
 };

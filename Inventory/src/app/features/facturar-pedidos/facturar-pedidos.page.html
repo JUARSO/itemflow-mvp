@@ -23,13 +23,15 @@
     </ion-segment>
   </div>
 
+  <app-search-bar [(query)]="query" placeholder="Buscar pedido por código o cliente" />
+
   @if (tab() === 'facturar') {
     <div class="list">
       @if (porFacturar().length === 0) {
-        <app-empty-state icon="🧾" title="Sin pedidos por facturar"
+        <app-empty-state icon="receipt-outline" title="Sin pedidos por facturar"
           body="Cuando despaches un pedido, aparecerá aquí para facturarlo."></app-empty-state>
       }
-      @for (o of porFacturar(); track o.id) {
+      @for (o of porFacturarFiltrados(); track o.id) {
         <article class="ped">
           <header class="ped__head">
             <div>
@@ -80,10 +82,10 @@
   } @else {
     <div class="list">
       @if (historial().length === 0) {
-        <app-empty-state icon="📚" title="Sin facturas"
+        <app-empty-state icon="library-outline" title="Sin facturas"
           body="Los pedidos facturados aparecerán aquí como historial."></app-empty-state>
       }
-      @for (o of historial(); track o.id) {
+      @for (o of historialFiltrados(); track o.id) {
         <article class="ped ped--done">
           <header class="ped__head">
             <div>
