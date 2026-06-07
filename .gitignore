@@ -56,6 +56,13 @@ Thumbs.db
 /src/
 
 # =========================
+# Firebase: config web generada en build desde GitHub Secrets (no versionar).
+# La plantilla environment.template.ts SÍ se versiona como referencia.
+# =========================
+Inventory/src/environments/environment.ts
+Inventory/src/environments/environment.prod.ts
+
+# =========================
 # Logs y temporales
 # =========================
 *.log
