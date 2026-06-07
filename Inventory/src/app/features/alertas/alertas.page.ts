@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import {
   IonHeader, IonToolbar, IonTitle, IonContent, IonButtons, IonMenuButton,
   IonSegment, IonSegmentButton, IonLabel,
@@ -6,6 +7,7 @@ import {
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
+import { ToastService } from '../../shared/components/toast/toast.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { KpiCardComponent } from '../../shared/components/kpi-card/kpi-card.component';
 import { AlertCardComponent } from '../../shared/components/alert-card/alert-card.component';
@@ -38,6 +40,8 @@ export class AlertasPage {
   protected readonly data = inject(DataService);
   protected readonly tenant = inject(TenantContextService);
   private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   readonly tab = signal<Tab>('activas');
 
@@ -70,9 +74,31 @@ export class AlertasPage {
     this.data.resolveAlert(a.id, name);
   }
 
-  reorder(_a: Alert) {
-    // demo: solo console; en una versión completa abriría el flujo de OC
-    alert('Flujo de generar OC — demo. Se navegaría a /ordenes-compra/nueva con el insumo prellenado.');
+  /**
+   * Genera una Orden de Compra a partir de una alerta de compra (restock /
+   * stockout_risk / order_now / order_day). Resuelve el proveedor de la alerta
+   * (o el más rápido del insumo) y aprueba su pre-compra sugerida — la misma
+   * lógica que usa la pantalla de Pre-compras, así la cantidad y la fecha de
+   * entrega salen del motor de reposición.
+   */
+  async reorder(a: Alert) {
+    if (!this.tenant.canManagePurchaseOrders()) {
+      await this.toast.show('No tienes permisos para generar órdenes de compra.', 'danger');
+      return;
+    }
+    const supplierId = a.supplierId
+      ?? (a.supplyId ? (this.data.supplyLeadTime(a.supplyId)?.supplierId ?? this.data.suppliersForSupply(a.supplyId)[0]?.id) : undefined);
+    if (!supplierId) {
+      await this.toast.show('Este insumo no tiene un proveedor configurado. Asígnalo en Proveedores.', 'danger');
+      return;
+    }
+    try {
+      const po = this.data.approvePrePurchaseForSupplier(supplierId);
+      await this.toast.show(`Orden de compra ${po.code} generada (${po.items.length} insumo(s)).`);
+      await this.router.navigate(['/ordenes-compra']);
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo generar la orden de compra.', 'danger');
+    }
   }
 }
 

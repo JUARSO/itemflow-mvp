@@ -30,11 +30,11 @@
               · <strong>Pago:</strong> {{ s.paymentTerms || '—' }}
             </span>
             @if (s.suppliedItems.length > 0) {
-              <small>{{ s.suppliedItems.length }} item(s) registrados → aparecen primero abajo.</small>
+              <small>Solo se muestran los {{ s.suppliedItems.length }} item(s) que entrega este proveedor.</small>
             } @else {
               <small class="warn">
-                Este proveedor no tiene insumos vinculados.
-                Podés editarlo en Proveedores para verlos prioritarios.
+                Este proveedor no tiene insumos vinculados (se muestran todos).
+                Vincúlalos en Proveedores para filtrar la lista.
               </small>
             }
           </div>
@@ -55,26 +55,43 @@
               <div [formGroupName]="$index" class="line">
                 <select formControlName="itemRef" class="line__supply">
                   <option value="">— Selecciona insumo o producto —</option>
-                  @if (supplierItemRefs().length > 0) {
-                    <optgroup [label]="'Asignados a ' + (selectedSupplier()?.name ?? '')">
-                      @for (s of supplierSupplies(); track s.id) {
-                        <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
+                  @if (selectedSupplier(); as s) {
+                    @if (supplierItemRefs().length > 0) {
+                      <!-- Proveedor registrado: SOLO los items que entrega. -->
+                      <optgroup [label]="'Items de ' + s.name">
+                        @for (sup of supplierSupplies(); track sup.id) {
+                          <option [value]="'sup:' + sup.id">{{ sup.name }} ({{ sup.unit | unitShort }})</option>
+                        }
+                        @for (p of supplierProducts(); track p.id) {
+                          <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }}) · reventa</option>
+                        }
+                      </optgroup>
+                    } @else {
+                      <!-- Proveedor sin items vinculados: se muestran todos como respaldo. -->
+                      <optgroup label="Insumos">
+                        @for (sup of data.activeSupplies(); track sup.id) {
+                          <option [value]="'sup:' + sup.id">{{ sup.name }} ({{ sup.unit | unitShort }})</option>
+                        }
+                      </optgroup>
+                      <optgroup label="Productos de reventa">
+                        @for (p of reventaProducts(); track p.id) {
+                          <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }})</option>
+                        }
+                      </optgroup>
+                    }
+                  } @else {
+                    <!-- Proveedor manual ("Otro") o sin seleccionar: todos los items. -->
+                    <optgroup label="Insumos">
+                      @for (sup of data.activeSupplies(); track sup.id) {
+                        <option [value]="'sup:' + sup.id">{{ sup.name }} ({{ sup.unit | unitShort }})</option>
                       }
-                      @for (p of supplierProducts(); track p.id) {
-                        <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }}) · reventa</option>
+                    </optgroup>
+                    <optgroup label="Productos de reventa">
+                      @for (p of reventaProducts(); track p.id) {
+                        <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }})</option>
                       }
                     </optgroup>
                   }
-                  <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros insumos' : 'Insumos'">
-                    @for (s of nonSupplierSupplies(); track s.id) {
-                      <option [value]="'sup:' + s.id">{{ s.name }} ({{ s.unit | unitShort }})</option>
-                    }
-                  </optgroup>
-                  <optgroup [label]="supplierItemRefs().length > 0 ? 'Otros productos de reventa' : 'Productos de reventa'">
-                    @for (p of nonSupplierProducts(); track p.id) {
-                      <option [value]="'prod:' + p.id">{{ p.name }} ({{ p.unit | unitShort }})</option>
-                    }
-                  </optgroup>
                 </select>
                 <input type="number" formControlName="qty" placeholder="Cant." min="0.001" step="0.001" class="line__qty mono" />
                 <input type="number" formControlName="unitCost" placeholder="C/U" min="0" step="0.01" class="line__cost mono" />

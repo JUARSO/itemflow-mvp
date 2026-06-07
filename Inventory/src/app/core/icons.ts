@@ -76,6 +76,8 @@ import {
   swapHorizontalOutline,
   peopleOutline,
   repeatOutline,
+  eyeOutline,
+  eyeOffOutline,
 } from 'ionicons/icons';
 
 /**
@@ -163,5 +165,7 @@ export function registerAppIcons(): void {
     'swap-horizontal-outline': swapHorizontalOutline,
     'people-outline': peopleOutline,
     'repeat-outline': repeatOutline,
+    'eye-outline': eyeOutline,
+    'eye-off-outline': eyeOffOutline,
   });
 }

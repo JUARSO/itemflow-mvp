@@ -27,6 +27,7 @@
         </div>
       </section>
 
+      @if (tenant.canManageBranding()) {
       <section class="card">
         <div class="card__head">
           <h3>Marca</h3>
@@ -61,16 +62,6 @@
               (ngModelChange)="onBrandingChange()"
               maxlength="32"
               placeholder="Atlas" />
-          </label>
-          <label class="field field--narrow">
-            <span class="field__label">Logo (emoji o texto)</span>
-            <input
-              type="text"
-              [(ngModel)]="logoDraftRaw"
-              (ngModelChange)="onBrandingChange()"
-              maxlength="3"
-              placeholder=""
-              [disabled]="!!branding.branding().logoImage" />
           </label>
         </div>
 
@@ -138,26 +129,7 @@
           </label>
         </div>
       </section>
-
-      <section class="card">
-        <h3>Empresa</h3>
-        <div class="kv">
-          <span class="muted">Tenant</span>
-          <strong>{{ tenant.company().name }}</strong>
-        </div>
-        <div class="kv">
-          <span class="muted">ID</span>
-          <span class="mono">{{ tenant.tenantId() }}</span>
-        </div>
-        <div class="kv">
-          <span class="muted">Moneda</span>
-          <span class="mono">{{ tenant.company().currency }}</span>
-        </div>
-        <div class="kv">
-          <span class="muted">Zona horaria</span>
-          <span class="mono">{{ tenant.company().timezone }}</span>
-        </div>
-      </section>
+      }
 
       @if (auth.isAdmin()) {
         <section class="card">
@@ -169,11 +141,14 @@
         <div class="card__head">
           <h3>Miembros del equipo</h3>
           @if (tenant.canManageMembers()) {
-            <ion-button size="small" (click)="abrirInvitar()">+ Invitar</ion-button>
+            <ion-button size="small" (click)="abrirInvitar()">+ Crear cuenta</ion-button>
           }
         </div>
         <div class="members">
-          @for (m of data.members(); track m.uid) {
+          @if (members.members().length === 0 && !members.loading()) {
+            <p class="muted">Aún no hay otros miembros. Usa “+ Crear cuenta” para dar acceso a Ventas o Producción.</p>
+          }
+          @for (m of members.members(); track m.uid) {
             <div class="member">
               <div class="member__avatar">{{ initials(m.displayName) }}</div>
               <div class="member__info">

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import {
   IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
   IonButton, IonIcon,
@@ -21,7 +22,7 @@ const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0]; // lun..dom
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule,
+    CommonModule, FormsModule,
     IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
     IonButton, IonIcon,
     UnitShortPipe,
@@ -155,10 +156,10 @@ export class ProveedorFormModalComponent {
     };
     try {
       if (this._editing()) {
-        this.data.updateSupplier(this._editing()!.id, payload);
+        await this.data.updateSupplier(this._editing()!.id, payload);
         await this.toast.show('Proveedor actualizado.');
       } else {
-        const s = this.data.createSupplier(payload);
+        const s = await this.data.createSupplier(payload);
         await this.toast.show(`Proveedor "${s.name}" creado.`);
       }
       this.saved.emit();

@@ -34,6 +34,11 @@ export const routes: Routes = [
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/register.page').then(m => m.RegisterPage),
   },
+  {
+    path: 'auth/forgot',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/auth/forgot.page').then(m => m.ForgotPage),
+  },
 
   // ===== App principal con shell =====
   {

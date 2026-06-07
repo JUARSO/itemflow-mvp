@@ -8,28 +8,62 @@
 
       <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
         <label class="field-label" for="orgName">Nombre de la empresa</label>
-        <input id="orgName" type="text" formControlName="orgName" placeholder="Ej: Panadería La Espiga" class="input" />
+        <input id="orgName" type="text" formControlName="orgName" placeholder="Ej: Panadería La Espiga"
+               class="input" [class.input--invalid]="invalid('orgName')" />
+        @if (invalid('orgName')) {
+          <span class="field-error">
+            @if (form.controls.orgName.hasError('required')) { El nombre de la empresa es obligatorio. }
+            @else { Escribe al menos 2 caracteres. }
+          </span>
+        }
 
         <label class="field-label" for="adminName">Tu nombre (administrador)</label>
-        <input id="adminName" type="text" formControlName="adminName" placeholder="Nombre y apellido" class="input" />
+        <input id="adminName" type="text" formControlName="adminName" placeholder="Nombre y apellido"
+               class="input" [class.input--invalid]="invalid('adminName')" />
+        @if (invalid('adminName')) {
+          <span class="field-error">Tu nombre es obligatorio.</span>
+        }
 
         <label class="field-label" for="adminEmail">Correo electrónico</label>
-        <input id="adminEmail" type="email" formControlName="adminEmail" autocomplete="email" placeholder="tu@empresa.com" class="input" />
+        <input id="adminEmail" type="email" formControlName="adminEmail" autocomplete="email" placeholder="tu@empresa.com"
+               class="input" [class.input--invalid]="invalid('adminEmail')" />
+        @if (invalid('adminEmail')) {
+          <span class="field-error">
+            @if (form.controls.adminEmail.hasError('required')) { El correo es obligatorio. }
+            @else { Escribe un correo válido (ej: tu@empresa.com). }
+          </span>
+        }
 
         <label class="field-label" for="password">Contraseña</label>
-        <input id="password" type="password" formControlName="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" class="input" />
-
-        <label class="field-label">Plan</label>
-        <div class="plans">
-          @for (p of plans; track p.id) {
-            <label class="plan" [class.plan--on]="form.controls.planId.value === p.id">
-              <input type="radio" formControlName="planId" [value]="p.id" />
-              <span class="plan__name">{{ p.name }}</span>
-              <span class="plan__price mono">{{ p.priceMonthly === 0 ? 'Gratis' : '₡' + (p.priceMonthly | number:'1.0-0') + '/mes' }}</span>
-              <span class="plan__desc">{{ p.description }}</span>
-            </label>
-          }
+        <div class="input-wrap">
+          <input id="password" [type]="showPwd() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres"
+                 class="input" [class.input--invalid]="invalid('password')" />
+          <button type="button" class="pwd-toggle" (click)="showPwd.set(!showPwd())"
+                  [attr.aria-label]="showPwd() ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+            <ion-icon [name]="showPwd() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+          </button>
         </div>
+        @if (invalid('password')) {
+          <span class="field-error">
+            @if (form.controls.password.hasError('required')) { La contraseña es obligatoria. }
+            @else { La contraseña debe tener al menos 6 caracteres. }
+          </span>
+        }
+
+        <label class="field-label" for="confirmPassword">Repite la contraseña</label>
+        <div class="input-wrap">
+          <input id="confirmPassword" [type]="showConfirm() ? 'text' : 'password'" formControlName="confirmPassword" autocomplete="new-password" placeholder="Vuelve a escribirla"
+                 class="input" [class.input--invalid]="mismatch() || invalid('confirmPassword')" />
+          <button type="button" class="pwd-toggle" (click)="showConfirm.set(!showConfirm())"
+                  [attr.aria-label]="showConfirm() ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+            <ion-icon [name]="showConfirm() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+          </button>
+        </div>
+        @if (invalid('confirmPassword') && form.controls.confirmPassword.hasError('required')) {
+          <span class="field-error">Repite la contraseña.</span>
+        } @else if (mismatch()) {
+          <span class="field-error">Las contraseñas no coinciden.</span>
+        }
 
         @if (error()) {
           <div class="error">{{ error() }}</div>

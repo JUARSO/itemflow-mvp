@@ -47,7 +47,12 @@
     .modal-shell {
       display: flex;
       flex-direction: column;
+      flex: 1 1 auto;
       height: 100%;
+      /* Tope definido (independiente del padre) → con --height:auto el contenido
+         largo queda acotado aquí y el body interno hace scroll; el corto se ajusta. */
+      max-height: var(--shell-max-h, 94vh);
+      min-height: 0;
       width: 100%;
       min-width: 0;
       max-width: 100%;
@@ -56,6 +61,7 @@
     }
     .modal-shell__head {
       display: flex;
+      flex-shrink: 0;
       align-items: center;
       justify-content: space-between;
       padding: var(--ui-sp-4);
@@ -81,7 +87,11 @@
     }
     .modal-shell__close:hover { background: var(--ui-surface-3); }
     .modal-shell__body {
-      flex: 1;
+      flex: 1 1 auto;
+      /* Clave para que el body genere su propia barra de scroll dentro del modal:
+         sin min-height:0 un hijo flex no se encoge bajo el tamaño de su contenido
+         y desborda sin barra. */
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
       min-width: 0;
@@ -89,10 +99,19 @@
     }
     .modal-shell__foot {
       display: flex;
-      gap: var(--ui-sp-2);
+      flex-shrink: 0;
+      gap: var(--ui-sp-4);
       justify-content: flex-start;
       flex-wrap: wrap;
       padding: var(--ui-sp-3) var(--ui-sp-4);
       background: var(--ui-surface-2);
       border-top: var(--ui-border-w-md) solid var(--ui-border);
+    }
+    /* Los modales envuelven sus botones en <div footer>, así que el gap real
+       entre botones va aquí, en ese contenedor proyectado. */
+    .modal-shell__foot ::ng-deep [footer] {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--ui-sp-4);
     }

@@ -19,6 +19,13 @@
           <app-form-field label="Unidades por lote" [required]="true" hint="Unidades que produce una corrida">
             <input type="number" formControlName="yieldQty" min="1" />
           </app-form-field>
+          <app-form-field label="Plantilla" hint="Define el tipo de ficha técnica">
+            <select formControlName="templateId">
+              @for (t of templates; track t.id) {
+                <option [value]="t.id">{{ t.label }} — {{ t.description }}</option>
+              }
+            </select>
+          </app-form-field>
         </div>
         @if (selectedProduct(); as p) {
           <div class="product-meta">
@@ -27,17 +34,19 @@
             <span><strong>Unidad:</strong> {{ p.unit | unitShort }}</span>
           </div>
         }
-        <div class="row row--3">
-          <app-form-field label="Peso crudo (g)">
-            <input type="number" formControlName="weightRaw" min="0" step="1" placeholder="100" />
-          </app-form-field>
-          <app-form-field label="Peso horneado (g)">
-            <input type="number" formControlName="weightBaked" min="0" step="1" placeholder="95" />
-          </app-form-field>
-          <app-form-field label="Peso final (g)">
-            <input type="number" formControlName="weightFinal" min="0" step="1" placeholder="95" />
-          </app-form-field>
-        </div>
+        @if (sections().weights) {
+          <div class="row row--3">
+            <app-form-field label="Peso crudo (g)">
+              <input type="number" formControlName="weightRaw" min="0" step="1" placeholder="100" />
+            </app-form-field>
+            <app-form-field label="Peso horneado (g)">
+              <input type="number" formControlName="weightBaked" min="0" step="1" placeholder="95" />
+            </app-form-field>
+            <app-form-field label="Peso final (g)">
+              <input type="number" formControlName="weightFinal" min="0" step="1" placeholder="95" />
+            </app-form-field>
+          </div>
+        }
         <app-form-field label="Almacenamiento">
           <input type="text" formControlName="storage" placeholder="Ej: Congelado -18°C / Ambiente seco" />
         </app-form-field>
@@ -106,52 +115,71 @@
             placeholder="Hacer el empaste de mantequilla…&#10;Pesar todos los ingredientes…&#10;Amasar 1 min a velocidad baja…"></textarea>
         </app-form-field>
 
-        <!-- ===== Laminado y horneo ===== -->
-        <h3 class="sheet-title">Laminado y horneo</h3>
-        <div class="row">
-          <app-form-field label="Gruesor del laminado">
-            <input type="text" formControlName="laminationThickness" placeholder="Ej: 3mm" />
-          </app-form-field>
-          <app-form-field label="Tiempo de fermentación">
-            <input type="text" formControlName="fermentationTime" placeholder="Ej: 12 horas" />
-          </app-form-field>
-        </div>
-        <div class="row row--3">
-          <app-form-field label="Temp. horno (abajo)">
-            <input type="text" formControlName="ovenTempBottom" placeholder="200°C" />
-          </app-form-field>
-          <app-form-field label="Temp. horno (arriba)">
-            <input type="text" formControlName="ovenTempTop" placeholder="230°C" />
-          </app-form-field>
-          <app-form-field label="Tiempo de horneo">
-            <input type="text" formControlName="bakingTime" placeholder="20 minutos" />
-          </app-form-field>
-        </div>
-
-        <!-- ===== Medidas ===== -->
-        <h3 class="sheet-title">Medidas</h3>
-        <div class="sizes">
-          <div class="sizes__label">Producto fermentado</div>
-          <div class="sizes__grid">
-            <input type="text" formControlName="fAlto" placeholder="Alto" />
-            <input type="text" formControlName="fLargo" placeholder="Largo" />
-            <input type="text" formControlName="fAncho" placeholder="Ancho" />
-            <input type="text" formControlName="fDiam" placeholder="Diámetro" />
+        <!-- ===== Preparación y horneo (según plantilla) ===== -->
+        @if (sections().lamination || sections().fermentation || sections().beating || sections().oven) {
+          <h3 class="sheet-title">{{ sections().lamination ? 'Laminado y horneo' : sections().beating ? 'Batido y horneo' : 'Horneo' }}</h3>
+          <div class="row row--3">
+            @if (sections().lamination) {
+              <app-form-field label="Gruesor del laminado">
+                <input type="text" formControlName="laminationThickness" placeholder="Ej: 3mm" />
+              </app-form-field>
+            }
+            @if (sections().fermentation) {
+              <app-form-field label="Tiempo de fermentación">
+                <input type="text" formControlName="fermentationTime" placeholder="Ej: 12 horas" />
+              </app-form-field>
+            }
+            @if (sections().beating) {
+              <app-form-field label="Tiempo de batido">
+                <input type="text" formControlName="beatingTime" placeholder="Ej: 8 min a vel. media" />
+              </app-form-field>
+            }
           </div>
-        </div>
-        <div class="sizes">
-          <div class="sizes__label">Producto terminado</div>
-          <div class="sizes__grid">
-            <input type="text" formControlName="tAlto" placeholder="Alto" />
-            <input type="text" formControlName="tLargo" placeholder="Largo" />
-            <input type="text" formControlName="tAncho" placeholder="Ancho" />
-            <input type="text" formControlName="tDiam" placeholder="Diámetro" />
-          </div>
-        </div>
+          @if (sections().oven) {
+            <div class="row row--3">
+              <app-form-field label="Temp. horno (abajo)">
+                <input type="text" formControlName="ovenTempBottom" placeholder="200°C" />
+              </app-form-field>
+              <app-form-field label="Temp. horno (arriba)">
+                <input type="text" formControlName="ovenTempTop" placeholder="230°C" />
+              </app-form-field>
+              <app-form-field label="Tiempo de horneo">
+                <input type="text" formControlName="bakingTime" placeholder="20 minutos" />
+              </app-form-field>
+            </div>
+          }
+        }
 
-        <app-form-field label="Tipo de remate / decoración">
-          <input type="text" formControlName="decoration" placeholder="Ej: Pintar con brillo (sunset), espolvorear azúcar" />
-        </app-form-field>
+        <!-- ===== Medidas (según plantilla) ===== -->
+        @if (sections().sizes) {
+          <h3 class="sheet-title">Medidas</h3>
+          @if (sections().fermentation) {
+            <div class="sizes">
+              <div class="sizes__label">Producto fermentado</div>
+              <div class="sizes__grid">
+                <input type="text" formControlName="fAlto" placeholder="Alto" />
+                <input type="text" formControlName="fLargo" placeholder="Largo" />
+                <input type="text" formControlName="fAncho" placeholder="Ancho" />
+                <input type="text" formControlName="fDiam" placeholder="Diámetro" />
+              </div>
+            </div>
+          }
+          <div class="sizes">
+            <div class="sizes__label">Producto terminado</div>
+            <div class="sizes__grid">
+              <input type="text" formControlName="tAlto" placeholder="Alto" />
+              <input type="text" formControlName="tLargo" placeholder="Largo" />
+              <input type="text" formControlName="tAncho" placeholder="Ancho" />
+              <input type="text" formControlName="tDiam" placeholder="Diámetro" />
+            </div>
+          </div>
+        }
+
+        @if (sections().decoration) {
+          <app-form-field [label]="currentTemplateId() === 'bebida' ? 'Presentación y servicio' : 'Tipo de remate / decoración'">
+            <input type="text" formControlName="decoration" placeholder="Ej: Pintar con brillo, espolvorear azúcar" />
+          </app-form-field>
+        }
 
         <app-form-field label="Observaciones" hint="Notas extra: advertencias, controles de calidad">
           <textarea

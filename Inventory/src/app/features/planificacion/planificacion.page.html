@@ -23,6 +23,28 @@
           [hint]="overdueTasks() > 0 ? 'inicio sugerido en el pasado' : 'al día'"></app-kpi-card>
       </div>
 
+      <!-- Resumen inicial: total a producir por producto (consolida todos los lotes). -->
+      @if (productionSummary().length > 0) {
+        <section class="resumen">
+          <div class="resumen__head">
+            <span class="resumen__title">Total a producir por producto</span>
+            <small>{{ productionSummary().length }} producto(s) · {{ totalUnits() | number:'1.0-0' }} unidades en total</small>
+          </div>
+          <div class="res-table">
+            <div class="res-row res-row--head">
+              <span>Producto</span><span class="num">A producir</span><span class="num">Lotes</span>
+            </div>
+            @for (p of productionSummary(); track p.productId) {
+              <div class="res-row">
+                <span class="res-name">{{ p.productName }}</span>
+                <span class="num mono"><strong>{{ p.totalQty | number:'1.0-0' }}</strong> {{ p.unit | unitShort }}</span>
+                <span class="num mono">{{ p.lots }}</span>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
       <!-- Cobertura de insumos: ¿alcanza para la demanda (pedidos + plan)? -->
       <section class="cobertura">
         <div class="cobertura__head">
@@ -75,67 +97,42 @@
         </div>
 
         <div class="list">
-            @for (b of nonEmptyDays(); track b.iso) {
-              <div class="list-day" [class.list-day--today]="b.isToday" [class.list-day--past]="b.isPast">
-                <div class="list-day__date">
-                  <div class="list-day__weekday">{{ b.date | date:'EEEE' }}</div>
-                  <div class="list-day__num mono">{{ b.date | date:'dd-MM' }}</div>
-                </div>
-                <div class="list-day__body">
-                  @if (b.starting.length > 0) {
-                    <div class="list-day__section">
-                      <strong><ion-icon name="hammer-outline"></ion-icon> Iniciar:</strong>
-                      <ul>
-                        @for (t of b.starting; track t.key) {
-                          <li [class.task--overdue]="t.overdue">
-                            <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit | unitShort }}
-                            de <strong>{{ t.productName }}</strong>
-                            · entrega <span class="mono">{{ t.deliveryDate | date:'dd-MM' }}</span>
-                            @if (t.sources.length > 1) {
-                              <span class="lot-badge">{{ t.sources.length }} pedidos</span>
-                            }
-                            <div class="clientes">
-                              <span class="clientes__label">Para:</span>
-                              @for (s of t.sources; track s.orderId) {
-                                <span class="cliente-chip">
-                                  {{ s.cliente }} <span class="mono">×{{ s.qty }}</span>
-                                  <span class="cliente-chip__code mono">{{ s.orderCode }}</span>
-                                </span>
-                              }
-                            </div>
-                          </li>
-                        }
-                      </ul>
-                    </div>
-                  }
-                  @if (b.delivering.length > 0) {
-                    <div class="list-day__section">
-                      <strong><ion-icon name="arrow-forward-outline"></ion-icon> Entregar:</strong>
-                      <ul>
-                        @for (t of b.delivering; track t.key) {
-                          <li>
-                            <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit | unitShort }}
-                            de <strong>{{ t.productName }}</strong>
-                            @if (t.sources.length > 1) {
-                              <span class="lot-badge">{{ t.sources.length }} pedidos</span>
-                            }
-                            <div class="clientes">
-                              <span class="clientes__label">Para:</span>
-                              @for (s of t.sources; track s.orderId) {
-                                <span class="cliente-chip">
-                                  {{ s.cliente }} <span class="mono">×{{ s.qty }}</span>
-                                  <span class="cliente-chip__code mono">{{ s.orderCode }}</span>
-                                </span>
-                              }
-                            </div>
-                          </li>
-                        }
-                      </ul>
-                    </div>
-                  }
-                </div>
+          @for (b of nonEmptyDays(); track b.iso) {
+            <div class="list-day" [class.list-day--today]="b.isToday">
+              <div class="list-day__date">
+                <div class="list-day__weekday">{{ b.date | date:'EEEE' }}</div>
+                <div class="list-day__num mono">{{ b.date | date:'dd-MM' }}</div>
               </div>
-            }
-          </div>
+              <div class="list-day__body">
+                @if (b.starting.length > 0) {
+                  <div class="list-day__section">
+                    <strong><ion-icon name="hammer-outline"></ion-icon> Iniciar:</strong>
+                    <ul>
+                      @for (t of b.starting; track t.productId) {
+                        <li [class.task--overdue]="t.overdue">
+                          <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit | unitShort }}
+                          de <strong>{{ t.productName }}</strong>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+                @if (b.delivering.length > 0) {
+                  <div class="list-day__section">
+                    <strong><ion-icon name="arrow-forward-outline"></ion-icon> Entregar:</strong>
+                    <ul>
+                      @for (t of b.delivering; track t.productId) {
+                        <li>
+                          <strong class="mono">{{ t.totalQty | number:'1.0-0' }}</strong> {{ t.unit | unitShort }}
+                          de <strong>{{ t.productName }}</strong>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
       }
     </ion-content>

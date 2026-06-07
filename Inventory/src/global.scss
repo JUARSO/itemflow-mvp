@@ -316,6 +316,16 @@ ion-modal.nb-modal {
   --max-width: 95vw;
   --height: auto;
   --max-height: 94vh;
+  /* Tope de altura para el contenido interno (.modal-shell). Como variable para
+     que el body genere scroll de forma fiable aun con --height: auto, sin depender
+     de que un padre de altura automática resuelva un height:100%. */
+  --shell-max-h: 94vh;
+}
+/* El contenido del modal es una columna flex acotada; así el .modal-shell la llena
+   y su body interno genera scroll cuando excede la altura. GLOBAL por el teleport. */
+ion-modal.nb-modal::part(content) {
+  display: flex;
+  flex-direction: column;
 }
 ion-modal.nb-modal--wide {
   --width: 1100px;
@@ -326,6 +336,7 @@ ion-modal.nb-modal--full {
   --max-width: 98vw;
   --height: 96vh;
   --max-height: 96vh;
+  --shell-max-h: 96vh;
 }
 ion-modal.nb-modal--full::part(content) {
   width: 98vw;
@@ -339,7 +350,27 @@ ion-modal.nb-modal--full::part(content) {
     --max-width: 100%;
     --height: 100%;
     --max-height: 100%;
+    --shell-max-h: 100%;
   }
+}
+
+/* ----- Diálogo de confirmación (app-confirm-dialog) -----
+   También GLOBAL: igual que nb-modal, el CSS encapsulado del componente no
+   alcanza al modal teletransportado. Sin esto, el diálogo usa el tamaño por
+   defecto de Ionic (un cuadro enorme). Con --height: auto se ajusta al texto. */
+ion-modal.nb-confirm {
+  --width: 420px;
+  --max-width: 95vw;
+  --height: auto;
+  --max-height: 90vh;
+}
+ion-modal.nb-confirm::part(content) {
+  border: var(--ui-border-w-lg) solid var(--ui-border);
+  box-shadow: var(--ui-shadow-lg);
+  background: var(--ui-surface);
+}
+@media (max-width: 600px) {
+  ion-modal.nb-confirm { --width: 100%; --max-width: 100%; }
 }
 
 ion-alert .alert-wrapper {

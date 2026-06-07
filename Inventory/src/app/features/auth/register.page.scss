@@ -36,21 +36,30 @@
   color: var(--ui-text);
 }
 
-.plans { display: grid; gap: 6px; }
-.plan {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+.input--invalid { border-color: var(--ui-danger); }
+.input-wrap { position: relative; }
+.input-wrap .input { padding-right: 44px; }
+.pwd-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 44px;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: var(--ui-border-w-md) solid var(--ui-border);
+  justify-content: center;
+  background: none;
+  border: none;
   cursor: pointer;
+  color: var(--ui-text-muted);
 }
-.plan--on { border-color: var(--ui-primary); box-shadow: inset 3px 0 0 var(--ui-primary); }
-.plan input { grid-row: span 2; }
-.plan__name { font-weight: var(--ui-fw-bold); }
-.plan__price { font-size: var(--ui-fs-xs); color: var(--ui-text-muted); text-align: right; }
-.plan__desc { grid-column: 2 / -1; font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
+.pwd-toggle ion-icon { font-size: 20px; }
+.field-error {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--ui-fs-xs);
+  color: var(--ui-danger);
+}
 
 .error {
   margin-top: var(--ui-sp-3);
@@ -65,5 +74,4 @@ ion-button { margin-top: var(--ui-sp-4); }
 .alt a { color: var(--ui-primary); font-weight: var(--ui-fw-bold); text-decoration: none; }
 .trial-note { text-align: center; margin-top: 4px; font-size: var(--ui-fs-xs); color: var(--ui-text-muted); }
 
-.plan:hover { border-color: var(--ui-border-strong); }
 .input:focus { outline: none; border-color: var(--ui-primary); }

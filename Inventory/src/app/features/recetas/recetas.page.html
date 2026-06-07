@@ -17,6 +17,21 @@
 
       <app-search-bar [(query)]="query" placeholder="Buscar receta por producto" />
 
+      @if (data.recipes().length > 0) {
+        <div class="tpl-filter">
+          <button type="button" class="tpl-chip" [class.tpl-chip--on]="templateFilter() === 'all'"
+            (click)="templateFilter.set('all')">
+            Todas <span class="tpl-chip__count">{{ data.recipes().length }}</span>
+          </button>
+          @for (t of templates; track t.id) {
+            <button type="button" class="tpl-chip" [class.tpl-chip--on]="templateFilter() === t.id"
+              (click)="templateFilter.set(t.id)">
+              {{ t.label }} <span class="tpl-chip__count">{{ countByTemplate(t.id) }}</span>
+            </button>
+          }
+        </div>
+      }
+
       @if (data.recipes().length === 0) {
         <app-empty-state
           icon="book-outline"

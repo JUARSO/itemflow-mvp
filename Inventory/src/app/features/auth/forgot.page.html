@@ -1,0 +1,50 @@
+<ion-content [fullscreen]="true">
+  <div class="page">
+    <div class="card">
+      <div class="brand">
+        <h1 class="brand__title">Recuperar contraseña</h1>
+        <p class="brand__tagline">Te enviaremos un enlace para restablecer tu contraseña.</p>
+      </div>
+
+      @if (sent()) {
+        <div class="sent">
+          <p class="sent__title">Revisa tu correo</p>
+          <p class="sent__text">
+            Si <strong>{{ form.controls.email.value }}</strong> tiene una cuenta, le enviamos un enlace
+            para restablecer la contraseña. Revisa también la carpeta de spam.
+          </p>
+        </div>
+        <p class="alt"><a routerLink="/auth/login">Volver a iniciar sesión</a></p>
+      } @else {
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <label class="field-label" for="email">Correo electrónico</label>
+          <input
+            id="email"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            placeholder="tu@empresa.com"
+            class="input"
+            [class.input--invalid]="invalid('email')"
+          />
+          @if (invalid('email')) {
+            <span class="field-error">
+              @if (form.controls.email.hasError('required')) { El correo es obligatorio. }
+              @else { Escribe un correo válido (ej: tu@empresa.com). }
+            </span>
+          }
+
+          @if (error()) {
+            <div class="error">{{ error() }}</div>
+          }
+
+          <ion-button expand="block" type="submit" [disabled]="loading()">
+            {{ loading() ? 'Enviando…' : 'Enviar enlace' }}
+          </ion-button>
+        </form>
+
+        <p class="alt">¿Recordaste tu contraseña? <a routerLink="/auth/login">Inicia sesión</a></p>
+      }
+    </div>
+  </div>
+</ion-content>

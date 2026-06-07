@@ -8,6 +8,7 @@ import {
 import { AuthService } from '../../core/services/auth.service';
 import { TenantContextService } from '../../core/services/tenant-context.service';
 import { DataService } from '../../core/services/data.service';
+import { MembersService } from '../../core/services/members.service';
 import { ThemeService } from '../../core/services/theme.service';
 import { BrandingService } from '../../core/services/branding.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -35,6 +36,7 @@ export class MasPage {
   protected readonly auth = inject(AuthService);
   protected readonly tenant = inject(TenantContextService);
   protected readonly data = inject(DataService);
+  protected readonly members = inject(MembersService);
   protected readonly theme = inject(ThemeService);
   protected readonly branding = inject(BrandingService);
   private readonly router = inject(Router);
@@ -74,20 +76,32 @@ export class MasPage {
   }
 
   async saveBranding() {
-    this.branding.update({
-      displayName: this.nameDraft(),
-      logo: this.logoDraft(),
-    });
-    await this.toast.show('Marca actualizada.', 'success');
+    try {
+      await this.branding.save({
+        displayName: this.nameDraft(),
+        logo: this.logoDraft(),
+      });
+      await this.toast.show('Marca actualizada.', 'success');
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo guardar la marca.', 'danger');
+    }
   }
 
   async resetBranding() {
-    this.branding.reset();
-    await this.toast.show('Marca restaurada al default.');
+    try {
+      await this.branding.reset();
+      await this.toast.show('Marca restaurada al default.');
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo restaurar la marca.', 'danger');
+    }
   }
 
-  selectTheme(id: string) {
-    this.theme.setTheme(id);
+  async selectTheme(id: string) {
+    try {
+      await this.theme.setTheme(id);
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo guardar la apariencia.', 'danger');
+    }
   }
 
   async onLogoFile(ev: Event) {
@@ -104,8 +118,12 @@ export class MasPage {
   }
 
   async clearLogo() {
-    this.branding.clearLogoImage();
-    await this.toast.show('Imagen quitada. Se usa el texto/emoji.');
+    try {
+      await this.branding.clearLogoImage();
+      await this.toast.show('Imagen quitada. Se usa el texto/emoji.');
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo quitar la imagen.', 'danger');
+    }
   }
 
   readonly confirmMessage = computed(() => {
@@ -167,14 +185,19 @@ export class MasPage {
   async eliminar() {
     const m = this.miembroAEliminar();
     if (!m) return;
-    this.data.removeMember(m.uid);
-    this.confirmOpen.set(false);
-    this.miembroAEliminar.set(null);
-    await this.toast.show(`Miembro "${m.displayName}" eliminado.`, 'success');
+    try {
+      await this.members.remove(m.uid);
+      await this.toast.show(`Miembro "${m.displayName}" eliminado.`, 'success');
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo eliminar el miembro.', 'danger');
+    } finally {
+      this.confirmOpen.set(false);
+      this.miembroAEliminar.set(null);
+    }
   }
 
   async logout() {
-    this.auth.logout();
+    await this.auth.logout();
     await this.router.navigateByUrl('/auth/login');
   }
 }

@@ -1,19 +1,35 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { StoreSync } from '../stores/store-sync.service';
+import { ProductsStore } from '../stores/products.store';
+import { SuppliesStore } from '../stores/supplies.store';
+import { RecipesStore } from '../stores/recipes.store';
+import { ProductStockStore } from '../stores/product-stock.store';
+import { SupplyStockStore } from '../stores/supply-stock.store';
+import { KardexStore } from '../stores/kardex.store';
+import { SalesStore } from '../stores/sales.store';
+import { AlertsStore } from '../stores/alerts.store';
+import { PredictionsStore } from '../stores/predictions.store';
+import { PurchaseOrdersStore } from '../stores/purchase-orders.store';
+import { OrdersStore } from '../stores/orders.store';
+import { CustomersStore } from '../stores/customers.store';
+import { ReturnedLotsStore } from '../stores/returned-lots.store';
+import { SuppliersStore } from '../stores/suppliers.store';
+import { UrnasStore } from '../stores/urnas.store';
+import { UrnaLotesStore } from '../stores/urna-lotes.store';
+import { PosSalesStore } from '../stores/pos-sales.store';
+import { PosClientesStore } from '../stores/pos-clientes.store';
+import { RecurringOrdersStore } from '../stores/recurring-orders.store';
+import { ReservasStore } from '../stores/reservas.store';
 import {
   Alert, Customer, CustomerOrder, DemandPrediction, KardexEntry, Member,
   OrderItem, OrderReservation, OrderShortfall, Product, ProductionMermaReason,
-  PurchaseOrder, Recipe, ReturnedLot, SaleRecord, StockItem,
+  PurchaseOrder, PurchaseOrderItem, Recipe, ReturnedLot, SaleRecord, StockItem,
   SuggestedPrePurchase, SuggestedPrePurchaseItem, SuggestedReason,
-  Supplier, Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
+  Supplier, SupplierItem, Supply, SupplyStockItem, StockStatus, UserRole, POStatus,
   Urna, UrnaLote, UrnaLoteLine, PosSale, PosSaleLine, PaymentMethod, ComprobanteTipo, PosCliente, RecurringOrder, RecurringOrderItem,
   ReservaItem, WeeklyPlanItem, WeeklyProductionPlan,
 } from '../models';
-import {
-  MOCK_ALERTS, MOCK_CUSTOMERS, MOCK_KARDEX, MOCK_MEMBERS, MOCK_ORDERS, MOCK_PREDICTIONS,
-  MOCK_PRODUCTS, MOCK_PRODUCT_STOCK, MOCK_PURCHASE_ORDERS, MOCK_RECIPES,
-  MOCK_RETURNED_LOTS, MOCK_SALES, MOCK_SUPPLIERS, MOCK_SUPPLIES, MOCK_SUPPLY_STOCK,
-  MOCK_URNAS, MOCK_URNA_LOTES, MOCK_CONSUMER_PRICES, DEFAULT_TENANT_ID,
-} from '../mocks/dummy-data';
+import { MOCK_MEMBERS, MOCK_CONSUMER_PRICES, DEFAULT_TENANT_ID } from '../mocks/dummy-data';
 import { computeSupplierLeadTime, LeadTimeResult } from '../lead-time';
 
 /**
@@ -40,28 +56,55 @@ interface TenantData {
  */
 @Injectable({ providedIn: 'root' })
 export class DataService {
-  // ----- Estado base como signals editables -----
-  private readonly _products = signal<Product[]>([...MOCK_PRODUCTS]);
-  private readonly _supplies = signal<Supply[]>([...MOCK_SUPPLIES]);
-  private readonly _recipes = signal<Recipe[]>([...MOCK_RECIPES]);
-  private readonly _productStock = signal<StockItem[]>([...MOCK_PRODUCT_STOCK]);
-  private readonly _supplyStock = signal<SupplyStockItem[]>([...MOCK_SUPPLY_STOCK]);
-  private readonly _kardex = signal<KardexEntry[]>([...MOCK_KARDEX]);
-  private readonly _sales = signal<SaleRecord[]>([...MOCK_SALES]);
-  private readonly _alerts = signal<Alert[]>([...MOCK_ALERTS]);
-  private readonly _predictions = signal<DemandPrediction[]>([...MOCK_PREDICTIONS]);
-  private readonly _pos = signal<PurchaseOrder[]>([...MOCK_PURCHASE_ORDERS]);
+  // ----- Stores por entidad (dueños del estado + persistencia vía StoreSync) -----
+  readonly productsStore = inject(ProductsStore);
+  readonly suppliesStore = inject(SuppliesStore);
+  readonly recipesStore = inject(RecipesStore);
+  readonly productStockStore = inject(ProductStockStore);
+  readonly supplyStockStore = inject(SupplyStockStore);
+  readonly kardexStore = inject(KardexStore);
+  readonly salesStore = inject(SalesStore);
+  readonly alertsStore = inject(AlertsStore);
+  readonly predictionsStore = inject(PredictionsStore);
+  readonly purchaseOrdersStore = inject(PurchaseOrdersStore);
+  readonly ordersStore = inject(OrdersStore);
+  readonly customersStore = inject(CustomersStore);
+  readonly returnedLotsStore = inject(ReturnedLotsStore);
+  readonly suppliersStore = inject(SuppliersStore);
+  readonly urnasStore = inject(UrnasStore);
+  readonly urnaLotesStore = inject(UrnaLotesStore);
+  readonly posSalesStore = inject(PosSalesStore);
+  readonly posClientesStore = inject(PosClientesStore);
+  readonly recurringOrdersStore = inject(RecurringOrdersStore);
+  readonly reservasStore = inject(ReservasStore);
+  private readonly storeSync = inject(StoreSync);
+
+  // ----- Getters internos: apuntan al signal de cada store, así toda la
+  // lógica de dominio existente (`this._x()`, `.update`, `.set`) sigue igual. -----
+  private get _products() { return this.productsStore.items; }
+  private get _supplies() { return this.suppliesStore.items; }
+  private get _recipes() { return this.recipesStore.items; }
+  private get _productStock() { return this.productStockStore.items; }
+  private get _supplyStock() { return this.supplyStockStore.items; }
+  private get _kardex() { return this.kardexStore.items; }
+  private get _sales() { return this.salesStore.items; }
+  private get _alerts() { return this.alertsStore.items; }
+  private get _predictions() { return this.predictionsStore.items; }
+  private get _pos() { return this.purchaseOrdersStore.items; }
+  private get _orders() { return this.ordersStore.items; }
+  private get _customers() { return this.customersStore.items; }
+  private get _returnedLots() { return this.returnedLotsStore.items; }
+  private get _suppliers() { return this.suppliersStore.items; }
+  private get _urnas() { return this.urnasStore.items; }
+  private get _urnaLotes() { return this.urnaLotesStore.items; }
+  private get _posSales() { return this.posSalesStore.items; }
+  private get _posClientes() { return this.posClientesStore.items; }
+  private get _recurringOrders() { return this.recurringOrdersStore.items; }
+  private get _reservas() { return this.reservasStore.items; }
+
+  // ----- Estado propio (no es una entidad persistida como colección) -----
+  /** Miembros: copia en memoria; la identidad real la gestiona MembersService/Functions. */
   private readonly _members = signal<Member[]>([...MOCK_MEMBERS]);
-  private readonly _orders = signal<CustomerOrder[]>([...MOCK_ORDERS]);
-  private readonly _customers = signal<Customer[]>([...MOCK_CUSTOMERS]);
-  private readonly _returnedLots = signal<ReturnedLot[]>([...MOCK_RETURNED_LOTS]);
-  private readonly _suppliers = signal<Supplier[]>([...MOCK_SUPPLIERS]);
-  private readonly _urnas = signal<Urna[]>([...MOCK_URNAS]);
-  private readonly _urnaLotes = signal<UrnaLote[]>([...MOCK_URNA_LOTES]);
-  private readonly _posSales = signal<PosSale[]>([]);
-  private readonly _posClientes = signal<PosCliente[]>([]);
-  private readonly _recurringOrders = signal<RecurringOrder[]>([]);
-  private readonly _reservas = signal<ReservaItem[]>([]);
   /** Plan de producción semanal recurrente (por día de la semana). */
   private readonly _weeklyPlan = signal<WeeklyProductionPlan>({});
   /** Entregas del plan al almacén ya realizadas (clave: fecha ISO). Evita doble entrega. */
@@ -69,17 +112,44 @@ export class DataService {
   /** Precio FINAL al consumidor por producto (catálogo de Ventas). */
   private readonly _consumerPrices = signal<Record<string, number>>({ ...MOCK_CONSUMER_PRICES });
   /**
-   * Adiciones MANUALES al carrito de pre-compra por proveedor. Es estado
-   * efímero (en-memoria) que se limpia al aprobar la pre-compra de ese
-   * proveedor. Estructura: { [supplierId]: [{ supplyId, qty }] }.
-   * No se persiste — la pre-compra sigue siendo "dinámica", esto es sólo
-   * una capa de overlay para que el usuario pueda agregar items.
+   * Adiciones MANUALES al carrito de pre-compra por proveedor. Estado efímero
+   * (en-memoria) que se limpia al aprobar la pre-compra. NO se persiste.
    */
   private readonly _manualAdditions = signal<Record<string, { supplyId: string; qty: number }[]>>({});
 
+  // ----- Backend (Firebase) — Fase 2 -----
+  // El estado de cada entidad vive en su store; la persistencia en Firestore la
+  // centraliza StoreSync. Aquí solo registramos los docs tipo Record (estado
+  // propio) y reconstruimos las alertas derivadas tras cargar el tenant.
+
   constructor() {
-    // Sembrar alertas auto-derivadas a partir del stock inicial.
+    // Docs tipo Record (no son colecciones): se cargan/persisten vía StoreSync.
+    this.storeSync.registerDoc({
+      path: 'consumer_prices/_all',
+      value: () => ({ values: this._consumerPrices() }),
+      read: v => this._consumerPrices.set((v as { values?: Record<string, number> }).values ?? {}),
+    });
+    this.storeSync.registerDoc({
+      path: 'app_state/weekly_plan',
+      value: () => ({ value: this._weeklyPlan() }),
+      read: v => this._weeklyPlan.set((v as { value?: WeeklyProductionPlan }).value ?? {}),
+    });
+    this.storeSync.registerDoc({
+      path: 'app_state/plan_deliveries',
+      value: () => ({ value: this._planDeliveries() }),
+      read: v => this._planDeliveries.set((v as { value?: Record<string, { at: Date; total: number }> }).value ?? {}),
+    });
+
+    // Tras cargar el tenant: recalcular el `status` del stock (no se persiste,
+    // se deriva del stock actual) y reconstruir las alertas derivadas.
+    // `untracked` evita el bucle: estas funciones leen y escriben los mismos signals.
     this.regenerateAutoAlerts();
+    effect(() => {
+      if (this.storeSync.ready()) untracked(() => {
+        this.recomputeStockStatuses();
+        this.regenerateAutoAlerts();
+      });
+    });
   }
 
   // ===================== Aislamiento por tenant =====================
@@ -315,13 +385,23 @@ export class DataService {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   );
 
-  /** Cola UNIFICADA de producción: pedidos de almacén + pedidos de cliente corroborados. */
+  /**
+   * Cola UNIFICADA de producción: pedidos de almacén + pedidos de cliente.
+   *
+   * El gate de "aceptación" (`acceptedBySalesAt`) solo aplica a pedidos
+   * `pending`: un pedido `pending` de cliente entra cuando ya fue corroborado
+   * por Ventas (o es de almacén). Los pedidos `in_production`/`completed` ya
+   * están dentro del flujo de producción, así que SIEMPRE entran (aunque les
+   * falte `acceptedBySalesAt`).
+   */
   readonly produccionQueue = computed(() =>
     this._orders()
       .filter(o =>
         o.status !== 'cancelled' && !o.deliveredToUrnaAt && !o.dispatchedAt &&
-        (o.status === 'pending' || o.status === 'in_production' || o.status === 'completed') &&
-        (!!o.urnaId || !!o.acceptedBySalesAt),
+        (
+          o.status === 'in_production' || o.status === 'completed' ||
+          (o.status === 'pending' && (!!o.urnaId || !!o.acceptedBySalesAt))
+        ),
       )
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   );
@@ -837,6 +917,11 @@ export class DataService {
   //  Órdenes de Compra
   // ============================================================
   createPurchaseOrder(input: Omit<PurchaseOrder, 'id' | 'code' | 'createdAt'>): PurchaseOrder {
+    // Consolidación: si ya existe una OC PENDIENTE del mismo proveedor y la
+    // misma fecha de llegada, fusionamos los items ahí en vez de crear otra.
+    const merged = this.tryMergeIntoExistingPO(input);
+    if (merged) return merged;
+
     const id = `po-${Date.now()}`;
     const code = `OC-${new Date().getFullYear()}-${Math.floor(Date.now() / 1000) % 10000}`;
     const po: PurchaseOrder = {
@@ -847,6 +932,52 @@ export class DataService {
     };
     this._pos.update(list => [po, ...list]);
     return po;
+  }
+
+  /**
+   * Busca una OC pendiente del mismo proveedor y misma fecha de llegada; si la
+   * encuentra, le suma los items (combinando líneas del mismo insumo/producto),
+   * recalcula el total y la devuelve. Devuelve `null` si no hay con qué fusionar
+   * (sin fecha de llegada definida no se consolida, para no mezclar OCs sueltas).
+   */
+  private tryMergeIntoExistingPO(input: Omit<PurchaseOrder, 'id' | 'code' | 'createdAt'>): PurchaseOrder | null {
+    if (!input.expectedDate) return null;
+    const target = this._pos().find(p =>
+      p.status === 'pending' &&
+      p.supplier === input.supplier &&
+      !!p.expectedDate && this.sameDay(p.expectedDate, input.expectedDate!)
+    );
+    if (!target) return null;
+
+    const items = this.mergePOItems(target.items, input.items);
+    const totalCost = items.reduce((sum, it) => sum + it.qty * it.unitCost, 0);
+    const updated: PurchaseOrder = { ...target, items, totalCost };
+    this._pos.update(list => list.map(p => p.id === target.id ? updated : p));
+    return updated;
+  }
+
+  /** Combina dos listas de líneas de OC: misma línea (insumo/producto) suma qty y toma el último costo. */
+  private mergePOItems(base: PurchaseOrderItem[], extra: PurchaseOrderItem[]): PurchaseOrderItem[] {
+    const keyOf = (it: PurchaseOrderItem) => it.supplyId ? `s:${it.supplyId}` : `p:${it.productId}`;
+    const map = new Map<string, PurchaseOrderItem>(base.map(it => [keyOf(it), { ...it }]));
+    for (const it of extra) {
+      const k = keyOf(it);
+      const existing = map.get(k);
+      if (existing) {
+        existing.qty += it.qty;
+        existing.unitCost = it.unitCost; // precio más reciente
+      } else {
+        map.set(k, { ...it });
+      }
+    }
+    return [...map.values()];
+  }
+
+  /** True si dos fechas caen el mismo día (ignora la hora). */
+  private sameDay(a: Date, b: Date): boolean {
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
   }
 
   updatePurchaseOrderStatus(id: string, status: POStatus, userName: string, userId: string) {
@@ -2213,6 +2344,23 @@ export class DataService {
   }
 
   /**
+   * Recalcula el `status` de TODO el stock (insumos y productos) a partir de la
+   * cantidad actual y los umbrales del insumo/producto. El `status` es una
+   * etiqueta DERIVADA: no se guarda en Firestore (ver StoreSync.derivedFields),
+   * se reconstruye aquí tras cargar el tenant para reflejar el stock actual.
+   */
+  recomputeStockStatuses(): void {
+    this._supplyStock.update(list => list.map(st => {
+      const s = this.supplyById(st.supplyId);
+      return s ? { ...st, status: this.computeStatus(st.quantity, s.reorderPoint, s.minStock) } : st;
+    }));
+    this._productStock.update(list => list.map(st => {
+      const p = this.productById(st.productId);
+      return { ...st, status: this.computeProductStatus(st.quantity, p?.reorderPoint, p?.minStock) };
+    }));
+  }
+
+  /**
    * Variante para productos: reorderPoint y minStock son opcionales. Si no están
    * definidos (producto sin monitoreo de reorden), el status es binario available/out.
    */
@@ -3450,25 +3598,22 @@ export class DataService {
   // ============================================================
 
   supplierById(id: string): Supplier | undefined {
-    return this._suppliers().find(s => s.id === id);
+    return this.suppliersStore.byId(id);
   }
 
+  /** ESCRIBIR: crea un proveedor (StoreSync lo persiste en Firestore). */
   createSupplier(input: Omit<Supplier, 'id' | 'createdAt'>): Supplier {
-    const s: Supplier = {
-      ...input,
-      id: `sup-${Date.now()}`,
-      createdAt: new Date(),
-    };
-    this._suppliers.update(list => [s, ...list]);
-    return s;
+    return this.suppliersStore.create(input);
   }
 
+  /** EDITAR: aplica cambios a un proveedor. */
   updateSupplier(id: string, patch: Partial<Omit<Supplier, 'id' | 'createdAt'>>): void {
-    this._suppliers.update(list => list.map(s => s.id === id ? { ...s, ...patch } : s));
+    this.suppliersStore.update(id, patch);
   }
 
+  /** ELIMINAR un proveedor. */
   deleteSupplier(id: string): void {
-    this._suppliers.update(list => list.filter(s => s.id !== id));
+    this.suppliersStore.delete(id);
   }
 
   /** True si hoy es día de pedidos según la ventana del proveedor. */
@@ -3517,33 +3662,33 @@ export class DataService {
       const wantedCost = byId.get(s.id);
 
       if (!existing && !shouldHave) return s; // nada que hacer
+      let next: Supplier = s;
       if (existing && !shouldHave) {
         // Remover
-        return {
+        next = {
           ...s,
           suppliedItems: s.suppliedItems.filter(
             i => !(i.kind === 'supply' && i.itemId === supplyId)
           ),
         };
-      }
-      if (!existing && shouldHave) {
+      } else if (!existing && shouldHave) {
         // Agregar
-        return {
+        next = {
           ...s,
           suppliedItems: [...s.suppliedItems, { kind: 'supply', itemId: supplyId, unitCost: wantedCost }],
         };
-      }
-      // Actualizar precio si cambió
-      if (existing && shouldHave && existing.unitCost !== wantedCost) {
-        return {
+      } else if (existing && shouldHave && existing.unitCost !== wantedCost) {
+        // Actualizar precio si cambió
+        next = {
           ...s,
           suppliedItems: s.suppliedItems.map(i =>
             i.kind === 'supply' && i.itemId === supplyId ? { ...i, unitCost: wantedCost } : i
           ),
         };
       }
-      return s;
+      return next;
     }));
+    // El cambio en el signal de proveedores lo persiste StoreSync por diff.
     // Tras cualquier cambio en proveedores/precios, refrescar el costo
     // promedio del insumo. Si ningún proveedor tiene precio, queda el manual.
     this.recomputeSupplyCostFromSuppliers(supplyId);

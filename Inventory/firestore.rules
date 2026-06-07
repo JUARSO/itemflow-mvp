@@ -25,10 +25,12 @@ service cloud.firestore {
         || (isMemberOf(tid) && claimRole() == 'produccion'
             && col in ['products','supplies','recipes','product_stock','supply_stock',
                        'kardex','purchase_orders','suppliers','alerts','predictions',
-                       'returned_lots','reservas'])
+                       'returned_lots','reservas','sale_records','app_state',
+                       'urnas','urna_lotes'])
         || (isMemberOf(tid) && claimRole() == 'ventas'
             && col in ['customers','orders','pos_sales','pos_clientes','urnas',
-                       'urna_lotes','recurring_orders','consumer_prices']);
+                       'urna_lotes','recurring_orders','consumer_prices',
+                       'sale_records']);
     }
 
     // -------- Tenant + sus datos (aislados por tenantId) --------

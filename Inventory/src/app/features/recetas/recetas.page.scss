@@ -114,3 +114,24 @@
       padding-top: var(--ui-sp-3);
       border-top: var(--ui-border-w-sm) solid var(--ui-border);
     }
+
+    /* Filtro por plantilla (chips) */
+    .tpl-filter {
+      display: flex; flex-wrap: wrap; gap: var(--ui-sp-2);
+      margin: 0 var(--ui-sp-4) var(--ui-sp-3);
+    }
+    .tpl-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      background: var(--ui-surface);
+      border: var(--ui-border-w-sm) solid var(--ui-border-strong);
+      border-radius: 999px;
+      font-size: var(--ui-fs-sm); font-weight: var(--ui-fw-bold);
+      color: var(--ui-text); cursor: pointer;
+    }
+    .tpl-chip--on { background: var(--ui-text); color: var(--ui-surface); }
+    .tpl-chip__count {
+      font-variant-numeric: tabular-nums;
+      font-size: var(--ui-fs-xs);
+      opacity: 0.7;
+    }

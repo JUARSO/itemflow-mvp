@@ -1,10 +1,10 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { IonButton } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
 import { Member, UserRole } from '../../core/models';
-import { DataService } from '../../core/services/data.service';
+import { MembersService } from '../../core/services/members.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 
 @Component({
@@ -17,7 +17,7 @@ import { ToastService } from '../../shared/components/toast/toast.service';
 })
 export class MiembroFormModalComponent {
   private readonly fb = inject(FormBuilder);
-  private readonly data = inject(DataService);
+  private readonly members = inject(MembersService);
   private readonly toast = inject(ToastService);
 
   readonly isOpen = input.required<boolean>();
@@ -25,19 +25,25 @@ export class MiembroFormModalComponent {
   readonly closed = output<void>();
   readonly saved = output<void>();
 
+  readonly saving = signal(false);
+
   readonly form = this.fb.group({
     displayName: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     email: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     role: this.fb.control<UserRole>('ventas', { nonNullable: true, validators: [Validators.required] }),
+    password: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.minLength(6)] }),
   });
 
   constructor() {
     effect(() => {
       const m = this.editing();
       if (m) {
-        this.form.reset({ displayName: m.displayName, email: m.email, role: m.role });
+        // Al editar solo cambia el rol: el correo/contraseña no aplican.
+        this.form.reset({ displayName: m.displayName, email: m.email, role: m.role, password: '' });
+        this.form.controls.password.disable();
       } else if (this.isOpen()) {
-        this.form.reset({ displayName: '', email: '', role: 'ventas' });
+        this.form.reset({ displayName: '', email: '', role: 'ventas', password: '' });
+        this.form.controls.password.enable();
       }
     });
   }
@@ -56,17 +62,25 @@ export class MiembroFormModalComponent {
     }
     const v = this.form.getRawValue();
     const editing = this.editing();
-    if (editing) {
-      this.data.updateMemberRole(editing.uid, v.role);
-      await this.toast.show(`Rol de "${editing.displayName}" actualizado a ${this.roleLabel(v.role)}.`);
-    } else {
-      this.data.inviteMember({
-        email: v.email.trim().toLowerCase(),
-        displayName: v.displayName.trim(),
-        role: v.role,
-      });
-      await this.toast.show(`${v.displayName} invitado como ${this.roleLabel(v.role)}.`);
+    this.saving.set(true);
+    try {
+      if (editing) {
+        await this.members.update(editing.uid, { role: v.role, displayName: v.displayName.trim() });
+        await this.toast.show(`Miembro "${v.displayName.trim()}" actualizado (${this.roleLabel(v.role)}).`);
+      } else {
+        await this.members.invite({
+          email: v.email.trim().toLowerCase(),
+          displayName: v.displayName.trim(),
+          role: v.role,
+          password: v.password,
+        });
+        await this.toast.show(`${v.displayName} creado como ${this.roleLabel(v.role)}.`);
+      }
+      this.saved.emit();
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo guardar el miembro.', 'danger');
+    } finally {
+      this.saving.set(false);
     }
-    this.saved.emit();
   }
 }

@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { EnvironmentInjector, Injectable, effect, inject, runInInjectionContext, signal } from '@angular/core';
+import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
+import { AuthService } from './auth.service';
 
 /**
  * Define un tema visual. Cada tema sobreescribe los tokens de marca
@@ -148,15 +150,29 @@ const DEFAULT_THEME_ID = 'sage';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
+  private readonly firestore = inject(Firestore);
+  private readonly auth = inject(AuthService);
+  private readonly injector = inject(EnvironmentInjector);
+
+  /** Ejecuta una llamada a Firebase dentro del contexto de inyección (AngularFire lo exige). */
+  private inCtx<T>(fn: () => T): T { return runInInjectionContext(this.injector, fn); }
+
   readonly availableThemes = THEME_PRESETS;
   private readonly _currentId = signal<string>(this.readInitialId());
   readonly currentId = this._currentId.asReadonly();
 
   constructor() {
     this.applyTheme(this._currentId());
+    // Carga el tema real del tenant desde Firestore cuando hay sesión.
+    effect(() => {
+      if (this.auth.authReady() && this.auth.isAuthenticated()) {
+        void this.loadFromFirestore(this.auth.tenantId());
+      }
+    });
   }
 
-  setTheme(id: string) {
+  /** Aplica el tema localmente (signal + caché) y lo guarda en Firestore (solo admin). */
+  async setTheme(id: string): Promise<void> {
     const preset = THEME_PRESETS.find(t => t.id === id);
     if (!preset) return;
     this._currentId.set(id);
@@ -164,10 +180,40 @@ export class ThemeService {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, id);
     }
+    await this.persistRemote(id);
   }
 
   current(): ThemePreset {
     return THEME_PRESETS.find(t => t.id === this._currentId()) ?? THEME_PRESETS[0];
+  }
+
+  private settingsRef(tenantId: string) {
+    return doc(this.firestore, `tenants/${tenantId}/settings/app`);
+  }
+
+  /** Lee el tema del tenant desde Firestore y lo aplica (si existe). */
+  private async loadFromFirestore(tenantId: string): Promise<void> {
+    try {
+      const snap = await this.inCtx(() => getDoc(this.settingsRef(tenantId)));
+      const id = snap.exists() ? (snap.data()['themeId'] as string | undefined) : undefined;
+      if (!id || !THEME_PRESETS.some(t => t.id === id)) return;
+      this._currentId.set(id);
+      this.applyTheme(id);
+      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, id);
+    } catch (e) {
+      console.error('No se pudo cargar el tema del tenant:', e);
+    }
+  }
+
+  /** Escribe el tema en Firestore (merge). Requiere admin por reglas. */
+  private async persistRemote(id: string): Promise<void> {
+    if (!this.auth.isAuthenticated()) return;
+    try {
+      await this.inCtx(() => setDoc(this.settingsRef(this.auth.tenantId()), { themeId: id }, { merge: true }));
+    } catch (e) {
+      console.error('No se pudo guardar el tema en Firestore:', e);
+      throw new Error('No se pudo guardar la apariencia. Verifica tu conexión o permisos.');
+    }
   }
 
   private readInitialId(): string {

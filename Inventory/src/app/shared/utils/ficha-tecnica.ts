@@ -6,6 +6,9 @@
  * diálogo del navegador. Sin dependencias externas.
  */
 
+import { recipeTemplate, templateSections } from '../../core/recipe-templates';
+import { RecipeTemplateId } from '../../core/models';
+
 export interface FichaSize {
   alto?: string;
   largo?: string;
@@ -28,6 +31,7 @@ export interface FichaTecnicaData {
   procedure: string[];
   laminationThickness?: string;
   fermentationTime?: string;
+  beatingTime?: string;
   ovenTempTop?: string;
   ovenTempBottom?: string;
   bakingTime?: string;
@@ -37,6 +41,8 @@ export interface FichaTecnicaData {
   notes?: string;
   /** Foto del producto (data URL o ruta). */
   imageUrl?: string;
+  /** Plantilla: define qué secciones muestra la ficha. Por defecto 'panaderia'. */
+  template?: RecipeTemplateId;
 }
 
 function esc(v: unknown): string {
@@ -73,8 +79,21 @@ function sizeRow(label: string, s?: FichaSize): string {
   </tr>`;
 }
 
+/** Secciones (booleans compartidos) + títulos propios de la ficha por plantilla. */
+function sectionsFor(template: RecipeTemplateId | undefined) {
+  const s = templateSections(template);
+  const ovenTitle = template === 'reposteria' ? 'Batido y horneo' : 'Laminado y horneo';
+  const decoTitle = template === 'bebida' ? 'Presentación y servicio'
+    : template === 'reposteria' ? 'Decoración y montaje'
+    : 'Tipo de remate / decoración';
+  return { ...s, ovenTitle, decoTitle };
+}
+
 function buildHtml(d: FichaTecnicaData): string {
   const today = new Date().toLocaleDateString('es-CR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const tpl = recipeTemplate(d.template);
+  const accent = tpl.accent;
+  const sec = sectionsFor(d.template);
 
   const ingredientsRows = d.ingredients.length
     ? d.ingredients.map(it => `<tr>
@@ -99,11 +118,11 @@ function buildHtml(d: FichaTecnicaData): string {
     color: #16202E; margin: 0; padding: 28px 32px; font-size: 12px; line-height: 1.45;
   }
   .head { display: flex; justify-content: space-between; align-items: flex-start;
-    border-bottom: 3px solid #16284B; padding-bottom: 10px; margin-bottom: 16px; }
-  .head h1 { font-size: 20px; margin: 0; color: #16284B; letter-spacing: 0.04em; }
+    border-bottom: 3px solid ${accent}; padding-bottom: 10px; margin-bottom: 16px; }
+  .head h1 { font-size: 20px; margin: 0; color: ${accent}; letter-spacing: 0.04em; }
   .head .brand { font-size: 11px; color: #5A6473; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
   .head .meta { text-align: right; font-size: 10px; color: #5A6473; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #16284B;
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: ${accent};
     margin: 18px 0 6px; border-bottom: 1px solid #C8A24B; padding-bottom: 3px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
   th, td { border: 1px solid #C2CAD6; padding: 5px 8px; text-align: left; vertical-align: top; }
@@ -130,10 +149,8 @@ function buildHtml(d: FichaTecnicaData): string {
       <div class="brand">${esc(d.brand)}</div>
       <h1>Ficha Técnica</h1>
     </div>
-    <div class="meta">Generado: ${esc(today)}</div>
+    <div class="meta">${esc(tpl.label)}<br/>Generado: ${esc(today)}</div>
   </div>
-
-  ${d.imageUrl ? `<div class="hero"><img src="${esc(d.imageUrl)}" alt="${esc(d.productName)}" /></div>` : ''}
 
   <h2>Producto</h2>
   <div class="two-col">
@@ -146,13 +163,13 @@ function buildHtml(d: FichaTecnicaData): string {
         <tr><th>Almacenamiento</th><td>${dash(d.storage)}</td></tr>
       </table>
     </div>
-    <div>
+    ${sec.weights ? `<div>
       <table class="kv">
         <tr><th>Peso por unidad (crudo)</th><td>${d.weightRaw != null ? esc(d.weightRaw) + ' g' : '—'}</td></tr>
         <tr><th>Peso por unidad (horneado)</th><td>${d.weightBaked != null ? esc(d.weightBaked) + ' g' : '—'}</td></tr>
         <tr><th>Peso por unidad (final)</th><td>${d.weightFinal != null ? esc(d.weightFinal) + ' g' : '—'}</td></tr>
       </table>
-    </div>
+    </div>` : ''}
   </div>
 
   <h2>Receta</h2>
@@ -164,27 +181,31 @@ function buildHtml(d: FichaTecnicaData): string {
   <h2>Procedimiento</h2>
   ${procedureItems}
 
-  <h2>Laminado y horneo</h2>
-  <table class="specs">
-    <tr><th>Gruesor del laminado</th><td>${dash(d.laminationThickness)}</td>
-        <th>Temperatura de horneo</th><td>${ovenLabel(d)}</td></tr>
-    <tr><th>Tiempo de fermentación</th><td>${dash(d.fermentationTime)}</td>
-        <th>Tiempo de horneo</th><td>${dash(d.bakingTime)}</td></tr>
-  </table>
+  ${(sec.lamination || sec.fermentation || sec.beating || sec.oven) ? `
+  <h2>${esc(sec.ovenTitle)}</h2>
+  <table class="kv">
+    ${sec.lamination ? `<tr><th>Gruesor del laminado</th><td>${dash(d.laminationThickness)}</td></tr>` : ''}
+    ${sec.fermentation ? `<tr><th>Tiempo de fermentación</th><td>${dash(d.fermentationTime)}</td></tr>` : ''}
+    ${sec.beating ? `<tr><th>Tiempo de batido</th><td>${dash(d.beatingTime)}</td></tr>` : ''}
+    ${sec.oven ? `<tr><th>Temperatura de horneo</th><td>${ovenLabel(d)}</td></tr>
+    <tr><th>Tiempo de horneo</th><td>${dash(d.bakingTime)}</td></tr>` : ''}
+  </table>` : ''}
 
+  ${sec.sizes ? `
   <h2>Medidas</h2>
   <table>
     <thead><tr><th></th><th>Alto</th><th>Largo</th><th>Ancho</th><th>Diámetro</th></tr></thead>
     <tbody>
-      ${sizeRow('Producto fermentado', d.fermentedSize)}
+      ${sec.fermentation ? sizeRow('Producto fermentado', d.fermentedSize) : ''}
       ${sizeRow('Producto terminado', d.finishedSize)}
     </tbody>
-  </table>
+  </table>` : ''}
 
-  <h2>Tipo de remate / decoración</h2>
-  <p>${dash(d.decoration)}</p>
+  ${sec.decoration ? `<h2>${esc(sec.decoTitle)}</h2><p>${dash(d.decoration)}</p>` : ''}
 
   ${d.notes ? `<h2>Observaciones</h2><p>${esc(d.notes)}</p>` : ''}
+
+  ${d.imageUrl ? `<h2>Imagen del producto</h2><div class="hero"><img src="${esc(d.imageUrl)}" alt="${esc(d.productName)}" /></div>` : ''}
 
   <div class="footer">${esc(d.brand)} · Ficha técnica de producción · ${esc(d.productName)}</div>
 </body>

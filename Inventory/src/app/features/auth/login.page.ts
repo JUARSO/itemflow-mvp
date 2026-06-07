@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { IonContent, IonButton, NavController } from '@ionic/angular/standalone';
+import { IonContent, IonButton, IonIcon, NavController } from '@ionic/angular/standalone';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
@@ -10,7 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule, RouterLink,
-    IonContent, IonButton,
+    IonContent, IonButton, IonIcon,
   ],
   templateUrl: './login.page.html',
   styleUrls: ['./login.page.scss'],
@@ -22,19 +22,24 @@ export class LoginPage {
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  /** Mostrar/ocultar el texto de la contraseña. */
+  readonly showPwd = signal(false);
 
   readonly form = this.fb.group({
-    email: this.fb.control('admin@demo.cr', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    password: this.fb.control('demo1234', { nonNullable: true, validators: [Validators.required, Validators.minLength(4)] }),
+    email: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
+    password: this.fb.control('', { nonNullable: true, validators: [Validators.required, Validators.minLength(6)] }),
   });
 
-  fillDemo(email: string) {
-    this.form.patchValue({ email, password: 'demo1234' });
+  /** ¿Mostrar el estado de error de un campo? (inválido y ya tocado/escrito). */
+  invalid(name: string): boolean {
+    const c = this.form.get(name);
+    return !!c && c.invalid && (c.touched || c.dirty);
   }
 
   async onSubmit() {
     if (this.form.invalid) {
-      this.error.set('Revisa los datos: email válido y contraseña de al menos 4 caracteres.');
+      this.form.markAllAsTouched(); // revela los errores visuales por campo
+      this.error.set('Revisa los campos marcados antes de continuar.');
       return;
     }
     this.error.set(null);

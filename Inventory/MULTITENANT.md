@@ -87,7 +87,12 @@ es lo que las reglas y los listeners de datos necesitan para aislar.
 4. En `app.config.ts` añadir providers: `provideFirebaseApp(() => initializeApp(environment.firebase))`,
    `provideFirestore(() => getFirestore())`, `provideAuth(() => getAuth())`.
 
-### Fase 1 — Auth real (identidad + tenant)
+### Fase 1 — Auth real (identidad + tenant) ✅ HECHA
+> Implementada y verificada contra emuladores (`npm run smoke:phase1`): registro de
+> empresa, custom claims `{tenantId, role}` y aislamiento entre tenants enforced por reglas.
+> Functions en `functions/` (`registerTenant`, `inviteMember`). `AuthService` reescrito
+> con `onAuthStateChanged` + `authReady`/`whenReady()` + `currentTenant`; guards async.
+> Emuladores requieren **JDK 21** (`npm run emulators`).
 5. **Cloud Function `onSignup`** (callable, en `functions/`): recibe `{ orgName, adminName, planId }`,
    y de forma atómica crea `tenants/{id}`, `tenants/{id}/members/{uid}`, `users/{uid} = { tenantId, role }`
    y fija **custom claims** `{ tenantId, role: 'admin' }` con el Admin SDK. Reemplaza

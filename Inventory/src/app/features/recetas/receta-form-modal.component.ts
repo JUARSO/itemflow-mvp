@@ -6,8 +6,10 @@ import { startWith } from 'rxjs';
 import { IonButton, IonIcon } from '@ionic/angular/standalone';
 import { FormModalComponent } from '../../shared/components/form-modal/form-modal.component';
 import { FormFieldComponent } from '../../shared/components/form-field/form-field.component';
-import { Recipe, RecipeSheet, RecipeSize } from '../../core/models';
+import { Recipe, RecipeSheet, RecipeSize, RecipeTemplateId } from '../../core/models';
+import { RECIPE_TEMPLATES, DEFAULT_RECIPE_TEMPLATE, templateSections } from '../../core/recipe-templates';
 import { DataService } from '../../core/services/data.service';
+import { StorageService } from '../../core/services/storage.service';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
@@ -25,6 +27,10 @@ export class RecetaFormModalComponent {
   private readonly fb = inject(FormBuilder);
   protected readonly data = inject(DataService);
   private readonly toast = inject(ToastService);
+  private readonly storage = inject(StorageService);
+
+  /** Catálogo de plantillas para el selector. */
+  protected readonly templates = RECIPE_TEMPLATES;
 
   readonly isOpen = input.required<boolean>();
   readonly editing = input<Recipe | null>(null);
@@ -34,6 +40,8 @@ export class RecetaFormModalComponent {
   readonly form = this.fb.group({
     productId: this.fb.control('', { nonNullable: true, validators: [Validators.required] }),
     yieldQty: this.fb.control(1, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    /** Tipo de plantilla (ficha técnica). */
+    templateId: this.fb.control<RecipeTemplateId>(DEFAULT_RECIPE_TEMPLATE, { nonNullable: true }),
     items: this.fb.array<ItemGroup>([]),
     // --- Ficha técnica ---
     storage: this.fb.control('', { nonNullable: true }),
@@ -43,6 +51,7 @@ export class RecetaFormModalComponent {
     procedure: this.fb.control('', { nonNullable: true }),
     laminationThickness: this.fb.control('', { nonNullable: true }),
     fermentationTime: this.fb.control('', { nonNullable: true }),
+    beatingTime: this.fb.control('', { nonNullable: true }),
     ovenTempBottom: this.fb.control('', { nonNullable: true }),
     ovenTempTop: this.fb.control('', { nonNullable: true }),
     bakingTime: this.fb.control('', { nonNullable: true }),
@@ -70,6 +79,16 @@ export class RecetaFormModalComponent {
     const id = this.productIdSig();
     return id ? this.data.productById(id) ?? null : null;
   });
+
+  private readonly templateIdSig = toSignal(
+    this.form.controls.templateId.valueChanges.pipe(startWith(this.form.controls.templateId.value)),
+    { initialValue: this.form.controls.templateId.value },
+  );
+
+  /** Secciones de ficha técnica visibles según la plantilla elegida. */
+  readonly sections = computed(() => templateSections(this.templateIdSig()));
+  /** Id de la plantilla seleccionada (para etiquetas dependientes). */
+  readonly currentTemplateId = computed(() => this.templateIdSig());
 
   /** Foto del producto (data URL) — se sube aparte del form reactivo. */
   readonly imageUrl = signal<string | undefined>(undefined);
@@ -165,6 +184,7 @@ export class RecetaFormModalComponent {
         this.form.patchValue({
           productId: r.productId,
           yieldQty: r.yieldQty,
+          templateId: r.templateId ?? DEFAULT_RECIPE_TEMPLATE,
           notes: r.notes ?? '',
           storage: s?.storage ?? '',
           weightRaw: s?.weightRaw ?? null,
@@ -173,6 +193,7 @@ export class RecetaFormModalComponent {
           procedure: (s?.procedure ?? []).join('\n'),
           laminationThickness: s?.laminationThickness ?? '',
           fermentationTime: s?.fermentationTime ?? '',
+          beatingTime: s?.beatingTime ?? '',
           ovenTempBottom: s?.ovenTempBottom ?? '',
           ovenTempTop: s?.ovenTempTop ?? '',
           bakingTime: s?.bakingTime ?? '',
@@ -263,6 +284,7 @@ export class RecetaFormModalComponent {
       procedure: procedure.length > 0 ? procedure : undefined,
       laminationThickness: txt(v.laminationThickness),
       fermentationTime: txt(v.fermentationTime),
+      beatingTime: txt(v.beatingTime),
       ovenTempBottom: txt(v.ovenTempBottom),
       ovenTempTop: txt(v.ovenTempTop),
       bakingTime: txt(v.bakingTime),
@@ -286,6 +308,19 @@ export class RecetaFormModalComponent {
       await this.toast.show('Producto no encontrado.', 'danger');
       return;
     }
+
+    // Imagen: si es una foto nueva (data URL) la subimos a Storage y guardamos
+    // la URL; si ya era una URL (sin cambios) o se quitó, se respeta tal cual.
+    let imageUrl = this.imageUrl();
+    if (StorageService.isDataUrl(imageUrl)) {
+      try {
+        imageUrl = await this.storage.uploadDataUrl(`recipes/${product.id}/photo.jpg`, imageUrl!);
+      } catch {
+        await this.toast.show('No se pudo subir la imagen.', 'danger');
+        return;
+      }
+    }
+
     const recipe: Recipe = {
       id: product.id,
       productId: product.id,
@@ -311,7 +346,8 @@ export class RecetaFormModalComponent {
         };
       }),
       sheet: this.buildSheet(v),
-      imageUrl: this.imageUrl(),
+      imageUrl,
+      templateId: v.templateId,
     };
     this.data.saveRecipe(recipe);
     await this.toast.show(`Receta de "${product.name}" guardada.`);

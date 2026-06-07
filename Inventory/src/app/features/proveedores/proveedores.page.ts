@@ -82,7 +82,11 @@ export class ProveedoresPage {
 
   async eliminar(s: Supplier) {
     if (!confirm(`¿Eliminar el proveedor "${s.name}"?`)) return;
-    this.data.deleteSupplier(s.id);
-    await this.toast.show(`Proveedor "${s.name}" eliminado.`);
+    try {
+      await this.data.deleteSupplier(s.id);
+      await this.toast.show(`Proveedor "${s.name}" eliminado.`);
+    } catch (e: unknown) {
+      await this.toast.show(e instanceof Error ? e.message : 'No se pudo eliminar el proveedor.', 'danger');
+    }
   }
 }

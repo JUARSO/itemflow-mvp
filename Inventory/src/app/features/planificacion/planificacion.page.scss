@@ -45,6 +45,46 @@
       .cob-row--head { display: none; }
     }
 
+    /* Resumen inicial: total a producir por producto */
+    .resumen {
+      margin: 0 var(--ui-sp-4) var(--ui-sp-4);
+      padding: var(--ui-sp-3);
+      background: var(--ui-surface);
+      border: var(--ui-border-w-md) solid var(--ui-border-strong);
+    }
+    .resumen__head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: var(--ui-sp-2);
+      margin-bottom: var(--ui-sp-2); flex-wrap: wrap;
+    }
+    .resumen__title { font-family: var(--ui-font-display); font-weight: var(--ui-fw-black); }
+    .resumen__head small { color: var(--ui-text-muted); font-size: var(--ui-fs-xs); }
+
+    .res-table { display: flex; flex-direction: column; }
+    .res-row {
+      display: grid;
+      grid-template-columns: 2fr 1.2fr 0.8fr;
+      gap: var(--ui-sp-2);
+      padding: 6px 0;
+      border-top: var(--ui-border-w-sm) dashed var(--ui-border);
+      font-size: var(--ui-fs-sm);
+    }
+    .res-row--head {
+      border-top: none;
+      font-size: var(--ui-fs-xs);
+      font-weight: var(--ui-fw-bold);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--ui-text-muted);
+    }
+    .res-row .num { text-align: right; }
+    .res-name { font-weight: var(--ui-fw-bold); }
+    @media (max-width: 560px) {
+      .res-row { grid-template-columns: 1fr auto; }
+      .res-name { grid-column: 1 / -1; }
+      .res-row .num { text-align: left; }
+      .res-row--head { display: none; }
+    }
+
     .kpis {
       display: grid;
       grid-template-columns: repeat(4, 1fr);

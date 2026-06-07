@@ -59,14 +59,6 @@ export class OcFormModalComponent {
     const refs = new Set(this.supplierItemRefs());
     return this.reventaProducts().filter(p => refs.has(`product:${p.id}`));
   });
-  readonly nonSupplierSupplies = computed(() => {
-    const refs = new Set(this.supplierItemRefs());
-    return this.data.activeSupplies().filter(s => !refs.has(`supply:${s.id}`));
-  });
-  readonly nonSupplierProducts = computed(() => {
-    const refs = new Set(this.supplierItemRefs());
-    return this.reventaProducts().filter(p => !refs.has(`product:${p.id}`));
-  });
 
   get lines(): FormArray<LineGroup> {
     return this.form.get('items') as FormArray<LineGroup>;
@@ -98,6 +90,11 @@ export class OcFormModalComponent {
    * fecha de entrega según su CALENDARIO (días de entrega), o today+leadTime.
    */
   onSupplierChange() {
+    // Los items dependen del proveedor: reiniciamos las líneas para no arrastrar
+    // selecciones de otro proveedor (el selector ahora solo muestra los suyos).
+    this.lines.clear();
+    this.addLine();
+
     const s = this.selectedSupplier();
     if (!s) return;
     if (!this.form.controls.expectedDate.value) {

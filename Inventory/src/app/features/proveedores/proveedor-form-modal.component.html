@@ -33,7 +33,7 @@
 
             <div class="row">
               <div class="field">
-                <label>Lead time (días entre pedido y entrega)</label>
+                <label>Lead time</label>
                 <input type="number" min="0" [value]="leadTimeDays()"
                   (input)="leadTimeDays.set(asNum($any($event.target).value))" />
               </div>

@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// ============================================================================
+//  Reglas de Storage multi-tenant. Las imágenes viven bajo
+//  `tenants/{tenantId}/...`. Solo los miembros del tenant (verificado por el
+//  custom claim `tenantId` del token) leen/escriben sus archivos.
+//  Subidas: solo imágenes y < 5 MB.
+// ============================================================================
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /tenants/{tenantId}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.token.tenantId == tenantId;
+      allow write: if request.auth != null
+                   && request.auth.token.tenantId == tenantId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.token.tenantId == tenantId;
+    }
+  }
+}

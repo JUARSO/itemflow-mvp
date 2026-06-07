@@ -15,6 +15,7 @@ import { RecetaFormModalComponent } from './receta-form-modal.component';
 import { SearchBarComponent } from '../../shared/components/search-bar/search-bar.component';
 import { BulkImportModalComponent, BulkImportConfig } from '../../shared/components/bulk-import/bulk-import-modal.component';
 import { Recipe, RecipeItem } from '../../core/models';
+import { RECIPE_TEMPLATES, DEFAULT_RECIPE_TEMPLATE } from '../../core/recipe-templates';
 import { printFichaTecnica } from '../../shared/utils/ficha-tecnica';
 import { UnitShortPipe } from '../../shared/pipes/unit-short.pipe';
 
@@ -45,13 +46,26 @@ export class RecetasPage {
   readonly recetaAEliminar = signal<Recipe | null>(null);
   readonly bulkOpen = signal(false);
 
+  /** Plantillas para el filtro (con opción "Todas"). */
+  protected readonly templates = RECIPE_TEMPLATES;
+  /** Filtro de plantilla: 'all' o un id de plantilla. */
+  readonly templateFilter = signal<string>('all');
+
   readonly query = signal('');
   readonly recipesFiltradas = computed(() => {
     const q = this.query().trim().toLowerCase();
-    const list = this.data.recipes();
-    if (!q) return list;
-    return list.filter(x => x.productName.toLowerCase().includes(q));
+    const tpl = this.templateFilter();
+    return this.data.recipes().filter(x => {
+      const matchQ = !q || x.productName.toLowerCase().includes(q);
+      const matchTpl = tpl === 'all' || (x.templateId ?? DEFAULT_RECIPE_TEMPLATE) === tpl;
+      return matchQ && matchTpl;
+    });
   });
+
+  /** Cantidad de recetas por plantilla, para los chips del filtro. */
+  countByTemplate(id: string): number {
+    return this.data.recipes().filter(r => (r.templateId ?? DEFAULT_RECIPE_TEMPLATE) === id).length;
+  }
 
   readonly bulkConfig: BulkImportConfig<Recipe> = {
     entityLabel: 'receta',
@@ -219,6 +233,7 @@ El producto destino y los componentes deben existir previamente. No se permite a
       procedure: s?.procedure ?? [],
       laminationThickness: s?.laminationThickness,
       fermentationTime: s?.fermentationTime,
+      beatingTime: s?.beatingTime,
       ovenTempTop: s?.ovenTempTop,
       ovenTempBottom: s?.ovenTempBottom,
       bakingTime: s?.bakingTime,
@@ -227,6 +242,7 @@ El producto destino y los componentes deben existir previamente. No se permite a
       decoration: s?.decoration,
       notes: recipe.notes,
       imageUrl: recipe.imageUrl,
+      template: recipe.templateId ?? DEFAULT_RECIPE_TEMPLATE,
     });
   }
 

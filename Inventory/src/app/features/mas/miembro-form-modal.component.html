@@ -1,6 +1,6 @@
     <app-form-modal
       [isOpen]="isOpen()"
-      [title]="editing() ? 'Editar miembro' : 'Invitar miembro'"
+      [title]="editing() ? 'Editar miembro' : 'Crear cuenta de miembro'"
       (dismissed)="closed.emit()">
 
       <form body [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
@@ -25,16 +25,22 @@
         </app-form-field>
 
         @if (!editing()) {
+          <app-form-field label="Contraseña temporal" [required]="true"
+            hint="El miembro entra con este correo y contraseña; podrá cambiarla luego.">
+            <input type="text" formControlName="password" autocomplete="off" placeholder="Mínimo 6 caracteres" />
+          </app-form-field>
+
           <p class="hint-block">
-            En el MVP la invitación crea el miembro directamente. En producción enviaría un email con un link de activación.
+            Solo el administrador puede crear cuentas de Ventas o Producción. La cuenta se crea de
+            inmediato; comparte el correo y la contraseña temporal con la persona.
           </p>
         }
       </form>
 
       <div footer>
-        <ion-button fill="clear" class="ghost" (click)="closed.emit()">Cancelar</ion-button>
-        <ion-button (click)="onSubmit()" [disabled]="form.invalid">
-          {{ editing() ? 'Guardar cambios' : 'Invitar' }}
+        <ion-button fill="clear" class="ghost" (click)="closed.emit()" [disabled]="saving()">Cancelar</ion-button>
+        <ion-button (click)="onSubmit()" [disabled]="form.invalid || saving()">
+          {{ saving() ? 'Guardando…' : (editing() ? 'Guardar cambios' : 'Crear cuenta') }}
         </ion-button>
       </div>
     </app-form-modal>

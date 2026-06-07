@@ -16,17 +16,37 @@
               autocomplete="email"
               placeholder="tu@empresa.com"
               class="input"
+              [class.input--invalid]="invalid('email')"
             />
+            @if (invalid('email')) {
+              <span class="field-error">
+                @if (form.controls.email.hasError('required')) { El correo es obligatorio. }
+                @else { Escribe un correo válido (ej: tu@empresa.com). }
+              </span>
+            }
 
             <label class="field-label" for="password">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              formControlName="password"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              class="input"
-            />
+            <div class="input-wrap">
+              <input
+                id="password"
+                [type]="showPwd() ? 'text' : 'password'"
+                formControlName="password"
+                autocomplete="current-password"
+                placeholder="••••••••"
+                class="input"
+                [class.input--invalid]="invalid('password')"
+              />
+              <button type="button" class="pwd-toggle" (click)="showPwd.set(!showPwd())"
+                      [attr.aria-label]="showPwd() ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+                <ion-icon [name]="showPwd() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+              </button>
+            </div>
+            @if (invalid('password')) {
+              <span class="field-error">
+                @if (form.controls.password.hasError('required')) { La contraseña es obligatoria. }
+                @else { La contraseña debe tener al menos 6 caracteres. }
+              </span>
+            }
 
             @if (error()) {
               <div class="error">{{ error() }}</div>
@@ -37,24 +57,8 @@
             </ion-button>
           </form>
 
+          <p class="alt"><a routerLink="/auth/forgot">¿Olvidaste tu contraseña?</a></p>
           <p class="alt">¿Tu empresa aún no está registrada? <a routerLink="/auth/register">Crea tu empresa</a></p>
-
-          <div class="demo">
-            <div class="demo__title">Usuarios demo</div>
-            <button type="button" class="demo__row" (click)="fillDemo('admin@demo.cr')">
-              <span class="demo__role demo__role--admin">ADMIN</span>
-              <span class="demo__email mono">admin&#64;demo.cr</span>
-            </button>
-            <button type="button" class="demo__row" (click)="fillDemo('produccion@demo.cr')">
-              <span class="demo__role demo__role--prod">PRODUCCIÓN</span>
-              <span class="demo__email mono">produccion&#64;demo.cr</span>
-            </button>
-            <button type="button" class="demo__row" (click)="fillDemo('ventas@demo.cr')">
-              <span class="demo__role demo__role--ventas">VENTAS</span>
-              <span class="demo__email mono">ventas&#64;demo.cr</span>
-            </button>
-            <p class="demo__hint">Contraseña: cualquiera ≥ 4 caracteres. Tap en un usuario para autocompletar.</p>
-          </div>
         </div>
       </div>
     </ion-content>

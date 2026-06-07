@@ -21,8 +21,12 @@ export class TenantContextService {
   private readonly tenants = inject(TenantService);
   private readonly data = inject(DataService);
 
-  /** Tenant actual (deriva del usuario); cae al demo si aún no hay sesión. */
-  readonly company = computed(() => this.tenants.byId(this.auth.tenantId()) ?? MOCK_COMPANY);
+  /**
+   * Tenant actual. Prioriza el doc real cargado desde Firestore por AuthService;
+   * cae al directorio local y, en último caso, al demo (cuando aún no hay sesión).
+   */
+  readonly company = computed(() =>
+    this.auth.currentTenant() ?? this.tenants.byId(this.auth.tenantId()) ?? MOCK_COMPANY);
   readonly tenantId = this.auth.tenantId;
 
   /** Suscripción y plan del tenant actual. */

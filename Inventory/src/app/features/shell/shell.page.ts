@@ -47,7 +47,7 @@ export class ShellPage {
   async logout() {
     // Cerrar el menú overlay antes de salir, para que no quede encima.
     await this.menuCtrl.close().catch(() => { /* sin menú abierto */ });
-    this.auth.logout();
+    await this.auth.logout();
     // navigateRoot resetea la pila de ion-router-outlet: sin esto, la página
     // anterior queda montada encima y la app "deja de responder".
     await this.navCtrl.navigateRoot('/auth/login', { animationDirection: 'back' });

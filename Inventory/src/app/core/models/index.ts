@@ -249,8 +249,10 @@ export interface RecipeSheet {
   procedure?: string[];
   /** Gruesor del laminado (ej. "3mm"). */
   laminationThickness?: string;
-  /** Tiempo de fermentación (ej. "12 horas"). */
+  /** Tiempo de fermentación (ej. "12 horas"). Panadería. */
   fermentationTime?: string;
+  /** Tiempo de batido (ej. "8 min a velocidad media"). Pastelería. */
+  beatingTime?: string;
   /** Temperatura de horneo (texto libre, ej. "200°C"). */
   ovenTempTop?: string;     // arriba
   ovenTempBottom?: string;  // abajo
@@ -263,6 +265,9 @@ export interface RecipeSheet {
   decoration?: string;
 }
 
+/** Tipo de plantilla (ficha técnica) que usa una receta. */
+export type RecipeTemplateId = 'panaderia' | 'reposteria' | 'bebida' | 'general';
+
 export interface Recipe {
   id: string;
   productId: string;
@@ -273,8 +278,10 @@ export interface Recipe {
   notes?: string;
   /** Ficha técnica de producción (campos extendidos). Opcional. */
   sheet?: RecipeSheet;
-  /** Foto del producto (data URL). Se muestra en la tarjeta y en la ficha. */
+  /** Foto del producto. URL de Firebase Storage (o data URL en datos legacy). */
   imageUrl?: string;
+  /** Tipo de plantilla de ficha técnica. Por defecto 'panaderia'. */
+  templateId?: RecipeTemplateId;
 }
 
 export interface StockItem {

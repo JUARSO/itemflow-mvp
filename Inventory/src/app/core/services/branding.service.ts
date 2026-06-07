@@ -1,14 +1,18 @@
-import { Injectable, signal } from '@angular/core';
+import { EnvironmentInjector, Injectable, effect, inject, runInInjectionContext, signal } from '@angular/core';
+import { Firestore, doc, getDoc, setDoc } from '@angular/fire/firestore';
+import { AuthService } from './auth.service';
+import { StorageService } from './storage.service';
 
 /**
- * Branding editable por el usuario: nombre visible y "logo".
+ * Branding por-tenant: nombre visible y "logo".
  *
  * Logo tiene dos modos:
  *  - `logoImage`: data URL (PNG redimensionado) — toma precedencia si está presente.
  *  - `logo`: emoji o texto corto (1-3 chars) usado como fallback.
  *
- * Todo se persiste en localStorage. El nombre legal/ID del tenant sigue siendo
- * administrado por TenantContextService.
+ * Persistencia: documento `tenants/{tenantId}/settings/app` en Firestore (fuente
+ * de verdad por empresa; solo el admin escribe, todos los miembros lo leen) +
+ * caché en localStorage para aplicar al instante y evitar parpadeo al cargar.
  */
 export interface Branding {
   displayName: string;
@@ -32,6 +36,14 @@ const MAX_RAW_BYTES = 2 * 1024 * 1024; // 2 MB
 
 @Injectable({ providedIn: 'root' })
 export class BrandingService {
+  private readonly firestore = inject(Firestore);
+  private readonly auth = inject(AuthService);
+  private readonly storage = inject(StorageService);
+  private readonly injector = inject(EnvironmentInjector);
+
+  /** Ejecuta una llamada a Firebase dentro del contexto de inyección (AngularFire lo exige). */
+  private inCtx<T>(fn: () => T): T { return runInInjectionContext(this.injector, fn); }
+
   private readonly _branding = signal<Branding>(this.readInitial());
   readonly branding = this._branding.asReadonly();
 
@@ -39,8 +51,15 @@ export class BrandingService {
     if (typeof document !== 'undefined') {
       document.title = this._branding().displayName;
     }
+    // Carga el branding real del tenant desde Firestore cuando hay sesión.
+    effect(() => {
+      if (this.auth.authReady() && this.auth.isAuthenticated()) {
+        void this.loadFromFirestore(this.auth.tenantId());
+      }
+    });
   }
 
+  /** Aplica un cambio localmente (signal + caché + título). No toca Firestore. */
   update(input: Partial<Branding>) {
     const current = this._branding();
     const next: Branding = {
@@ -50,13 +69,19 @@ export class BrandingService {
       logoImage: input.logoImage === '' ? undefined : (input.logoImage ?? current.logoImage),
     };
     this._branding.set(next);
-    this.persist(next);
+    this.persistLocal(next);
     if (typeof document !== 'undefined') {
       document.title = next.displayName;
     }
   }
 
-  /** Sube y procesa un archivo de imagen, redimensionándolo y guardándolo como data URL PNG. */
+  /** Aplica el cambio y lo guarda en Firestore (solo admin). Lanza si falla. */
+  async save(input: Partial<Branding>): Promise<void> {
+    this.update(input);
+    await this.persistRemote(this._branding());
+  }
+
+  /** Sube y procesa un archivo de imagen, lo guarda como data URL PNG y persiste. */
   async uploadLogoImage(file: File): Promise<void> {
     if (!file.type.startsWith('image/')) {
       throw new Error('El archivo debe ser una imagen.');
@@ -65,28 +90,64 @@ export class BrandingService {
       throw new Error('La imagen es demasiado grande (máx 2MB).');
     }
     const dataUrl = await this.resizeAndEncode(file);
-    this.update({ logoImage: dataUrl });
+    // Subir a Storage y guardar la URL (antes se guardaba el data URL en Firestore).
+    const url = await this.storage.uploadDataUrl('branding/logo.png', dataUrl);
+    await this.save({ logoImage: url });
   }
 
   /** Elimina la imagen y vuelve al logo textual. */
-  clearLogoImage() {
-    this.update({ logoImage: '' });
+  async clearLogoImage(): Promise<void> {
+    await this.storage.deletePath('branding/logo.png');
+    await this.save({ logoImage: '' });
   }
 
-  reset() {
+  async reset(): Promise<void> {
     this._branding.set({ ...DEFAULTS });
     if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY);
     if (typeof document !== 'undefined') document.title = DEFAULTS.displayName;
+    await this.persistRemote({ ...DEFAULTS });
   }
 
-  private persist(b: Branding) {
+  private settingsRef(tenantId: string) {
+    return doc(this.firestore, `tenants/${tenantId}/settings/app`);
+  }
+
+  /** Lee el branding del tenant desde Firestore y lo aplica (si existe). */
+  private async loadFromFirestore(tenantId: string): Promise<void> {
+    try {
+      const snap = await this.inCtx(() => getDoc(this.settingsRef(tenantId)));
+      const b = snap.exists() ? (snap.data()['branding'] as Partial<Branding> | undefined) : undefined;
+      if (!b) return;
+      const next: Branding = {
+        displayName: b.displayName?.trim() || DEFAULTS.displayName,
+        logo: b.logo?.trim() || DEFAULTS.logo,
+        logoImage: b.logoImage || undefined,
+      };
+      this._branding.set(next);
+      this.persistLocal(next);
+      if (typeof document !== 'undefined') document.title = next.displayName;
+    } catch (e) {
+      console.error('No se pudo cargar el branding del tenant:', e);
+    }
+  }
+
+  /** Escribe el branding en Firestore (merge). Requiere admin por reglas. */
+  private async persistRemote(b: Branding): Promise<void> {
+    if (!this.auth.isAuthenticated()) return;
+    try {
+      await this.inCtx(() => setDoc(this.settingsRef(this.auth.tenantId()), { branding: b }, { merge: true }));
+    } catch (e) {
+      console.error('No se pudo guardar el branding en Firestore:', e);
+      throw new Error('No se pudo guardar la marca. Verifica tu conexión o permisos.');
+    }
+  }
+
+  private persistLocal(b: Branding) {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(b));
-    } catch (e) {
-      // localStorage puede estar lleno; lo más probable es por la imagen.
-      console.error('No se pudo persistir branding:', e);
-      throw new Error('No se pudo guardar la imagen (almacenamiento lleno). Prueba con una imagen más pequeña.');
+    } catch {
+      // localStorage lleno (probablemente por la imagen). Firestore sigue siendo la verdad.
     }
   }
 

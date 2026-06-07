@@ -49,13 +49,33 @@ interface ProductionTask {
   overdue: boolean;
 }
 
+/** Línea de un día ya CONSOLIDADA por producto (suma de todos los lotes del día). */
+interface PlanLine {
+  productId: string;
+  productName: string;
+  unit: string;
+  totalQty: number;
+  /** Algún lote de esta línea tiene el inicio sugerido en el pasado. */
+  overdue: boolean;
+}
+
 interface DayBucket {
   date: Date;
   iso: string;
   isToday: boolean;
   isPast: boolean;
-  starting: ProductionTask[];
-  delivering: ProductionTask[];
+  starting: PlanLine[];
+  delivering: PlanLine[];
+}
+
+/** Resumen consolidado: total a producir por producto, sumando todos los lotes. */
+interface ProductSummary {
+  productId: string;
+  productName: string;
+  unit: string;
+  totalQty: number;
+  /** Cantidad de lotes (producto+fecha) que se agregan en este total. */
+  lots: number;
 }
 
 @Component({
@@ -192,6 +212,31 @@ export class PlanificacionPage {
   });
 
   /**
+   * Resumen inicial: TOTAL a producir por producto, consolidando todos los
+   * lotes (pedidos + plan semanal) sin importar la fecha de entrega. Sirve para
+   * ver de un vistazo cuánto hay que fabricar de cada producto en total.
+   */
+  readonly productionSummary = computed<ProductSummary[]>(() => {
+    const map = new Map<string, ProductSummary>();
+    for (const t of this.tasks()) {
+      const ex = map.get(t.productId);
+      if (ex) {
+        ex.totalQty += t.totalQty;
+        ex.lots += 1;
+      } else {
+        map.set(t.productId, {
+          productId: t.productId,
+          productName: t.productName,
+          unit: t.unit,
+          totalQty: t.totalQty,
+          lots: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty);
+  });
+
+  /**
    * Horizonte dinámico: desde hoy hasta la fecha de entrega más lejana
    * (mínimo 30 días para que se vea siempre algo).
    */
@@ -205,35 +250,47 @@ export class PlanificacionPage {
     return Math.max(MIN_HORIZON_DAYS, diffDays);
   });
 
-  /** Buckets diarios desde hoy hasta el horizonte. */
+  /**
+   * Buckets diarios desde hoy hasta el horizonte. Cada día consolida sus tareas
+   * POR PRODUCTO: si varios lotes del mismo producto inician (o se entregan) el
+   * mismo día, se muestran como una sola línea con la cantidad sumada.
+   */
   readonly days = computed<DayBucket[]>(() => {
     const start = this.today();
     const horizon = this.horizonDays();
-    const buckets = new Map<string, DayBucket>();
+    interface Acc { date: Date; iso: string; isToday: boolean; isPast: boolean; start: Map<string, PlanLine>; deliver: Map<string, PlanLine>; }
+    const buckets = new Map<string, Acc>();
     for (let i = 0; i < horizon; i++) {
       const d = new Date(start);
       d.setDate(d.getDate() + i);
       const iso = this.toIso(d);
-      buckets.set(iso, {
-        date: d,
-        iso,
-        isToday: i === 0,
-        isPast: false,
-        starting: [],
-        delivering: [],
-      });
+      buckets.set(iso, { date: d, iso, isToday: i === 0, isPast: false, start: new Map(), deliver: new Map() });
     }
-    // Bucket virtual para tareas atrasadas (las metemos en hoy)
     const today = buckets.get(this.todayIso());
+
+    const add = (map: Map<string, PlanLine>, t: ProductionTask) => {
+      const ex = map.get(t.productId);
+      if (ex) {
+        ex.totalQty += t.totalQty;
+        ex.overdue = ex.overdue || t.overdue;
+      } else {
+        map.set(t.productId, { productId: t.productId, productName: t.productName, unit: t.unit, totalQty: t.totalQty, overdue: t.overdue });
+      }
+    };
+
     for (const t of this.tasks()) {
-      const startIso = this.toIso(t.startDate);
-      const deliverIso = this.toIso(t.deliveryDate);
-      const startBucket = buckets.get(startIso) ?? today;
-      if (startBucket) startBucket.starting.push(t);
-      const deliverBucket = buckets.get(deliverIso);
-      if (deliverBucket) deliverBucket.delivering.push(t);
+      const startBucket = buckets.get(this.toIso(t.startDate)) ?? today;
+      if (startBucket) add(startBucket.start, t);
+      const deliverBucket = buckets.get(this.toIso(t.deliveryDate));
+      if (deliverBucket) add(deliverBucket.deliver, t);
     }
-    return Array.from(buckets.values());
+
+    const byQty = (a: PlanLine, b: PlanLine) => b.totalQty - a.totalQty;
+    return Array.from(buckets.values()).map(b => ({
+      date: b.date, iso: b.iso, isToday: b.isToday, isPast: b.isPast,
+      starting: Array.from(b.start.values()).sort(byQty),
+      delivering: Array.from(b.deliver.values()).sort(byQty),
+    }));
   });
 
   readonly nonEmptyDays = computed(() =>
